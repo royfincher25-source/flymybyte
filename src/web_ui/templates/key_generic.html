@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+
+{% block title %}{{ service_name }} — Ключи и мосты{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>
+        {% if service == 'shadowsocks' %}
+            <i class="bi bi-circle-fill text-warning"></i> Shadowsocks
+        {% elif service == 'vless' %}
+            <i class="bi bi-circle-fill text-success"></i> VLESS
+        {% elif service == 'hysteria2' %}
+            <i class="bi bi-lightning-charge-fill text-warning"></i> Hysteria 2
+            <span class="badge bg-secondary ms-1">Бета</span>
+        {% elif service == 'trojan' %}
+            <i class="bi bi-circle-fill text-info"></i> Trojan
+        {% elif service == 'tor' %}
+            <i class="bi bi-circle-fill text-danger"></i> Tor
+        {% endif %}
+    </h2>
+    <div>
+        <a href="{{ url_for('main.keys') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('main.key_config', service=service) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <h5 class="card-title">Ключ доступа</h5>
+            
+            {% if service == 'shadowsocks' %}
+            <p class="card-text text-muted">
+                Вставьте ключ Shadowsocks в формате:<br>
+                <code>ss://base64(method:password)@server:port#name</code>
+            </p>
+            <div class="mb-3">
+                <textarea 
+                    name="key" 
+                    id="key" 
+                    class="form-control" 
+                    rows="4"
+                    placeholder="ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpQYXNzd29yZDEyMw@server.example.com:9663#MyVPN"
+                    required
+                ></textarea>
+                <div class="form-text">
+                    Поддерживаются ключи с URL-safe base64 (с символами - и _)
+                </div>
+            </div>
+            
+            {% elif service == 'vless' %}
+            <p class="card-text text-muted">
+                Вставьте ключ VLESS в формате:<br>
+                <code>vless://uuid@server:port?encryption=none&security=tls&sni=...#name</code>
+            </p>
+            <div class="mb-3">
+                <textarea 
+                    name="key" 
+                    id="key" 
+                    class="form-control" 
+                    rows="4"
+                    placeholder="vless://xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx@server.example.com:443?security=tls&sni=...#name"
+                    required
+                ></textarea>
+                <div class="form-text">
+                    Ключ должен содержать UUID, сервер, порт и параметры безопасности
+                </div>
+            </div>
+            
+            {% elif service == 'hysteria2' %}
+            <div class="alert alert-warning small" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> <strong>Бета-версия!</strong> Hysteria 2 требует больше ресурсов и может нестабильно работать на роутерах с 128MB RAM (KN-1210/1211/1212). Рекомендуется для мощных Keenetic (KN-1810+).
+            </div>
+            <p class="card-text text-muted">
+                Вставьте ключ Hysteria 2 в формате:<br>
+                <code>hysteria2://password@sni@server:port?insecure=0#name</code>
+            </p>
+            <div class="mb-3">
+                <textarea 
+                    name="key" 
+                    id="key" 
+                    class="form-control" 
+                    rows="4"
+                    placeholder="hysteria2://password@sni.example.com@server.example.com:443#MyVPN"
+                    required
+                ></textarea>
+                <div class="form-text">
+                    Поддерживаются ключи с параметрами: insecure, obfs, obfspwd
+                </div>
+            </div>
+            
+            {% elif service == 'trojan' %}
+            <p class="card-text text-muted">
+                Вставьте ключ Trojan в формате:<br>
+                <code>trojan://password@server:port?security=tls&sni=...#name</code>
+            </p>
+            <div class="mb-3">
+                <textarea 
+                    name="key" 
+                    id="key" 
+                    class="form-control" 
+                    rows="4"
+                    placeholder="trojan:password@server.example.com:443?security=tls&sni=...#name"
+                    required
+                ></textarea>
+                <div class="form-text">
+                    Ключ должен содержать пароль, сервер и порт
+                </div>
+            </div>
+            
+            {% elif service == 'tor' %}
+            <p class="card-text text-muted">
+                Вставьте мосты Tor (каждый с новой строки):<br>
+                <code>bridge [transport] IP:ORPort [fingerprint] [options]</code>
+            </p>
+            <div class="mb-3">
+                <textarea 
+                    name="key" 
+                    id="key" 
+                    class="form-control" 
+                    rows="6"
+                    placeholder="bridge 192.0.2.1:443 AABBCCDD11223344556677889900DDEEFF112233
+bridge obfs4 192.0.2.2:8443 ... cert=... iat-mode=..."
+                    required
+                ></textarea>
+                <div class="form-text">
+                    Можно вводить несколько мостов, каждый с новой строки
+                </div>
+            </div>
+            {% endif %}
+            
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Сохранить и перезапустить
+                </button>
+                <a href="{{ url_for('main.keys') }}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i> Отмена
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<div class="card shadow-sm mt-4">
+    <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-question-circle"></i> Как получить ключ?</h5>
+        
+        {% if service == 'shadowsocks' %}
+        <p class="card-text">
+            Ключи Shadowsocks обычно предоставляются VPN-провайдерами в формате ссылки.
+            Если у вас есть ссылка вида <code>ss://...</code>, просто скопируйте её целиком.
+        </p>
+        <ul class="mb-0">
+            <li>Метод шифрования: chacha20-ietf-poly1305, aes-256-gcm, и др.</li>
+            <li>Пароль: случайная строка</li>
+            <li>Сервер и порт: предоставляются провайдером</li>
+        </ul>
+        
+        {% elif service == 'vless' %}
+        <p class="card-text">
+            Ключи VLESS генерируются сервером Xray/V2Ray.
+            Ссылка содержит UUID, настройки безопасности и транспорт.
+        </p>
+        <ul class="mb-0">
+            <li>UUID: уникальный идентификатор пользователя</li>
+            <li>Безопасность: tls, reality, none</li>
+            <li>Транспорт: tcp, ws, grpc</li>
+        </ul>
+        
+        {% elif service == 'hysteria2' %}
+        <p class="card-text">
+            Hysteria 2 — быстрый и устойчивый к блокировкам протокол на основе QUIC.
+            <strong class="text-warning">Требует больше оперативной памяти и CPU.</strong>
+        </p>
+        <ul class="mb-0">
+            <li>Пароль: случайная строка (auth)</li>
+            <li>SNI: домен для TLS сертификата</li>
+            <li>obfs: optional obfuscation (sensitive)</li>
+            <li>obfspwd: пароль для обфускации</li>
+        </ul>
+        <div class="alert alert-warning small mt-2 mb-0" role="alert">
+            <strong>Внимание:</strong> Не рекомендуется для Keenetic KN-1210/1211/1212 (128MB RAM)
+        </div>
+        
+        {% elif service == 'trojan' %}
+        <p class="card-text">
+            Ключи Trojan предоставляются сервером Trojan.
+            Ссылка содержит пароль и настройки TLS.
+        </p>
+        <ul class="mb-0">
+            <li>Пароль: случайная строка</li>
+            <li>TLS: обязательное шифрование</li>
+            <li>SNI: домен сервера</li>
+        </ul>
+        
+        {% elif service == 'tor' %}
+        <p class="card-text">
+            Мосты Tor можно получить:
+        </p>
+        <ul class="mb-0">
+            <li>На сайте <a href="https://bridges.torproject.org" target="_blank">bridges.torproject.org</a></li>
+            <li>В Telegram боте @GetBridgesBot</li>
+            <li>По запросу bridges@torproject.org (с Gmail)</li>
+        </ul>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

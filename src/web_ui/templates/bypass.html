@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Списки обхода — Bypass Keenetic{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-journal-text"></i> Списки обхода</h2>
+    <div>
+        <a href="{{ url_for('main.bypass_catalog') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-collection"></i> Каталог списков
+        </a>
+        <a href="{{ url_for('main.view_logs') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-file-text"></i> Логи
+        </a>
+        <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+{% if available_files %}
+<style>
+/* Выделение строки при наведении на список файлов */
+.bypass-files-list .list-group-item {
+    transition: background-color 0.2s ease;
+}
+.bypass-files-list .list-group-item:hover {
+    background-color: rgba(102, 126, 234, 0.1);
+    cursor: pointer;
+}
+</style>
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h5 class="card-title">Доступные файлы</h5>
+        <p class="card-text text-muted">Выберите файл для управления</p>
+        <ul class="list-group list-group-flush bypass-files-list">
+            {% for file in available_files %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="bi bi-file-earmark-text"></i> {{ file }}.txt
+                </span>
+                <div>
+                    <a href="{{ url_for('main.view_bypass', filename=file) }}" class="btn btn-sm btn-primary">
+                        <i class="bi bi-eye"></i> Управление
+                    </a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-warning" role="alert">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>Внимание:</strong> Файлы списков обхода не найдены.
+    Убедитесь, что установка выполнена корректно и директория существует.
+</div>
+{% endif %}
+
+<div class="card shadow-sm mt-4" style="margin-bottom: 3.5rem;">
+    <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-info-circle"></i> Информация</h5>
+        <p class="card-text">
+            Списки обхода используются для обхода блокировок сайтов через VPN.
+        </p>
+        <ul class="mb-0">
+            <li><strong>unblockvless.txt</strong> — список для VLESS proxy</li>
+            <li><strong>unblockhysteria2.txt</strong> — список для Hysteria 2 proxy</li>
+            <li><strong>unblockshadowsocks.txt</strong> — список для Shadowsocks proxy</li>
+            <li><strong>unblocktrojan.txt</strong> — список для Trojan proxy</li>
+            <li><strong>unblocktor.txt</strong> — список для Tor proxy</li>
+            <li><strong>vpn-*.txt</strong> — списки для дополнительных VPN</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

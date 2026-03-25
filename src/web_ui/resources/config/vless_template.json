@@ -1,0 +1,87 @@
+{
+	"log":{
+		"access":"/opt/etc/xray/access.log",
+		"error":"/opt/etc/xray/error.log",
+		"loglevel":"none"
+		},
+	"inbounds":[
+		{
+			"port":{{localportvless}},
+			"listen":"::",
+			"protocol":"dokodemo-door",
+			"settings":{
+				"network":"tcp",
+				"followRedirect":true
+				},
+			"sniffing":{
+				"enabled":true,
+				"destOverride":[
+					"http",
+					"tls"
+				]
+			}
+		}
+	],
+	"outbounds": [
+        {
+            "tag": "vless-outbound",
+            "protocol": "vless",
+            "settings": {
+                "vnext": [
+                    {
+                        "address": "{{address}}",
+                        "port": {{port}},
+                        "users": [
+                            {
+                                "id": "{{id}}",
+                                "flow": "{{flow}}",
+                                "encryption": "{{encryption}}",
+                                "level": 0
+                            }
+                        ]
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "{{type}}",
+                "security": "{{security}}",
+                "realitySettings": {
+                    "publicKey": "{{pbk}}",
+                    "fingerprint": "{{fp}}",
+                    "serverName": "{{sni}}",
+                    "shortId": "{{sid}}",
+                    "spiderX": "{{spx}}"
+                }
+            }
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom"
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {
+                "response": {
+                    "type": "http"
+                }
+            }
+        }
+    ],
+	"routing":{
+		"domainStrategy":"UseIP",
+		"rules":[
+			{
+				"type":"field",
+				"ip":["geoip:private"],
+				"outboundTag":"direct"
+			},
+			{
+				"type":"field",
+				"port":"0-65535",
+				"outboundTag":"vless-outbound",
+				"enabled":true
+			}
+		]
+	}
+}

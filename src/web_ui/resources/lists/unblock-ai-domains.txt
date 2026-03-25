@@ -1,0 +1,53 @@
+# Google AI Services Domains for DNS Spoofing
+# These domains are used for Google AI services and may be region-blocked
+# Format: one domain per line (no wildcards, no IPs)
+
+# Google AI Studio / Vertex AI
+aistudio.google.com
+*.aistudio.google.com
+ai.google
+ai.google.com
+*.ai.google.com
+
+# Gemini
+gemini.google.com
+*.gemini.google.com
+gemini.googleusercontent.com
+
+# Google Colab
+colab.research.google.com
+colab.google.com
+*.colab.research.google.com
+research.google.com
+*.research.google.com
+
+# Kaggle
+kaggle.com
+www.kaggle.com
+*.kaggle.com
+kaggleusercontent.com
+
+# Google DeepMind
+deepmind.google
+*.deepmind.google
+deepmind.com
+*.deepmind.com
+
+# Google Cloud AI
+cloud.google.com
+*.cloud.google.com
+console.cloud.google.com
+cloud.googleusercontent.com
+
+# TensorFlow
+tensorflow.org
+*.tensorflow.org
+www.tensorflow.org
+
+# Other Google AI services
+notebooks.googleusercontent.com
+*.notebooks.googleusercontent.com
+script.google.com
+*.script.google.com
+ml.googleapis.com
+generativelanguage.googleapis.com

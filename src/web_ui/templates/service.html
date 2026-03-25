@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}Сервис — Bypass Keenetic{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-gear"></i> Сервисное меню</h2>
+    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Назад
+    </a>
+</div>
+
+<!-- Системные характеристики -->
+<div class="card border-primary mb-4">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-memory"></i> Системные характеристики</span>
+        <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="auto-optimize-toggle">
+            <label class="form-check-label text-white small" for="auto-optimize-toggle">
+                Авто-оптимизация
+            </label>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <h6><i class="bi bi-memory"></i> RAM</h6>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar" id="mem-bar" role="progressbar" style="width: 0%">0%</div>
+                </div>
+                <small id="mem-text">Загрузка...</small>
+            </div>
+            <div class="col-md-3">
+                <h6><i class="bi bi-cpu"></i> CPU</h6>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar bg-warning" id="cpu-bar" role="progressbar" style="width: 0%">0%</div>
+                </div>
+                <small id="cpu-text">Загрузка...</small>
+            </div>
+            <div class="col-md-3">
+                <h6><i class="bi bi-database"></i> Cache</h6>
+                <div class="progress mb-2" style="height: 25px;">
+                    <div class="progress-bar bg-info" id="cache-bar" role="progressbar" style="width: 0%">0</div>
+                </div>
+                <small id="cache-text">Загрузка...</small>
+            </div>
+            <div class="col-md-3">
+                <h6><i class="bi bi-wifi"></i> DNS</h6>
+                <small id="dns-status">Загрузка...</small>
+                <div class="mt-2">
+                    <small id="optimize-mode" class="text-muted"></small>
+                </div>
+            </div>
+        </div>
+        <div class="mt-3">
+            <button class="btn btn-outline-primary btn-sm" onclick="manualOptimize()">
+                <i class="bi bi-lightning"></i> Оптимизировать память
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let autoOptimizeEnabled = false;
+
+async function updateStats() {
+    try {
+        const resp = await fetch('/api/system/stats');
+        const data = await resp.json();
+
+        // RAM - use percent (excluding cache) for accurate display
+        const memPercent = data.percent || 0;  // Real percent excluding cache
+        const memBar = document.getElementById('mem-bar');
+        memBar.style.width = memPercent + '%';
+        memBar.textContent = memPercent + '%';
+        
+        // Color based on real usage (excluding cache)
+        if (memPercent > 80) memBar.className = 'progress-bar bg-danger';
+        else if (memPercent > 60) memBar.className = 'progress-bar bg-warning';
+        else memBar.className = 'progress-bar bg-success';
+        
+        // Show detailed memory info with cache breakdown
+        const usedDisplay = data.real_used_mb || data.used_mb;
+        const cacheDisplay = data.cached_mb ? ` (кэш: ${data.cached_mb}MB)` : '';
+        const freeDisplay = `(свободно: ${data.available_mb || data.free_mb}MB)`;
+        document.getElementById('mem-text').textContent =
+            `${usedDisplay}MB / ${data.total_mb}MB${cacheDisplay} ${freeDisplay}`;
+        
+        // Cache
+        const cacheEntries = data.cache_entries || 0;
+        const cacheMax = data.cache_max || 30;
+        const cachePercent = cacheMax > 0 ? (cacheEntries / cacheMax) * 100 : 0;
+        const cacheBar = document.getElementById('cache-bar');
+        if (cacheBar) {
+            cacheBar.style.width = cachePercent + '%';
+            cacheBar.textContent = `${cacheEntries}/${cacheMax}`;
+        }
+        
+        // Update cache text with more info
+        let cacheText = `LRU entries: ${cacheEntries}/${cacheMax}`;
+        if (cacheEntries === 0) {
+            cacheText += ' (пусто)';
+        } else if (cacheEntries >= cacheMax) {
+            cacheText += ' (заполнен)';
+        }
+        const cacheTextEl = document.getElementById('cache-text');
+        if (cacheTextEl) {
+            cacheTextEl.textContent = cacheText;
+        }
+        
+        // CPU
+        const cpuPercent = data.cpu_percent || 0;
+        const cpuBar = document.getElementById('cpu-bar');
+        cpuBar.style.width = cpuPercent + '%';
+        cpuBar.textContent = cpuPercent + '%';
+        if (cpuPercent > 80) cpuBar.className = 'progress-bar bg-danger';
+        else if (cpuPercent > 60) cpuBar.className = 'progress-bar bg-warning';
+        else cpuBar.className = 'progress-bar bg-success';
+        document.getElementById('cpu-text').textContent = cpuPercent + '% загрузки';
+        
+        // DNS
+        const dnsInfo = data.dns_status;
+        let dnsText = '';
+        if (dnsInfo && dnsInfo.running) {
+            dnsText = `✅ ${dnsInfo.current_server || 'N/A'} | Failures: ${dnsInfo.failures}`;
+        } else {
+            dnsText = '⏸️ Остановлен';
+        }
+        document.getElementById('dns-status').textContent = dnsText;
+        
+        // Memory Manager
+        const mm = data.memory_manager;
+        autoOptimizeEnabled = mm.enabled;
+        document.getElementById('auto-optimize-toggle').checked = mm.enabled;
+        
+        let modeText = '';
+        if (mm.enabled) {
+            modeText = mm.aggressive ? '⚠️ Агрессивный режим' : '📊 Нормальный режим';
+        } else {
+            modeText = '⏸️ Отключено';
+        }
+        document.getElementById('optimize-mode').textContent = modeText;
+        
+    } catch (e) {
+        console.error('Failed to load stats:', e);
+    }
+}
+
+async function toggleAutoOptimize() {
+    const enabled = document.getElementById('auto-optimize-toggle').checked;
+    const action = enabled ? 'enable' : 'disable';
+    try {
+        const resp = await fetch(`/api/system/memory-manager/${action}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const data = await resp.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.error || 'Ошибка', 'danger');
+        }
+        updateStats();
+    } catch (e) {
+        console.error('Failed to toggle:', e);
+    }
+}
+
+async function manualOptimize() {
+    try {
+        const resp = await fetch('/api/system/optimize', {method: 'POST'});
+        const data = await resp.json();
+        if (data.success) {
+            showToast(data.message, 'success');
+        } else {
+            showToast(data.error || 'Ошибка', 'danger');
+        }
+        updateStats();
+    } catch (e) {
+        console.error('Failed to optimize:', e);
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div>`;
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    toast.addEventListener('hidden.bs.toast', () => toast.remove());
+}
+
+document.getElementById('auto-optimize-toggle').addEventListener('change', toggleAutoOptimize);
+updateStats();
+// Update stats every 10 seconds (reduced from 5 for KN-1212 performance)
+setInterval(updateStats, 10000);
+</script>
+
+<div class="row g-4">
+    <!-- Перезапуск Unblock-сервиса -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-shield-check"></i> Перезапуск Unblock</h5>
+                <p class="text-muted small">Перезапуск сервиса обхода блокировок</p>
+                <form method="POST" action="{{ url_for('main.service_restart_unblock') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Перезапустить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Перезапуск роутера -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-router"></i> Перезапуск роутера</h5>
+                <p class="text-muted small">Перезагрузка всего роутера (~2 минуты)</p>
+                <form method="POST" action="{{ url_for('main.service_restart_router') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-warning btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Перезапустить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- DNS Override -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-globe"></i> DNS Override</h5>
+                <p class="text-muted small">Перенаправление DNS запросов через роутер</p>
+                
+                <!-- Статус DNS Override -->
+                <div class="mb-2">
+                    {% set dns_status = 'ВКЛ' if dns_override_enabled else 'ВЫКЛ' %}
+                    {% set dns_class = 'success' if dns_override_enabled else 'secondary' %}
+                    <span class="badge bg-{{ dns_class }}">
+                        <i class="bi bi-{{ 'check-circle' if dns_override_enabled else 'x-circle' }}"></i>
+                        DNS Override: {{ dns_status }}
+                    </span>
+                    {% if dns_override_enabled %}
+                        <small class="text-success ms-2">Активно</small>
+                    {% else %}
+                        <small class="text-muted ms-2">Неактивно</small>
+                    {% endif %}
+                </div>
+                
+                <form method="POST" action="{{ url_for('main.service_dns_override', action='on') }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-success btn-sm">ВКЛ</button>
+                </form>
+                <form method="POST" action="{{ url_for('main.service_dns_override', action='off') }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger btn-sm">ВЫКЛ</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- DNS Монитор -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-activity"></i> DNS Монитор</h5>
+                <p class="text-muted small">Автоматическое переключение при отказе DNS</p>
+                <a href="{{ url_for('main.dns_monitor_status') }}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-gear"></i> Настроить
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- DNS-обход AI-доменов -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-globe2"></i> DNS-обход AI</h5>
+                <p class="text-muted small">Обход блокировок AI-сервисов через DNS</p>
+                <a href="{{ url_for('main.dns_spoofing') }}" class="btn btn-info btn-sm">
+                    <i class="bi bi-gear"></i> Настроить
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Перезапуск всех сервисов -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-arrow-repeat"></i> Перезапуск всех сервисов</h5>
+                <p class="text-muted small">VLESS, Shadowsocks, Trojan, Tor</p>
+                <form method="POST" action="{{ url_for('main.service_restart_all') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-info btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Перезапустить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Бэкап -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-hdd"></i> Бэкап</h5>
+                <p class="text-muted small">Создание резервной копии конфигов</p>
+                <form method="POST" action="{{ url_for('main.service_backup') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-download"></i> Создать
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Обновления -->
+    <div class="col-12 col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-arrow-repeat"></i> Обновления</h5>
+                <p class="text-muted small">Проверка и установка обновлений</p>
+                <a href="{{ url_for('main.service_updates') }}" class="btn btn-secondary btn-sm">
+                    <i class="bi bi-search"></i> Проверить
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Логи -->
+    <div class="col-12 col-md-6" style="margin-bottom: 3.5rem;">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-journal-text"></i> Логи</h5>
+                <p class="text-muted small">Просмотр логов приложения</p>
+                <a href="{{ url_for('main.view_logs') }}" class="btn btn-dark btn-sm">
+                    <i class="bi bi-journal-text"></i> Открыть
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+# Список доменов для разблокировки VLESS/VMess трафика
+# Источник: https://github.com/royfincher25-source/bypass_keenetic
+# Обновлено: 10 марта 2026 г.
+
+# =============================================================================
+# TELEGRAM
+# =============================================================================
+cdn-telegram.org
+comments.app
+contest.com
+fragment.com
+graph.org
+graph.whatsapp.com
+graph.whatsapp.net
+openai.com
+t.me
+tdesktop.com
+telega.one
+telegra.ph
+telegram-cdn.org
+telegram.dog
+telegram.me
+telegram.org
+telegram.space
+telesco.pe
+tg.dev
+tx.me
+wa.me
+web.telegram.org
+whatsapp-plus.info
+whatsapp-plus.me
+whatsapp-plus.net
+whatsapp.cc
+whatsapp.com
+whatsapp.info
+whatsapp.net
+whatsapp.org
+whatsapp.tv
+whatsappbrand.com
+
+# =============================================================================
+# ПРОЧИЕ
+# =============================================================================
+forum.ru-board.com
+geminicli.com
+rebel666.fun
+rockblack.su

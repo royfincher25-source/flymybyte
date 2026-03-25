@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}{{ filename }}.txt — Списки обхода{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-file-earmark-text"></i> {{ filename }}.txt</h2>
+    <div>
+        <a href="{{ url_for('main.bypass') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Действия -->
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Действия</h5>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('main.add_to_bypass', filename=filename) }}" class="btn btn-success">
+                        <i class="bi bi-plus-lg"></i> Добавить в список
+                    </a>
+                    <a href="{{ url_for('main.remove_from_bypass', filename=filename) }}" class="btn btn-danger">
+                        <i class="bi bi-dash-lg"></i> Удалить из списка
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Содержимое файла -->
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Содержимое списка</h5>
+                <span class="badge bg-primary">{{ entries|length }} записей</span>
+            </div>
+            <div class="card-body">
+                {% if entries %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Запись</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for entry in entries %}
+                            <tr>
+                                <td><code>{{ entry }}</code></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle"></i>
+                    Список пуст. Добавьте записи, нажав кнопку «Добавить в список».
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
