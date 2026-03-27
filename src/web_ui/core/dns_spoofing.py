@@ -45,6 +45,7 @@ DNSMASQ_AI_CONFIG_TEMPLATE = '/opt/etc/web_ui/resources/config/unblock-ai.dnsmas
 # который возвращает IP-адреса, видимые из другой локации.
 # Провайдерская блокировка (DPI) не отслеживает эти соединения.
 VPN_DNS_HOST = '1.1.1.1'
+VPN_DNS_PORT = 53
 
 # Validation
 MAX_DOMAIN_LENGTH = 253
@@ -214,7 +215,6 @@ class DNSSpoofing:
         ]
         
         for domain in domains:
-            # Route DNS queries through VPN DNSPort
             lines.append(f"server=/{domain}/{VPN_DNS_HOST}#{VPN_DNS_PORT}")
         
         config = '\n'.join(lines)
