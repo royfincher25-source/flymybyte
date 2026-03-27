@@ -19,7 +19,7 @@ AI-сервисы Google (aistudio.google.com, gemini.google.com, colab.research
 - **HTTP-level:** 403 Forbidden или редирект на заглушку
 
 ### 1.2. Текущее состояние
-Проект FlyMyByte уже реализует:
+Проект flymybyte уже реализует:
 - ✅ Маршрутизацию через VPN (Shadowsocks, Tor, VLESS, Trojan)
 - ✅ DNS-мониторинг и автопереключение
 - ✅ Разрешение доменов через ipset
@@ -43,7 +43,6 @@ AI-сервисы Google (aistudio.google.com, gemini.google.com, colab.research
 │                    dnsmasq (роутер Keenetic)                     │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │  /opt/etc/unblock-ai.dnsmasq                              │  │
-│  │  address=/aistudio.google.com/127.0.0.1#40500            │  │
 │  │  server=/aistudio.google.com/127.0.0.1#40500             │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
@@ -86,19 +85,15 @@ AI-сервисы Google (aistudio.google.com, gemini.google.com, colab.research
 # Все DNS-запросы к AI-доменам направляются через VPN DNS (порт 40500)
 
 # Google AI Studio
-address=/aistudio.google.com/127.0.0.1#40500
 server=/aistudio.google.com/127.0.0.1#40500
 
 # Gemini
-address=/gemini.google.com/127.0.0.1#40500
 server=/gemini.google.com/127.0.0.1#40500
 
 # Google Colab
-address=/colab.research.google.com/127.0.0.1#40500
 server=/colab.research.google.com/127.0.0.1#40500
 
 # Kaggle
-address=/kaggle.com/127.0.0.1#40500
 server=/kaggle.com/127.0.0.1#40500
 ```
 
@@ -195,7 +190,6 @@ if [ -f "/opt/etc/unblock/ai-domains.txt" ]; then
     while read -r domain; do
         [ -z "$domain" ] && continue
         [ "${domain:0:1}" = "#" ] && continue
-        echo "address=/$domain/127.0.0.1#$VPN_DNS_PORT" >> /opt/etc/unblock-ai.dnsmasq
         echo "server=/$domain/127.0.0.1#$VPN_DNS_PORT" >> /opt/etc/unblock-ai.dnsmasq
     done < /opt/etc/unblock/ai-domains.txt
 fi

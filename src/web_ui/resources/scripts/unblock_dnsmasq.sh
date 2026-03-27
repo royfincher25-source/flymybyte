@@ -110,7 +110,6 @@ if [ -f "$AI_DOMAINS_FILE" ]; then
         esac
         
         # Add dnsmasq rules for AI domains
-        echo "address=/$domain/127.0.0.1#40500" >> /opt/etc/unblock-ai.dnsmasq
         echo "server=/$domain/127.0.0.1#40500" >> /opt/etc/unblock-ai.dnsmasq
     done < "$AI_DOMAINS_FILE"
     

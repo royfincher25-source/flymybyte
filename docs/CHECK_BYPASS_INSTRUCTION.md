@@ -35,9 +35,7 @@ cat /opt/etc/unblock-ai.dnsmasq
 **✅ Ожидается:**
 ```conf
 # AI Domains DNS Spoofing
-address=/aistudio.google.com/127.0.0.1#40500
 server=/aistudio.google.com/127.0.0.1#40500
-address=/gemini.google.com/127.0.0.1#40500
 server=/gemini.google.com/127.0.0.1#40500
 ...
 ```
