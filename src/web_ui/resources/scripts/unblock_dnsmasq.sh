@@ -1,6 +1,6 @@
 #!/bin/sh
 # unblock_dnsmasq.sh - Optimized version with parallel generation
-# Includes AI domains DNS spoofing support
+# Includes AI domains DNS spoofing support (IPv4 + IPv6)
 
 mkdir -p /opt/var/log
 LOGFILE="/opt/var/log/unblock_dnsmasq.log"
@@ -36,6 +36,7 @@ generate_config() {
         # Handle wildcard domains (keep as is, dnsmasq ignores leading dots)
         echo "ipset=/$line/$setname" >> "$temp_config"
         echo "server=/$line/127.0.0.1#40500" >> "$temp_config"
+        echo "server=/$line/::1#40500" >> "$temp_config"
     done < "$file"
 }
 
@@ -82,7 +83,7 @@ cat "$temp_dir"/config_*.txt >> /opt/etc/unblock.dnsmasq
 # Cleanup
 rm -rf "$temp_dir"
 
-# AI Domains DNS Spoofing
+# AI Domains DNS Spoofing (IPv4 + IPv6)
 # Generate config for AI domains to route DNS through VPN
 AI_DOMAINS_FILE="/opt/etc/unblock/ai-domains.txt"
 if [ -f "$AI_DOMAINS_FILE" ]; then
@@ -109,8 +110,9 @@ if [ -f "$AI_DOMAINS_FILE" ]; then
                 ;;
         esac
         
-        # Add dnsmasq rules for AI domains
+        # Add dnsmasq rules for AI domains (IPv4 + IPv6)
         echo "server=/$domain/127.0.0.1#40500" >> /opt/etc/unblock-ai.dnsmasq
+        echo "server=/$domain/::1#40500" >> /opt/etc/unblock-ai.dnsmasq
     done < "$AI_DOMAINS_FILE"
     
     ai_count=$(wc -l < /opt/etc/unblock-ai.dnsmasq)

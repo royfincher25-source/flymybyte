@@ -17,6 +17,10 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+# VPN DNS configuration
+VPN_DNS_HOST = '127.0.0.1'
+VPN_DNS_PORT = 40500
+
 # Default DNS servers
 DEFAULT_DNS_SERVERS = {
     'primary': [
@@ -156,6 +160,10 @@ class DNSMonitor:
             'last_check': self._last_check.isoformat() if self._last_check else None,
             'failures': self._failures,
         }
+    
+    def check_vpn_dns(self) -> Dict[str, Any]:
+        """Check if VPN DNS (port 40500) is available"""
+        return check_dns_server(VPN_DNS_HOST, port=VPN_DNS_PORT, timeout=TIMEOUT)
 
     def _monitor_loop(self) -> None:
         """Background monitoring loop"""

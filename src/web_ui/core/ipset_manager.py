@@ -16,6 +16,7 @@ Example:
 import subprocess
 import logging
 import re
+import os
 from typing import List, Tuple, Optional
 
 logger = logging.getLogger(__name__)
@@ -352,3 +353,119 @@ def _sanitize_for_ipset(text: str) -> str:
         raise ValueError("Invalid entry after sanitization")
 
     return sanitized
+
+
+def save_ipset(setname: str, save_path: str) -> Tuple[bool, str]:
+    """
+    Save ipset to file for later restore.
+
+    Args:
+        setname: Name of ipset to save
+        save_path: Path to save file
+
+    Returns:
+        Tuple of (success: bool, message: str)
+
+    Example:
+        >>> success, msg = save_ipset('unblock', '/tmp/unblock_backup.txt')
+        >>> if success:
+        ...     print(f"Saved: {msg}")
+    """
+    try:
+        result = subprocess.run(
+            ['ipset', 'list', setname],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode != 0:
+            logger.error(f"ipset {setname} not found: {result.stderr}")
+            return False, f"ipset {setname} not found"
+
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
+        with open(save_path, 'w', encoding='utf-8') as f:
+            f.write(result.stdout)
+
+        entry_count = result.stdout.count('\n') - 10
+        logger.info(f"ipset {setname} saved to {save_path} ({entry_count} entries)")
+        return True, f"Saved {entry_count} entries"
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"ipset {setname} save timeout")
+        return False, "Timeout"
+    except Exception as e:
+        logger.error(f"ipset {setname} save error: {e}")
+        return False, str(e)
+
+
+def restore_ipset(setname: str, save_path: str) -> Tuple[bool, str]:
+    """
+    Restore ipset from file.
+
+    Args:
+        setname: Name of ipset to restore
+        save_path: Path to save file
+
+    Returns:
+        Tuple of (success: bool, message: str)
+
+    Example:
+        >>> success, msg = restore_ipset('unblock', '/tmp/unblock_backup.txt')
+        >>> if success:
+        ...     print(f"Restored: {msg}")
+    """
+    if not os.path.exists(save_path):
+        logger.error(f"Backup file not found: {save_path}")
+        return False, "Backup file not found"
+
+    try:
+        with open(save_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        lines = content.split('\n')
+        entries = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('#') and not line.startswith('Name:') \
+               and not line.startswith('Type:') and not line.startswith('Header:') \
+               and not line.startswith('Size:') and not line.startswith('References:') \
+               and not line.startswith('Members:'):
+                entries.append(line)
+
+        if not entries:
+            logger.warning(f"ipset {setname} backup is empty")
+            return False, "Backup file is empty"
+
+        commands = []
+        for entry in entries:
+            sanitized = _sanitize_for_ipset(entry)
+            if _is_valid_entry(sanitized):
+                commands.append(f"add {setname} {sanitized}")
+
+        if not commands:
+            return False, "No valid entries to restore"
+
+        cmd_text = "\n".join(commands)
+        result = subprocess.run(
+            ['ipset', 'restore'],
+            input=cmd_text,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+
+        if result.returncode == 0:
+            logger.info(f"ipset {setname} restored from {save_path} ({len(commands)} entries)")
+            return True, f"Restored {len(commands)} entries"
+        else:
+            logger.error(f"ipset restore error: {result.stderr}")
+            return False, result.stderr[:200]
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"ipset {setname} restore timeout")
+        return False, "Timeout"
+    except Exception as e:
+        logger.error(f"ipset {setname} restore error: {e}")
+        return False, str(e)

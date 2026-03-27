@@ -531,3 +531,44 @@ pytest tests/web/ -v
 ## Поддержка
 
 Вопросы и предложения: https://github.com/royfincher25-source/flymybyte/issues
+
+---
+
+## Для разработчиков
+
+### Быстрый старт
+
+```bash
+# Клонировать репозиторий
+git clone https://github.com/royfincher25-source/flymybyte.git
+cd flymybyte
+
+# Установить зависимости
+pip install -r src/web_ui/requirements.txt
+
+# Запустить тесты
+cd src/web_ui
+python -m pytest ../../tests/ -v
+```
+
+### Структура тестов
+
+```
+tests/
+├── test_dns_spoofing.py    # Тесты DNS-спуфинга
+├── test_dns_monitor.py     # Тесты DNS-мониторинга
+└── test_ipset_manager.py  # Тесты ipset менеджера
+```
+
+### Запуск линтера
+
+```bash
+# Проверка синтаксиса Python
+python -m py_compile src/web_ui/core/*.py
+```
+
+### GitHub Actions
+
+CI/CD настроен в `.github/workflows/test.yml`:
+- Автоматический запуск тестов при push/PR
+- Проверка Python синтаксиса
