@@ -126,6 +126,20 @@ for file in __init__.py app_config.py config.py utils.py services.py ipset_manag
 done
 cd ..
 
+# Загружаем parsers (VLESS, Shadowsocks, Trojan)
+log_info "⏳ Загрузка парсеров..."
+mkdir -p core/parsers
+cd core/parsers
+for file in __init__.py vless_parser.py shadowsocks_parser.py trojan_parser.py; do
+    printf "  → %-20s" "$file"
+    if curl -sL -o "$file" "$BASE_URL/core/parsers/$file"; then
+        echo " ✅"
+    else
+        echo " ❌"
+    fi
+done
+cd ../..
+
 # =============================================================================
 # ЗАГРУЗКА ШАБЛОНОВ
 # =============================================================================
