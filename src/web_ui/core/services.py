@@ -1,5 +1,5 @@
 """
-Bypass Keenetic Web Interface - Key Parsers and Service Management
+FlyMyByte Web Interface - Key Parsers and Service Management
 
 Full-featured parsers for VPN keys (VLESS, Shadowsocks, Trojan, Tor).
 Memory-optimized for embedded devices (128MB RAM).

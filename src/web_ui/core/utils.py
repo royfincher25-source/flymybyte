@@ -1,5 +1,5 @@
 """
-Bypass Keenetic Web Interface - Core Utilities
+FlyMyByte Web Interface - Core Utilities
 
 Memory-optimized utilities for embedded devices (128MB RAM).
 - LRU cache with 50 entry limit (reduced from 100)

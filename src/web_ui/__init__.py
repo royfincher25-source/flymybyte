@@ -1,5 +1,5 @@
 """
-Bypass Keenetic Web Interface Package.
+FlyMyByte Web Interface Package.
 
 Flask web application for managing Keenetic router bypass.
 """

@@ -1,5 +1,5 @@
 """
-Bypass Keenetic Web Interface - Routes
+FlyMyByte Web Interface - Routes
 
 Routes for the web interface with session-based authentication.
 """

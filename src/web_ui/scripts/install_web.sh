@@ -39,7 +39,7 @@ log_error() {
 # =============================================================================
 # ПРОВЕРКА ТРЕБОВАНИЙ
 # =============================================================================
-log_info "=== Bypass Keenetic Web UI Installer ==="
+log_info "=== FlyMyByte Web UI Installer ==="
 echo ""
 
 # Проверка Python
@@ -228,7 +228,7 @@ cd ..
 log_info "⏳ Создание конфигурации..."
 if [ ! -f .env ]; then
     cat > .env << 'EOF'
-# Bypass Keenetic Web UI Configuration
+# FlyMyByte Web UI Configuration
 WEB_HOST=0.0.0.0
 WEB_PORT=8080
 WEB_PASSWORD=changeme
