@@ -127,7 +127,7 @@ ssh root@192.168.1.1 -p 222
 
 # 2. Скачайте список AI-доменов
 curl -sL -o /opt/etc/unblock/ai-domains.txt \
-  https://raw.githubusercontent.com/royfincher25-source/bypass_keenetic_web/master/src/web_ui/resources/lists/unblock-ai-domains.txt
+  https://raw.githubusercontent.com/royfincher25-source/flymybyte/master/src/web_ui/resources/lists/unblock-ai-domains.txt
 
 # 3. Примените конфигурацию
 sh /opt/etc/web_ui/resources/scripts/unblock_dnsmasq.sh

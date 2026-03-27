@@ -94,8 +94,8 @@ cd /opt/etc
 git clone https://github.com/royfincher25-source/flymybyte.git
 
 # Скопировать web_ui
-cp -r FlyMyByte/src/web_ui/* /opt/etc/web_ui/
-rm -rf FlyMyByte
+cp -r flymybyte/src/web_ui/* /opt/etc/web_ui/
+rm -rf flymybyte
 ```
 
 ### Шаг 3: Настройка конфигурации

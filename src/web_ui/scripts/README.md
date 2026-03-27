@@ -31,15 +31,6 @@ scp scripts/script.sh root@192.168.1.1:/opt/root/
 /opt/root/script.sh -install
 ```
 
-## Отличия от версии Telegram-бота
-
-| Параметр | Telegram-бот | Веб-интерфейс |
-|----------|--------------|---------------|
-| **Конфигурация** | `/opt/etc/bot/bot_config.py` | `/opt/etc/web_ui/core/web_config.py` |
-| **Директория** | `/opt/etc/bot/` | `/opt/etc/web_ui/` |
-| **Init скрипт** | `S99telegram_bot` | `S99web_ui` |
-| **Порт** | Не требуется | 8080 |
-
 ## Обновление скрипта
 
 Для обновления script.sh:

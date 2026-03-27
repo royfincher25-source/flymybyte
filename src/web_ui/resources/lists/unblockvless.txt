@@ -1,5 +1,5 @@
 # Список доменов для разблокировки VLESS/VMess трафика
-# Источник: https://github.com/royfincher25-source/bypass_keenetic
+# Источник: https://github.com/royfincher25-source/flymybyte
 # Обновлено: 10 марта 2026 г.
 
 # =============================================================================

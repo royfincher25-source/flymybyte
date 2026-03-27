@@ -4,8 +4,7 @@ Web-интерфейс для управления flymybyte на роутера
 
 ## Описание
 
-Web-интерфейс заменяет Telegram-бота и предоставляет тот же функционал через браузер.
-Основное преимущество — не зависит от доступности Telegram.
+Веб-интерфейс для управления flymybyte на роутерах Keenetic через браузер.
 
 ## ⚡ Быстрая установка (2 шага!)
 
@@ -76,97 +75,40 @@ curl -sL https://raw.githubusercontent.com/royfincher25-source/flymybyte/master/
 - Автоматический fallback на Flask development server
 - Режим `threaded=True` для многопоточности
 
-## Установка
+## Ручная установка
 
-### Оптимизация для роутеров (128MB RAM)
+Если curl недоступен — установите вручную:
 
-> [!important] Критические оптимизации
-> Проект оптимизирован для работы на роутерах с ограниченными ресурсами:
-> - Ротация логов: 100KB × 3 = 300KB макс.
-> - LRU-кэш: 50 записей (was 100)
-> - MD5-хэш для кэширования VPN-ключей
-> - Кэширование статусов сервисов: 30с TTL
-> - ThreadPoolExecutor: 2 воркера max
-
-1. Скопировать директорию `flymybyte/` на роутер:
-    ```bash
-    scp -r flymybyte/ root@192.168.1.1:/opt/etc/
-   ```
-
-2. Установить зависимости:
-   ```bash
-   pip3 install -r /opt/etc/web_ui/requirements.txt
-   ```
-
-3. Настроить `.env` по примеру `.env.example`:
-   ```bash
-   cp /opt/etc/web_ui/.env.example /opt/etc/web_ui/.env
-   nano /opt/etc/web_ui/.env
-   ```
-
-4. Запустить:
-   ```bash
-   cd /opt/etc/web_ui
-   python3 app.py &
-   ```
-
-## Рекомендации по установке
-
-### 1. Проверка перед установкой
+### Шаг 1: Копирование файлов
 
 ```bash
-# 1. Проверить свободное место
-df -h /opt
-
-# Требуется: минимум 20MB, рекомендуется 50MB+
-
-# 2. Проверить доступную память
-free -m
-
-# Требуется: минимум 64MB свободной
-
-# 3. Проверить версию Python
-python3 --version
-
-# Требуется: Python 3.8+
+scp -r src/web_ui/ root@192.168.1.1:/opt/etc/web_ui/
 ```
 
-### 2. Установка зависимостей
+### Шаг 2: Установка зависимостей
 
 ```bash
-# Вариант А: Из requirements.txt (рекомендуется)
-cd /opt/etc/web_ui
-pip3 install -r requirements.txt
-
-# Вариант Б: Прямая установка
-pip3 install Flask==3.0.0 Jinja2==3.1.2 Werkzeug==3.0.0 requests>=2.31.0 waitress==2.1.2
+pip3 install -r /opt/etc/web_ui/requirements.txt
 ```
 
-### 3. Проверка установки
+### Шаг 3: Настройка
 
 ```bash
-# Проверить установленные пакеты
-pip3 list | grep -E "Flask|Jinja2|Werkzeug|requests|waitress"
-
-# Проверить импорт модулей
-python3 -c "import flask, jinja2, werkzeug, requests; print('OK')"
+cp /opt/etc/web_ui/.env.example /opt/etc/web_ui/.env
+nano /opt/etc/web_ui/.env
 ```
 
-### 4. Первый запуск
+### Шаг 4: Запуск
 
 ```bash
-# Запуск в фоновом режиме
 cd /opt/etc/web_ui
 nohup python3 app.py > /opt/var/log/web_ui.log 2>&1 &
-
-# Проверка процесса
-ps | grep python
-
-# Проверка порта
-netstat -tlnp | grep 8080
 ```
 
-### 5. Установка dnsmasq (опционально, рекомендуется)
+> [!important] Оптимизация для 128MB RAM
+> Проект оптимизирован: ротация логов (100KB×3), LRU-кэш 50 записей, кэш статусов 30с TTL, ThreadPool 2 воркера.
+
+### Установка dnsmasq (опционально)
 
 > [!tip]
 > **dnsmasq** обеспечивает автоматическое переключение DNS при отказе и кэширование запросов.
@@ -550,30 +492,6 @@ flymybyte/
 └── README.md
 ```
 
-## Установка
-
-1. Скопировать директорию `src/web_ui/` на роутер:
-   ```bash
-   scp -r src/web_ui/ root@192.168.1.1:/opt/etc/web_ui/
-   ```
-
-2. Установить зависимости:
-   ```bash
-   pip3 install -r /opt/etc/web_ui/requirements.txt
-   ```
-
-3. Настроить `.env` по примеру `.env.example`:
-   ```bash
-   cp /opt/etc/web_ui/.env.example /opt/etc/web_ui/.env
-   nano /opt/etc/web_ui/.env
-   ```
-
-4. Запустить:
-   ```bash
-   cd /opt/etc/web_ui
-   python3 app.py &
-   ```
-
 ## Логирование
 
 Логи пишутся в файл, указанный в `LOG_FILE` (по умолчанию `/opt/var/log/web_ui.log`):
@@ -602,18 +520,9 @@ pytest tests/web/ -v
 
 ## Потребление ресурсов
 
-- **Память:** ~15MB (vs 5MB у Telegram-бота)
+- **Память:** ~15MB
 - **Порт:** 8080 (локально)
 - **CPU:** минимальное в простое
-
-## Отличия от Telegram-бота
-
-| Параметр | Telegram | Web |
-|----------|----------|-----|
-| Потребление памяти | ~5MB | ~15MB |
-| Зависимость | Telegram API | Нет |
-| Интерфейс | Inline кнопки | Плитки (cards) |
-| Навигация | Callback queries | Полные перезагрузки |
 
 ## Лицензия
 

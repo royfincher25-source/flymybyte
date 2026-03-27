@@ -1,4 +1,4 @@
-# Pre-commit hooks for FlyMyByte
+# Pre-commit hooks for flymybyte
 # Optimized for embedded development (fast hooks only)
 
 repos:
