@@ -1,3 +1,4 @@
+{% import "macros.html" as m %}
 <!DOCTYPE html>
 <html lang="ru" data-bs-theme="dark">
 <head>
@@ -35,16 +36,7 @@
     </nav>
 
     <main class="container mt-4">
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+        {{ m.flash_messages() }}
         
         {% block content %}{% endblock %}
     </main>

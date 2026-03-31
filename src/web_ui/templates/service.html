@@ -221,12 +221,9 @@ setInterval(updateStats, 10000);
             <div class="card-body">
                 <h5 class="card-title"><i class="bi bi-router"></i> Перезапуск роутера</h5>
                 <p class="text-muted small">Перезагрузка всего роутера (~2 минуты)</p>
-                <form method="POST" action="{{ url_for('main.service_restart_router') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-warning btn-sm">
-                        <i class="bi bi-arrow-clockwise"></i> Перезапустить
-                    </button>
-                </form>
+                <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#rebootModal">
+                    <i class="bi bi-arrow-clockwise"></i> Перезапустить
+                </button>
             </div>
         </div>
     </div>
@@ -345,6 +342,36 @@ setInterval(updateStats, 10000);
                 <a href="{{ url_for('main.view_logs') }}" class="btn btn-dark btn-sm">
                     <i class="bi bi-journal-text"></i> Открыть
                 </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения перезагрузки роутера -->
+<div class="modal fade" id="rebootModal" tabindex="-1" aria-labelledby="rebootModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rebootModalLabel">
+                    <i class="bi bi-exclamation-triangle text-warning"></i> Подтверждение
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <p>Вы уверены, что хотите перезагрузить роутер?</p>
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Все сервисы будут перезапущены. Веб-интерфейс станет недоступен на ~2 минуты.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <form method="POST" action="{{ url_for('main.service_restart_router') }}" class="d-inline">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-arrow-clockwise"></i> Перезагрузить
+                    </button>
+                </form>
             </div>
         </div>
     </div>

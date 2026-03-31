@@ -12,6 +12,17 @@ import threading
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+# Импортируем константы из централизованного хранилища
+from .constants import (
+    DEFAULT_WEB_HOST,
+    DEFAULT_WEB_PORT,
+    DEFAULT_WEB_PASSWORD,
+    DEFAULT_ROUTER_IP,
+    DEFAULT_UNBLOCK_DIR,
+    MIN_PORT,
+    MAX_PORT,
+)
+
 
 # =============================================================================
 # ИМПОРТ ENV PARSER
@@ -54,18 +65,18 @@ except ImportError:
 
 
 # =============================================================================
-# КОНСТАНТЫ
+# КОНСТАНТЫ (импортируются из constants.py для единообразия)
 # =============================================================================
 
-DEFAULT_WEB_HOST = "0.0.0.0"
-DEFAULT_WEB_PORT = 8080
-DEFAULT_WEB_PASSWORD = "changeme"
-DEFAULT_ROUTER_IP = "192.168.1.1"
-DEFAULT_UNBLOCK_DIR = "/opt/etc/unblock/"
-
-# Валидация порта
-MIN_PORT = 1
-MAX_PORT = 65535
+from .constants import (
+    DEFAULT_WEB_HOST,
+    DEFAULT_WEB_PORT,
+    DEFAULT_WEB_PASSWORD,
+    DEFAULT_ROUTER_IP,
+    DEFAULT_UNBLOCK_DIR,
+    MIN_PORT,
+    MAX_PORT,
+)
 
 
 # =============================================================================
