@@ -28,7 +28,10 @@ Example:
     >>> print(f"Enabled: {status['enabled']}, Domains: {status['domain_count']}")
 """
 import os
+import re
+import threading
 import logging
+import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
 
@@ -63,15 +66,14 @@ class DNSSpoofing:
     """
     
     _instance: Optional['DNSSpoofing'] = None
-    _lock = None
+    _lock = threading.Lock()
     
     def __new__(cls) -> 'DNSSpoofing':
         """Singleton pattern with thread safety"""
         if cls._instance is None:
-            with cls._lock if cls._lock else threading.Lock():
+            with cls._lock:
                 if cls._instance is None:
                     cls._instance = super().__new__(cls)
-                    cls._lock = threading.Lock()
         return cls._instance
     
     def __init__(self):
@@ -167,7 +169,6 @@ class DNSSpoofing:
         # Must have at least one dot (TLD required)
         pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)+$'
         
-        import re
         if not re.match(pattern, domain):
             return False
         
@@ -183,7 +184,6 @@ class DNSSpoofing:
         Returns:
             True if IP address, False otherwise
         """
-        import re
         ip_pattern = r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'
         return bool(re.match(ip_pattern, entry))
     
@@ -421,14 +421,13 @@ class DNSSpoofing:
         
         try:
             result = subprocess.run(
-                ['ps', '|', 'grep', 'dnsmasq'],
-                shell=True,
+                ['pgrep', 'dnsmasq'],
                 capture_output=True,
                 text=True,
                 timeout=5
             )
             
-            return 'dnsmasq' in result.stdout and 'grep' not in result.stdout
+            return result.returncode == 0
             
         except Exception:
             return False
@@ -547,7 +546,3 @@ def get_dns_spoofing_status() -> Dict[str, Any]:
     """Get DNS spoofing status"""
     spoofing = DNSSpoofing()
     return spoofing.get_status()
-
-
-# Import threading for singleton
-import threading

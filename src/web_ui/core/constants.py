@@ -86,7 +86,7 @@ MAX_PORT = 65535
 # =============================================================================
 
 # Thread pool workers (optimized for KN-1212)
-THREAD_POOL_WORKERS = 2
+THREAD_POOL_WORKERS = 4
 
 # Service restart timeout (seconds)
 SERVICE_RESTART_TIMEOUT = 60

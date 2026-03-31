@@ -55,10 +55,13 @@ def create_app(config_class=None):
     app.config['SESSION_COOKIE_SECURE'] = False  # False для HTTP, True для HTTPS
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
-    # Регистрация маршрутов
-    from routes import bp, register_routes
-    app.register_blueprint(bp)
-    register_routes(app)
+    # Регистрация маршрутов (разделены по Blueprints)
+    from routes_service import bp as main_bp, shutdown_executor
+    from routes_keys import bp as keys_bp
+    from routes_bypass import bp as bypass_bp
+    app.register_blueprint(main_bp)
+    app.register_blueprint(keys_bp)
+    app.register_blueprint(bypass_bp)
 
     # Добавить csrf_token в контекст шаблонов
     @app.context_processor
@@ -84,15 +87,20 @@ def create_app(config_class=None):
     dns_monitor.start()
     logger.info("DNS monitor initialized and started")
 
-    # Регистрация обработчика завершения для graceful shutdown
+    # Регистрация обработчиков завершения для graceful shutdown
     import atexit
-    @atexit.register
-    def cleanup():
-        logger.info("Shutting down DNS monitor...")
+    import signal
+    def graceful_shutdown(signum=None, frame=None):
+        logger.info("Graceful shutdown initiated...")
         dns_monitor.stop()
-        logger.info("Shutting down ThreadPoolExecutor...")
-        from routes import shutdown_executor
         shutdown_executor()
+        logger.info("All services stopped")
+    atexit.register(graceful_shutdown)
+    try:
+        signal.signal(signal.SIGTERM, graceful_shutdown)
+        signal.signal(signal.SIGINT, graceful_shutdown)
+    except (ValueError, OSError):
+        pass  # Signals may not work in all environments (e.g., Windows)
 
     return app
 

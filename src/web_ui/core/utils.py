@@ -12,6 +12,7 @@ import re
 import time
 import subprocess
 import logging
+from collections import OrderedDict
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import List, Tuple, Optional, Any, Dict
@@ -80,7 +81,7 @@ class Cache:
 
     _cache: Dict[str, Any] = {}
     _timestamps: Dict[str, float] = {}
-    _access_order: List[str] = []
+    _access_order: OrderedDict[str, None] = OrderedDict()
     _lock = threading.Lock()  # Thread safety for concurrent access
     MAX_ENTRIES: int = 30  # Оптимизировано для KN-1212 (128MB RAM)
     
@@ -102,10 +103,11 @@ class Cache:
             cls._cache[key] = value
             cls._timestamps[key] = time.time() + ttl
 
-            # Update access order
+            # Update access order (O(1) with OrderedDict)
             if key in cls._access_order:
-                cls._access_order.remove(key)
-            cls._access_order.append(key)
+                cls._access_order.move_to_end(key)
+            else:
+                cls._access_order[key] = None
 
     @classmethod
     def get(cls, key: str, default: Any = None) -> Any:
@@ -129,10 +131,11 @@ class Cache:
                 cls._remove(key)
                 return default
 
-            # Update access order
+            # Update access order (O(1) with OrderedDict)
             if key in cls._access_order:
-                cls._access_order.remove(key)
-                cls._access_order.append(key)
+                cls._access_order.move_to_end(key)
+            else:
+                cls._access_order[key] = None
 
             return cls._cache.get(key, default)
 
@@ -163,15 +166,15 @@ class Cache:
         """Remove cache entry."""
         cls._cache.pop(key, None)
         cls._timestamps.pop(key, None)
-        if key in cls._access_order:
-            cls._access_order.remove(key)
+        cls._access_order.pop(key, None)
     
     @classmethod
     def _evict_oldest(cls) -> None:
         """Evict oldest (least recently used) entry."""
         if cls._access_order:
-            oldest = cls._access_order[0]
-            cls._remove(oldest)
+            oldest, _ = cls._access_order.popitem(last=False)
+            cls._cache.pop(oldest, None)
+            cls._timestamps.pop(oldest, None)
     
     @classmethod
     def clear(cls) -> None:
@@ -693,13 +696,23 @@ def get_cpu_stats() -> dict:
         return {'cpu_percent': 0}
 
 
+# Cache for get_memory_stats (5 second TTL)
+_memory_stats_cache = {'data': None, 'timestamp': 0}
+_MEMORY_STATS_TTL = 5  # seconds
+
+
 def get_memory_stats() -> dict:
     """
     Get memory usage statistics for the system.
+    Cached for 5 seconds to reduce /proc/meminfo I/O.
     
     Returns:
         dict with total_mb, used_mb, free_mb, percent, cache_entries
     """
+    now = time.time()
+    if _memory_stats_cache['data'] is not None and (now - _memory_stats_cache['timestamp']) < _MEMORY_STATS_TTL:
+        return _memory_stats_cache['data']
+    
     try:
         with open('/proc/meminfo', 'r') as f:
             lines = f.readlines()
@@ -720,28 +733,19 @@ def get_memory_stats() -> dict:
         cached = mem.get('Cached', 0) / 1024
         available = mem.get('MemAvailable', 0) / 1024  # MB (if available in kernel)
 
-        # Calculate used memory
-        # MemAvailable already includes buffers + cached that can be freed
         if available > 0:
             used = total - available
-            # Real used memory (excluding reclaimable cache)
             real_used = used
         else:
-            # Fallback: estimate used memory
             used = total - free - buffers - cached
             real_used = used
 
-        # For display purposes
         if available > 0:
             display_available = available
         else:
             display_available = free + buffers + cached
 
-        # Calculate percentage based on real used memory (excluding cache)
-        # This gives more accurate picture for embedded devices
         percent = (real_used / total * 100) if total > 0 else 0
-        
-        # Also calculate "raw" percentage (including cache) for reference
         raw_percent = (used / total * 100) if total > 0 else 0
 
         try:
@@ -752,19 +756,22 @@ def get_memory_stats() -> dict:
             cache_entries = 0
             cache_max = 30
 
-        return {
+        result = {
             'total_mb': round(total, 1),
             'used_mb': round(used, 1),
             'free_mb': round(free, 1),
             'available_mb': round(display_available, 1),
             'cached_mb': round(cached, 1),
             'buffers_mb': round(buffers, 1),
-            'real_used_mb': round(real_used, 1),  # Excluding cache
-            'percent': round(percent, 1),  # Real percent (excluding cache)
-            'raw_percent': round(raw_percent, 1),  # Raw percent (including cache)
+            'real_used_mb': round(real_used, 1),
+            'percent': round(percent, 1),
+            'raw_percent': round(raw_percent, 1),
             'cache_entries': cache_entries,
             'cache_max': cache_max,
         }
+        _memory_stats_cache['data'] = result
+        _memory_stats_cache['timestamp'] = now
+        return result
     except Exception as e:
         logger.error(f"Failed to get memory stats: {e}")
         try:

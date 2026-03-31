@@ -41,7 +41,7 @@ def parse_vless_key(key: str) -> Dict[str, Any]:
     cache_key = f'vless:{hashlib.md5(key.encode()).hexdigest()}'
 
     if Cache.is_valid(cache_key):
-        logger.info(f"VLESS cache hit: {cache_key[:20]}...")
+        logger.debug(f"VLESS cache hit: {cache_key[:20]}...")
         return Cache.get(cache_key)
 
     if not key.startswith('vless://'):
@@ -65,7 +65,7 @@ def parse_vless_key(key: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"VLESS ASCII encode error: {e}")
 
-    logger.info(f"VLESS normalized key: {key[:80]}...")
+    logger.debug(f"VLESS normalized key: {key[:80]}...")
 
     # Parse URL (keep vless:// for urlparse to work correctly)
     # urlparse needs the scheme to extract username/hostname
@@ -124,7 +124,7 @@ def parse_vless_key(key: str) -> Dict[str, Any]:
         result['sid'] = params.get('sid', [''])[0]
         result['spx'] = params.get('spx', [''])[0]
     
-    logger.info(f"VLESS parsed successfully: server={server}, port={port}")
+    logger.debug(f"VLESS parsed successfully: server={server}, port={port}")
 
     # TTL 24 hours (86400s) - VPN keys are stable
     Cache.set(cache_key, result, ttl=86400)
@@ -264,9 +264,9 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
     cache_key = f'ss:{hashlib.md5(key.encode()).hexdigest()}'
 
     if Cache.is_valid(cache_key):
-        logger.info(f"Shadowsocks cache hit: {cache_key[:20]}...")
+        logger.debug(f"Shadowsocks cache hit: {cache_key[:20]}...")
         cached_result = Cache.get(cache_key)
-        logger.info(f"Shadowsocks cache get вернул: {type(cached_result)}")
+        logger.debug(f"Shadowsocks cache get вернул: {type(cached_result)}")
         return cached_result
     
     if not key.startswith('ss://'):
@@ -291,12 +291,12 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Shadowsocks ASCII encode error: {e}")
     
-    logger.info(f"Shadowsocks normalized key: {key[:80]}...")
+    logger.debug(f"Shadowsocks normalized key: {key[:80]}...")
     
     url = key[5:]  # Remove 'ss://'
     parsed_url = urlparse(url)
     
-    logger.info(f"Shadowsocks urlparse: hostname={parsed_url.hostname}, username={parsed_url.username}, port={parsed_url.port}")
+    logger.debug(f"Shadowsocks urlparse: hostname={parsed_url.hostname}, username={parsed_url.username}, port={parsed_url.port}")
     
     # Try standard format with @
     if parsed_url.hostname and parsed_url.username:
@@ -313,9 +313,9 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
                 encoded += '=' * padding
             
             decoded = base64.b64decode(encoded).decode('utf-8')
-            logger.info(f"Shadowsocks decoded: {decoded}")
+            logger.debug(f"Shadowsocks decoded: {decoded}")
             method, password = decoded.split(':', 1)
-            logger.info(f"Shadowsocks method={method}, password={password}")
+            logger.debug(f"Shadowsocks method={method}, password={password}")
         except Exception as e:
             logger.error(f"Shadowsocks base64 error: {e}")
             raise ValueError(f"Ошибка декодирования base64: {str(e)}")
@@ -326,24 +326,24 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
             'password': password,
             'method': method,
         }
-        logger.info(f"Shadowsocks OK: server={result['server']}, port={result['port']}")
+        logger.debug(f"Shadowsocks OK: server={result['server']}, port={result['port']}")
 
         # TTL 24 hours (86400s) - VPN keys are stable
         Cache.set(cache_key, result, ttl=86400)
         return result
     
     # Try alternative format (manual parsing)
-    logger.info(f"Shadowsocks: нет username, пробуем альтернативный формат")
+    logger.debug(f"Shadowsocks: нет username, пробуем альтернативный формат")
     
     try:
         url_part = url.split('#')[0]
-        logger.info(f"Shadowsocks url_part: {url_part[:80]}...")
+        logger.debug(f"Shadowsocks url_part: {url_part[:80]}...")
         
         at_index = url_part.rfind('@')
         if at_index > 0:
             encoded = url_part[:at_index]
             server_port = url_part[at_index+1:]
-            logger.info(f"Shadowsocks manual: encoded={encoded[:50]}..., server_port={server_port}")
+            logger.debug(f"Shadowsocks manual: encoded={encoded[:50]}..., server_port={server_port}")
             
             if ':' in server_port:
                 server, port_str = server_port.rsplit(':', 1)
@@ -358,7 +358,7 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
                     encoded += '=' * padding
                 
                 decoded = base64.b64decode(encoded).decode('utf-8')
-                logger.info(f"Shadowsocks manual decoded: {decoded}")
+                logger.debug(f"Shadowsocks manual decoded: {decoded}")
                 method, password = decoded.split(':', 1)
                 
                 result = {
@@ -367,7 +367,7 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
                     'password': password,
                     'method': method,
                 }
-                logger.info(f"Shadowsocks manual OK: server={result['server']}, port={result['port']}")
+                logger.debug(f"Shadowsocks manual OK: server={result['server']}, port={result['port']}")
                 Cache.set(cache_key, result, ttl=3600)
                 return result
     except Exception as e:
@@ -382,7 +382,7 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
             encoded += '=' * padding
         
         decoded = base64.b64decode(encoded).decode('utf-8')
-        logger.info(f"Shadowsocks alt decoded: {decoded}")
+        logger.debug(f"Shadowsocks alt decoded: {decoded}")
         
         match = re.match(r'([^:]+):([^@]+)@([^:]+):(\d+)', decoded)
         if match:
@@ -393,7 +393,7 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
                 'password': password,
                 'method': method,
             }
-            logger.info(f"Shadowsocks alt OK: server={result['server']}, port={result['port']}")
+            logger.debug(f"Shadowsocks alt OK: server={result['server']}, port={result['port']}")
             Cache.set(cache_key, result, ttl=3600)
             return result
     except Exception as e:
@@ -456,7 +456,7 @@ def parse_trojan_key(key: str) -> Dict[str, Any]:
     cache_key = f'trojan:{hashlib.md5(key.encode()).hexdigest()}'
 
     if Cache.is_valid(cache_key):
-        logger.info(f"Trojan cache hit: {cache_key[:20]}...")
+        logger.debug(f"Trojan cache hit: {cache_key[:20]}...")
         return Cache.get(cache_key)
 
     if not key.startswith('trojan://'):
@@ -471,7 +471,7 @@ def parse_trojan_key(key: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Trojan ASCII encode error: {e}")
     
-    logger.info(f"Trojan normalized key: {key[:80]}...")
+    logger.debug(f"Trojan normalized key: {key[:80]}...")
     
     url = key[11:]  # Remove 'trojan://'
     parsed = urlparse(url)
@@ -505,7 +505,7 @@ def parse_trojan_key(key: str) -> Dict[str, Any]:
         'name': parsed.fragment or 'Trojan',
     }
 
-    logger.info(f"Trojan parsed successfully: server={server}, port={port}")
+    logger.debug(f"Trojan parsed successfully: server={server}, port={port}")
 
     # TTL 24 hours (86400s) - VPN keys are stable
     Cache.set(cache_key, result, ttl=86400)
@@ -586,7 +586,7 @@ def parse_hysteria2_key(key: str) -> Dict[str, Any]:
     cache_key = f'hysteria2:{hashlib.md5(key.encode()).hexdigest()}'
     
     if Cache.is_valid(cache_key):
-        logger.info(f"Hysteria2 cache hit: {cache_key[:20]}...")
+        logger.debug(f"Hysteria2 cache hit: {cache_key[:20]}...")
         return Cache.get(cache_key)
     
     if not key.startswith('hysteria2://'):
@@ -601,7 +601,7 @@ def parse_hysteria2_key(key: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Hysteria2 ASCII encode error: {e}")
     
-    logger.info(f"Hysteria2 normalized key: {key[:80]}...")
+    logger.debug(f"Hysteria2 normalized key: {key[:80]}...")
     
     url = key[11:]
     parsed = urlparse(url)
@@ -638,7 +638,7 @@ def parse_hysteria2_key(key: str) -> Dict[str, Any]:
     }
     
     Cache.set(cache_key, result)
-    logger.info(f"parse_hysteria2_key: parsed {result['server']}:{result['port']}")
+    logger.debug(f"parse_hysteria2_key: parsed {result['server']}:{result['port']}")
     
     return result
 
@@ -696,7 +696,7 @@ def write_hysteria2_config(config: Dict[str, Any], filepath: str) -> None:
         config: Configuration dict
         filepath: Path to write config
     """
-    logger.info(f"write_hysteria2_config: writing to {filepath}")
+    logger.debug(f"write_hysteria2_config: writing to {filepath}")
     
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
@@ -706,7 +706,7 @@ def write_hysteria2_config(config: Dict[str, Any], filepath: str) -> None:
             json.dump(config, f, indent=2, ensure_ascii=False)
         
         os.replace(temp_path, filepath)
-        logger.info(f"write_hysteria2_config: config written to {filepath}")
+        logger.debug(f"write_hysteria2_config: config written to {filepath}")
         
     except Exception as e:
         logger.error(f"write_hysteria2_config: error writing config: {e}")
@@ -743,7 +743,7 @@ def parse_tor_bridges(bridges_text: str) -> list:
             # Try to parse as IP:Port
             bridges.append(f'bridge {line}')
     
-    logger.info(f"Tor bridges parsed: {len(bridges)} entries")
+    logger.debug(f"Tor bridges parsed: {len(bridges)} entries")
     return bridges
 
 
@@ -757,7 +757,7 @@ def tor_config(bridges_text: str) -> Dict[str, Any]:
     Returns:
         Dict with Tor configuration
     """
-    logger.info(f"tor_config: вызов с мостами")
+    logger.debug(f"tor_config: вызов с мостами")
     
     bridges = parse_tor_bridges(bridges_text)
     
@@ -801,7 +801,6 @@ def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
         logger.error(f"Init script not found: {init_script}")
         return False, f"Скрипт {init_script} не найден"
 
-    logger.info(f"restart_service: running ['sh', {init_script}, 'restart']")
     try:
         result = subprocess.run(
             ['sh', init_script, 'restart'],
@@ -809,13 +808,12 @@ def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
             text=True,
             timeout=60
         )
-        logger.info(f"restart_service: {service_name} completed with returncode={result.returncode}")
 
         success = result.returncode == 0
         output = result.stdout.strip() or result.stderr.strip()
 
         if success:
-            logger.info(f"{service_name} restarted successfully: {output}")
+            logger.info(f"{service_name} restarted successfully")
         else:
             logger.error(f"{service_name} restart failed: {output}")
 
@@ -857,6 +855,19 @@ def check_service_status(init_script: str) -> str:
         status = "❌ Скрипт не найден"
     else:
         try:
+            # Try pgrep first (faster than running init script)
+            script_name = os.path.basename(init_script)
+            proc_name = script_name.replace('S', '').split('init')[0]
+            pgrep_result = subprocess.run(
+                ['pgrep', '-f', init_script],
+                capture_output=True, text=True, timeout=5
+            )
+            if pgrep_result.returncode == 0:
+                status = "✅ Активен"
+                Cache.set(cache_key, status, ttl=30)
+                return status
+
+            # Fallback to init script status check
             logger.debug(f"Running: sh {init_script} status")
             result = subprocess.run(
                 ['sh', init_script, 'status'],
@@ -909,24 +920,17 @@ def write_json_config(config: Dict[str, Any], filepath: str) -> None:
         config: Configuration dict
         filepath: Path to output file
     """
-    logger.info(f"write_json_config: writing to {filepath}")
+    logger.debug(f"write_json_config: writing to {filepath}")
     temp_path = filepath + '.tmp'
 
     try:
-        logger.info(f"write_json_config: creating directory {os.path.dirname(filepath)}")
-        # Создать директорию если не существует
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        logger.debug(f"Directory created or exists: {os.path.dirname(filepath)}")
 
-        logger.info(f"write_json_config: opening temp file {temp_path}")
-        logger.debug(f"Writing config to {temp_path}")
         with open(temp_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
-        logger.info(f"write_json_config: config written to {temp_path}")
 
-        logger.info(f"write_json_config: replacing {temp_path} with {filepath}")
         os.replace(temp_path, filepath)
-        logger.info(f"write_json_config: config written to {filepath} successfully")
+        logger.info(f"write_json_config: config written to {filepath}")
 
     except Exception as e:
         logger.error(f"write_json_config: error writing config: {e}")
@@ -949,14 +953,12 @@ def write_tor_config(config: Dict[str, Any], filepath: str) -> None:
         config: Configuration dict
         filepath: Path to output file
     """
-    logger.info(f"write_tor_config: writing to {filepath}")
+    logger.debug(f"write_tor_config: writing to {filepath}")
     temp_path = filepath + '.tmp'
 
     try:
-        logger.info(f"write_tor_config: creating directory {os.path.dirname(filepath)}")
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
-        logger.info(f"write_tor_config: opening temp file {temp_path}")
         with open(temp_path, 'w', encoding='utf-8') as f:
             for key, value in config.items():
                 if isinstance(value, list):
@@ -964,11 +966,9 @@ def write_tor_config(config: Dict[str, Any], filepath: str) -> None:
                         f.write(f"{key} {item}\n")
                 else:
                     f.write(f"{key} {value}\n")
-        logger.info(f"write_tor_config: config written to {temp_path}")
 
-        logger.info(f"write_tor_config: replacing {temp_path} with {filepath}")
         os.replace(temp_path, filepath)
-        logger.info(f"write_tor_config: Tor config written to {filepath} successfully")
+        logger.info(f"write_tor_config: Tor config written to {filepath}")
 
     except Exception as e:
         logger.error(f"write_tor_config: error writing config: {e}")
