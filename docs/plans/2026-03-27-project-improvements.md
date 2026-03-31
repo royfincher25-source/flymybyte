@@ -433,13 +433,44 @@ git commit -m "docs: improve project documentation"
 ## 📊 Чек-лист завершения плана
 
 - [x] Task 1: Исправить DNS-спуфинг (готово)
-- [ ] Task 2: IPv6 поддержка
+- [ ] ❌ Task 2: IPv6 поддержка — **ПРОБЛЕМА**: dnsmasq filter-aaaa не работает, IPv6 DNS записи всё ещё возвращаются
 - [ ] Task 3: DNS мониторинг для VPN DNS
 - [ ] Task 4: Рефакторинг services.py
 - [ ] Task 5: Graceful shutdown ipset
 - [ ] Task 6: Docker для разработки
 - [ ] Task 7: GitHub Actions
 - [ ] Task 8: Документация
+
+---
+
+## 🚨 Известные проблемы
+
+### IPv6 DNS Leak
+
+**Описание:** Несмотря на отключение IPv6 на уровне ядра (`disable_ipv6=1`), dnsmasq продолжает возвращать IPv6 адреса (AAAA записи) для AI-доменов.
+
+**Симптомы:**
+```
+nslookup chatgpt.com 192.168.1.1
+Addresses:  2a06:98c1:3123:8000::1  ← IPv6 провайдера
+          172.64.155.209           ← IPv4 Cloudflare ✅
+```
+
+**Попытки решения:**
+1. ✅ Отключить IPv6 на уровне ядра: `sysctl -w net.ipv6.conf.all.disable_ipv6=1`
+2. ❌ `filter-aaaa` в dnsmasq — не работает (нет поддержки в версии)
+3. ❌ `filter-aaaa-on-local` — не работает
+
+**Возможные решения:**
+1. Отключить IPv6 на сетевом адаптере Windows
+2. Использовать IPv6-only DNS серверы (не рекомендуется)
+3. Модифицировать dnsmasq для игнорирования AAAA записей
+
+**Файлы:**
+- `src/web_ui/resources/scripts/unblock_dnsmasq.sh`
+- `docs/SMART_DNS_COMPARISON.md`
+
+**Приоритет:** Высокий (критично для обхода блокировок)
 
 ---
 

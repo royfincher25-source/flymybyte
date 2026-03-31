@@ -41,11 +41,13 @@ DNSMASQ_AI_CONFIG_TEMPLATE = '/opt/etc/web_ui/resources/config/unblock-ai.dnsmas
 
 # DNS configuration
 # DNS-спуфинг обходит региональные блокировки AI-сервисов.
-# DNS запросы к AI доменам перенаправляются на 1.1.1.1 (Cloudflare),
+# DNS запросы к AI доменам перенаправляются на VPN DNS (DNS-over-TLS/HTTPS),
 # который возвращает IP-адреса, видимые из другой локации.
 # Провайдерская блокировка (DPI) не отслеживает эти соединения.
-VPN_DNS_HOST = '1.1.1.1'
-VPN_DNS_PORT = 53
+# По умолчанию используется 127.0.0.1:40500 (DNS-over-TLS порт flymybyte)
+# Порт может быть изменён через WebConfig (dnsovertlsport)
+VPN_DNS_HOST = '127.0.0.1'
+VPN_DNS_PORT = 40500  # Будет заменён на dnsovertlsport из WebConfig при установке
 
 # Validation
 MAX_DOMAIN_LENGTH = 253
