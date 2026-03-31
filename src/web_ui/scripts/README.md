@@ -120,7 +120,9 @@ base_url = "https://raw.githubusercontent.com/royfincher25-source/flymybyte/main
 ```
 /opt/etc/web_ui/
 ├── app.py              # Flask приложение
-├── routes.py           # Маршруты
+├── routes_service.py   # Blueprint: система, логи, обновления
+├── routes_keys.py      # Blueprint: VPN-ключи
+├── routes_bypass.py    # Blueprint: списки обхода
 ├── env_parser.py       # Парсер .env
 ├── requirements.txt    # Зависимости Python
 ├── .env.example        # Шаблон конфигурации

@@ -160,13 +160,12 @@ def stats():
     if os.path.exists(unblock_dir):
         for filename in os.listdir(unblock_dir):
             if filename.endswith('.txt'):
-                filepath = os.path.join(unblock_dir, filename)
                 try:
-                    with open(filepath, 'r') as f:
-                        lines = [line.strip() for line in f if line.strip() and not line.startswith('#')]
-                        count = len(lines)
-                        total_domains += count
-                        bypass_lists.append({'name': filename, 'count': count, 'path': filepath})
+                    data = load_bypass_list(filename, unblock_dir)
+                    lines = data.get('entries', [])
+                    count = len(lines)
+                    total_domains += count
+                    bypass_lists.append({'name': filename, 'count': count, 'path': os.path.join(unblock_dir, filename)})
                 except Exception as e:
                     logger.error(f"stats Exception reading {filename}: {e}")
     active_services = sum(1 for s in services.values() if s['status'] == '✅ Активен')
@@ -406,7 +405,9 @@ def service_updates_run():
             'VERSION': '/opt/etc/web_ui/VERSION',
             'web_ui/.env.example': '/opt/etc/web_ui/.env.example',
             'web_ui/__init__.py': '/opt/etc/web_ui/__init__.py',
-            'web_ui/routes.py': '/opt/etc/web_ui/routes.py',
+            'web_ui/routes_service.py': '/opt/etc/web_ui/routes_service.py',
+            'web_ui/routes_keys.py': '/opt/etc/web_ui/routes_keys.py',
+            'web_ui/routes_bypass.py': '/opt/etc/web_ui/routes_bypass.py',
             'web_ui/app.py': '/opt/etc/web_ui/app.py',
             'web_ui/env_parser.py': '/opt/etc/web_ui/env_parser.py',
             'web_ui/core/__init__.py': '/opt/etc/web_ui/core/__init__.py',
@@ -417,7 +418,6 @@ def service_updates_run():
             'web_ui/core/dns_resolver.py': '/opt/etc/web_ui/core/dns_resolver.py',
             'web_ui/core/ipset_manager.py': '/opt/etc/web_ui/core/ipset_manager.py',
             'web_ui/core/app_config.py': '/opt/etc/web_ui/core/app_config.py',
-            'web_ui/core/web_config.py': '/opt/etc/web_ui/core/web_config.py',
             'web_ui/core/list_catalog.py': '/opt/etc/web_ui/core/list_catalog.py',
             'web_ui/core/update_progress.py': '/opt/etc/web_ui/core/update_progress.py',
             'web_ui/core/dns_spoofing.py': '/opt/etc/web_ui/core/dns_spoofing.py',

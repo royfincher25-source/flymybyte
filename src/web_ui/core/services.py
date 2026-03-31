@@ -76,11 +76,7 @@ def parse_vless_key(key: str) -> Dict[str, Any]:
     
     parsed = urlparse(key)
     
-    logger.debug(f"Parsed scheme: {parsed.scheme}")
-    logger.debug(f"Parsed username: {parsed.username}")
-    logger.debug(f"Parsed hostname: {parsed.hostname}")
-    logger.debug(f"Parsed port: {parsed.port}")
-    logger.debug(f"Parsed query: {parsed.query[:100] if parsed.query else 'None'}")
+    logger.debug(f"VLESS parsed: scheme={parsed.scheme}, host={parsed.hostname}, port={parsed.port}, query_len={len(parsed.query) if parsed.query else 0}")
 
     # Extract UUID
     uuid = parsed.username
@@ -265,9 +261,7 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
 
     if Cache.is_valid(cache_key):
         logger.debug(f"Shadowsocks cache hit: {cache_key[:20]}...")
-        cached_result = Cache.get(cache_key)
-        logger.debug(f"Shadowsocks cache get вернул: {type(cached_result)}")
-        return cached_result
+        return Cache.get(cache_key)
     
     if not key.startswith('ss://'):
         raise ValueError("Неверный формат ключа Shadowsocks")
@@ -315,7 +309,7 @@ def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
             decoded = base64.b64decode(encoded).decode('utf-8')
             logger.debug(f"Shadowsocks decoded: {decoded}")
             method, password = decoded.split(':', 1)
-            logger.debug(f"Shadowsocks method={method}, password={password}")
+            logger.debug(f"Shadowsocks method={method}")
         except Exception as e:
             logger.error(f"Shadowsocks base64 error: {e}")
             raise ValueError(f"Ошибка декодирования base64: {str(e)}")
@@ -839,9 +833,6 @@ def check_service_status(init_script: str) -> str:
     Returns:
         Status string
     """
-    import logging
-    logger = logging.getLogger(__name__)
-    
     # Cache status for 30 seconds to reduce CPU load
     cache_key = f'status:{init_script}'
     cached_status = Cache.get(cache_key)
@@ -930,13 +921,10 @@ def write_json_config(config: Dict[str, Any], filepath: str) -> None:
             json.dump(config, f, indent=2, ensure_ascii=False)
 
         os.replace(temp_path, filepath)
-        logger.info(f"write_json_config: config written to {filepath}")
+        logger.debug(f"write_json_config: config written to {filepath}")
 
     except Exception as e:
-        logger.error(f"write_json_config: error writing config: {e}")
-        logger.error(f"Exception type: {type(e).__name__}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.exception(f"write_json_config: error writing config: {e}")
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -968,13 +956,10 @@ def write_tor_config(config: Dict[str, Any], filepath: str) -> None:
                     f.write(f"{key} {value}\n")
 
         os.replace(temp_path, filepath)
-        logger.info(f"write_tor_config: Tor config written to {filepath}")
+        logger.debug(f"write_tor_config: Tor config written to {filepath}")
 
     except Exception as e:
-        logger.error(f"write_tor_config: error writing config: {e}")
-        logger.error(f"Exception type: {type(e).__name__}")
-        import traceback
-        logger.error(f"Traceback: {traceback.format_exc()}")
+        logger.exception(f"write_tor_config: error writing config: {e}")
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)

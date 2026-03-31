@@ -89,7 +89,7 @@ cd "$WEB_DIR"
 log_info "⏳ Загрузка файлов веб-интерфейса..."
 
 # Основные файлы
-FILES="app.py routes.py env_parser.py requirements.txt .env.example"
+FILES="app.py routes_service.py routes_keys.py routes_bypass.py env_parser.py requirements.txt .env.example"
 for file in $FILES; do
     printf "  → %-20s" "$file"
     if curl -sL -o "$file" "$BASE_URL/$file"; then
@@ -116,7 +116,7 @@ mkdir -p core
 cd core
 
 # Загружаем все .py файлы из core/
-for file in __init__.py app_config.py config.py utils.py services.py ipset_manager.py list_catalog.py dns_manager.py dns_monitor.py dns_resolver.py dns_spoofing.py web_config.py; do
+for file in __init__.py app_config.py config.py utils.py services.py ipset_manager.py list_catalog.py dns_manager.py dns_monitor.py dns_resolver.py dns_spoofing.py; do
     printf "  → %-20s" "$file"
     if curl -sL -o "$file" "$BASE_URL/core/$file"; then
         echo " ✅"

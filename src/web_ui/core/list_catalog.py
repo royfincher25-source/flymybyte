@@ -5,7 +5,6 @@ Curated lists for common services and regions.
 Optimized for embedded devices (128MB RAM).
 """
 from typing import Dict, List, Any
-import requests
 import logging
 import os
 from pathlib import Path
@@ -97,6 +96,7 @@ def download_list(name: str, dest_dir: str) -> tuple:
         # If URL provided, download
         if 'url' in list_info:
             logger.info(f"Downloading {name} from {list_info['url']}")
+            import requests
             response = requests.get(list_info['url'], timeout=30)
             response.raise_for_status()
             

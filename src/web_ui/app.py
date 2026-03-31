@@ -4,11 +4,9 @@ flymybyte Web Interface - Main Application
 Flask application for Keenetic router bypass management.
 """
 import os
-import sys
 import secrets
 import logging
-from functools import wraps
-from flask import Flask, session, request, abort
+from flask import Flask, session
 from datetime import timedelta
 
 from core.app_config import WebConfig
@@ -73,13 +71,18 @@ def create_app(config_class=None):
             return session['csrf_token']
         return dict(csrf_token=generate_csrf_token)
     
+    # Кэшируем версию при старте (вместо чтения файла на каждый запрос)
+    try:
+        from core.services import get_local_version
+        _app_version = get_local_version()
+    except Exception:
+        _app_version = 'unknown'
+
     # Добавить версию в контекст шаблонов
     @app.context_processor
     def inject_version():
-        """Inject version into all templates"""
-        from core.services import get_local_version
-        version = get_local_version()
-        return dict(app_version=version)
+        """Inject version into all templates (cached at startup)"""
+        return dict(app_version=_app_version)
 
     # Запуск DNS монитора в фоновом режиме
     from core.dns_monitor import DNSMonitor

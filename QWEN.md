@@ -45,13 +45,14 @@
 FlyMyByte/
 ├── src/web_ui/                    # Основная директория веб-интерфейса
 │   ├── app.py                     # Flask приложение (factory function)
-│   ├── routes.py                  # Маршруты (Blueprint main, 2179 строк)
+│   ├── routes_service.py          # Blueprint: система, логи, обновления, DNS-spoofing
+│   ├── routes_keys.py             # Blueprint: VLESS, SS, Trojan, Tor, Hysteria2
+│   ├── routes_bypass.py           # Blueprint: списки обхода, каталог, ipset
 │   ├── env_parser.py              # Лёгкий парсер .env
 │   ├── requirements.txt           # Python зависимости
 │   ├── .env.example               # Пример конфигурации
 │   │
 │   ├── core/                      # Ядро приложения
-│   │   ├── web_config.py          # Конфигурация для script.sh
 │   │   ├── app_config.py          # WebConfig singleton
 │   │   ├── utils.py               # Утилиты, LRU-кэш, логирование
 │   │   ├── services.py            # Парсеры VPN-ключей
@@ -257,27 +258,35 @@ git worktree remove feature-branch
 Factory function `create_app()`:
 - Генерация SECRET_KEY
 - Загрузка WebConfig
-- Регистрация маршрутов (routes.py)
+- Регистрация маршрутов (3 Blueprint'а)
 - Запуск DNS монитора
 - Graceful shutdown (atexit)
 
-#### 2. Routes (routes.py, 2179 строк)
+#### 2. Blueprints (3 модуля, ~1500 строк)
 
-Blueprint `main` с маршрутами:
+**routes_service.py** (Blueprint `main`):
 - `/` — Главное меню
 - `/login` — Авторизация
-- `/keys` — Ключи и мосты
-- `/bypass` — Списки обхода
-- `/install` — Установка/удаление
-- `/stats` — Статистика
+- `/logout` — Выход
+- `/status`, `/stats` — Статус и статистика
 - `/service` — Сервисное меню
+- `/install`, `/remove` — Установка/удаление
 - `/dns-spoofing` — DNS-обход AI (8 API endpoints)
+- `/logs` — Просмотр логов
+- `/api/*` — API endpoints
+
+**routes_keys.py** (Blueprint `keys`):
+- `/keys` — Ключи и мосты
+- `/keys/<service>` — Настройка VPN-сервисов
+
+**routes_bypass.py** (Blueprint `bypass`):
+- `/bypass` — Списки обхода
+- `/bypass/catalog` — Каталог готовых списков
 
 #### 3. Core Modules
 
 | Модуль | Назначение |
 |--------|------------|
-| `web_config.py` | Конфигурация для script.sh (shell-совместимый) |
 | `app_config.py` | WebConfig singleton (загрузка .env) |
 | `utils.py` | Утилиты, LRU-кэш, валидация, логирование |
 | `services.py` | Парсеры VPN-ключей (VLESS, Hysteria2, Shadowsocks, Trojan, Tor) |
@@ -434,7 +443,9 @@ nohup python3 app.py > /opt/var/log/web_ui.log 2>&1 &
 | Файл | Описание | Строк |
 |------|----------|-------|
 | `src/web_ui/app.py` | Flask приложение (factory) | ~100 |
-| `src/web_ui/routes.py` | Маршруты и API endpoints | 2179 |
+| `src/web_ui/routes_service.py` | Blueprint: система, логи, обновления | ~984 |
+| `src/web_ui/routes_keys.py` | Blueprint: VPN-ключи | ~329 |
+| `src/web_ui/routes_bypass.py` | Blueprint: списки обхода | ~314 |
 | `src/web_ui/core/dns_spoofing.py` | DNS-обход AI-доменов | ~200 |
 | `src/web_ui/core/dns_monitor.py` | DNS мониторинг | ~150 |
 | `src/web_ui/core/ipset_manager.py` | Bulk-операции ipset | ~100 |

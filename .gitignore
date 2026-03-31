@@ -2,3 +2,6 @@ test*
 ssh_scripts/
 logo
 .worktrees/
+*.pyc
+__pycache__/
+.pytest_cache/

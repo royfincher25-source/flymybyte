@@ -5,16 +5,11 @@ Blueprint for managing proxy keys and service configuration.
 """
 from flask import Blueprint, render_template, redirect, url_for, request, session, flash, current_app, jsonify
 from functools import wraps
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Thread pool for blocking operations
-executor = ThreadPoolExecutor(max_workers=4)
-
-# Импорты utility-функций
 from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_hysteria2_key, hysteria2_config, write_hysteria2_config,
@@ -24,6 +19,7 @@ from core.services import (
     restart_service, check_service_status
 )
 from core.app_config import WebConfig
+from routes_service import executor
 
 
 bp = Blueprint('keys', __name__, template_folder='templates', static_folder='static')

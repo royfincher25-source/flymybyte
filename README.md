@@ -451,7 +451,9 @@ flymybyte/
 ├── src/
 │   └── web_ui/            # Папка для копирования на роутер
 │       ├── app.py              # Flask приложение (factory function)
-│       ├── routes.py           # Маршруты (Blueprint main)
+│       ├── routes_service.py   # Blueprint: система, логи, обновления, DNS-spoofing
+│       ├── routes_keys.py      # Blueprint: VLESS, SS, Trojan, Tor, Hysteria2
+│       ├── routes_bypass.py    # Blueprint: списки обхода, каталог, ipset
 │       ├── env_parser.py       # Лёгкий парсер .env
 │       ├── scripts/
 │       │   ├── script.sh       # Скрипт установки/удаления flymybyte
