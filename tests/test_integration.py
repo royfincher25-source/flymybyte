@@ -210,7 +210,8 @@ def test_reboot_confirmation_modal():
     with open(template_file, 'r', encoding='utf-8') as f:
         content = f.read()
     assert 'rebootModal' in content
-    assert 'data-bs-toggle="modal"' in content
+    assert 'openModal' in content
+    assert 'closeModal' in content
     assert 'Подтверждение' in content
 
 

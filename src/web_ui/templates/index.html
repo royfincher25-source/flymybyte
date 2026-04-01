@@ -3,69 +3,69 @@
 {% block title %}Главное меню — FlyMyByte{% endblock %}
 
 {% block content %}
-<h1 class="mb-4"><i class="bi bi-menu-app"></i> Главное меню</h1>
+<h1 class="mb-4"><i class="fm fm-menu-app fm-3x"></i> Главное меню</h1>
 
-<div class="row g-4">
+<div class="row row--menu">
     <!-- Ключи и мосты -->
-    <div class="col-12 col-md-6 col-lg-4">
+    <div>
         <a href="{{ url_for('main.keys') }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm menu-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-key display-4 text-primary"></i>
+                <div class="card__body text-center">
+                    <i class="fm fm-key fm-3x text-primary"></i>
                     <h5 class="card-title mt-3">Ключи и мосты</h5>
-                    <p class="card-text text-muted">Настройка VPN ключей</p>
+                    <p class="card__text text-muted">Настройка VPN ключей</p>
                 </div>
             </div>
         </a>
     </div>
 
     <!-- Списки обхода -->
-    <div class="col-12 col-md-6 col-lg-4">
+    <div>
         <a href="{{ url_for('main.bypass') }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm menu-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-list-check display-4 text-success"></i>
+                <div class="card__body text-center">
+                    <i class="fm fm-list-check fm-3x text-success"></i>
                     <h5 class="card-title mt-3">Списки обхода</h5>
-                    <p class="card-text text-muted">Управление списками</p>
+                    <p class="card__text text-muted">Управление списками</p>
                 </div>
             </div>
         </a>
     </div>
 
     <!-- Установка и удаление -->
-    <div class="col-12 col-md-6 col-lg-4">
+    <div>
         <a href="{{ url_for('main.install') }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm menu-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-download display-4 text-info"></i>
+                <div class="card__body text-center">
+                    <i class="fm fm-download fm-3x text-info"></i>
                     <h5 class="card-title mt-3">Установка</h5>
-                    <p class="card-text text-muted">Установка и удаление</p>
+                    <p class="card__text text-muted">Установка и удаление</p>
                 </div>
             </div>
         </a>
     </div>
 
     <!-- Статистика -->
-    <div class="col-12 col-md-6 col-lg-4">
+    <div>
         <a href="{{ url_for('main.stats') }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm menu-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-graph-up display-4 text-warning"></i>
+                <div class="card__body text-center">
+                    <i class="fm fm-graph-up fm-3x text-warning"></i>
                     <h5 class="card-title mt-3">Статистика</h5>
-                    <p class="card-text text-muted">Статистика трафика</p>
+                    <p class="card__text text-muted">Статистика трафика</p>
                 </div>
             </div>
         </a>
     </div>
 
     <!-- Сервис -->
-    <div class="col-12 col-md-6 col-lg-4">
+    <div>
         <a href="{{ url_for('main.service') }}" class="text-decoration-none">
             <div class="card h-100 shadow-sm menu-card">
-                <div class="card-body text-center">
-                    <i class="bi bi-gear display-4 text-secondary"></i>
+                <div class="card__body text-center">
+                    <i class="fm fm-gear fm-3x text-secondary"></i>
                     <h5 class="card-title mt-3">Сервис</h5>
-                    <p class="card-text text-muted">Сервисные функции</p>
+                    <p class="card__text text-muted">Сервисные функции</p>
                 </div>
             </div>
         </a>

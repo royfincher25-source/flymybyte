@@ -1,4 +1,4 @@
-{# FlyMyByte — Jinja2 Macros for reusable template components #}
+﻿{# FlyMyByte — Jinja2 Macros for reusable template components #}
 
 {# CSRF token hidden input #}
 {% macro csrf_field() %}
@@ -11,9 +11,9 @@
     {% if messages %}
         {% for category, message in messages %}
             {% set alert_class = 'danger' if category == 'error' else category %}
-            <div class="alert alert-{{ alert_class }} alert-dismissible fade show" role="alert">
+            <div class="alert alert--{{ alert_class }} alert--dismissible" role="alert">
                 {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <button class="alert__close" onclick="this.parentElement.remove()">&times;</button>
             </div>
         {% endfor %}
     {% endif %}
@@ -22,13 +22,13 @@
 
 {# Page header with title, icon, and optional buttons #}
 {% macro page_header(title, icon, back_url=None, extra_buttons=None) %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-{{ icon }}"></i> {{ title }}</h2>
+<div class="flex-between flex-center mb-4">
+    <h2><i class="fm fm-{{ icon }}"></i> {{ title }}</h2>
     <div>
         {% if extra_buttons %}{{ extra_buttons }}{% endif %}
         {% if back_url %}
-        <a href="{{ back_url }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Назад
+        <a href="{{ back_url }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
         </a>
         {% endif %}
     </div>
@@ -38,26 +38,26 @@
 {# Service icon with name and optional beta badge #}
 {% macro service_icon(service_id, show_beta=True) %}
 {% if service_id == 'vless' %}
-    <i class="bi bi-circle-fill text-success"></i> VLESS
+    <i class="fm fm-circle-fill text-success"></i> VLESS
 {% elif service_id == 'hysteria2' %}
-    <i class="bi bi-lightning-charge-fill text-warning"></i> Hysteria 2
-    {% if show_beta %}<span class="badge bg-secondary ms-1">Бета</span>{% endif %}
+    <i class="fm fm-lightning-charge-fill text-warning"></i> Hysteria 2
+    {% if show_beta %}<span class="badge badge--secondary ms-1">Бета</span>{% endif %}
 {% elif service_id == 'shadowsocks' %}
-    <i class="bi bi-circle-fill text-warning"></i> Shadowsocks
+    <i class="fm fm-circle-fill text-warning"></i> Shadowsocks
 {% elif service_id == 'trojan' %}
-    <i class="bi bi-circle-fill text-info"></i> Trojan
+    <i class="fm fm-circle-fill text-info"></i> Trojan
 {% elif service_id == 'tor' %}
-    <i class="bi bi-circle-fill text-danger"></i> Tor
+    <i class="fm fm-circle-fill text-danger"></i> Tor
 {% endif %}
 {% endmacro %}
 
 {# Info card #}
 {% macro info_card(title="Информация", content=None, list_items=None) %}
 <div class="card shadow-sm mt-4" style="margin-bottom: 3.5rem;">
-    <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-info-circle"></i> {{ title }}</h5>
+    <div class="card__body">
+        <h5 class="card-title"><i class="fm fm-info-circle"></i> {{ title }}</h5>
         {% if content %}
-        <p class="card-text">{{ content }}</p>
+        <p class="card__text">{{ content }}</p>
         {% endif %}
         {% if list_items %}
         <ul class="mb-0">
@@ -71,11 +71,11 @@
 {% endmacro %}
 
 {# Action card for service.html grid #}
-{% macro action_card(title, icon, description, action_html, col_class="col-12 col-md-6") %}
-<div class="{{ col_class }}">
+{% macro action_card(title, icon, description, action_html) %}
+<div>
     <div class="card shadow-sm">
-        <div class="card-body">
-            <h5 class="card-title"><i class="bi bi-{{ icon }}"></i> {{ title }}</h5>
+        <div class="card__body">
+            <h5 class="card-title"><i class="fm fm-{{ icon }}"></i> {{ title }}</h5>
             <p class="text-muted small">{{ description }}</p>
             {{ action_html }}
         </div>
@@ -86,13 +86,13 @@
 {# Table card with header and badge #}
 {% macro table_card(title, badge_text=None, table_content=None) %}
 <div class="card shadow-sm mb-4">
-    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+    <div class="card__header bg-light flex-between flex-center">
         <h5 class="mb-0">{{ title }}</h5>
         {% if badge_text %}
-        <span class="badge bg-primary">{{ badge_text }}</span>
+        <span class="badge badge--primary">{{ badge_text }}</span>
         {% endif %}
     </div>
-    <div class="card-body">
+    <div class="card__body">
         <div class="table-responsive">
             {{ table_content }}
         </div>
@@ -102,24 +102,24 @@
 
 {# Alert block #}
 {% macro alert(type="info", message=None, icon=None, dismissible=False) %}
-<div class="alert alert-{{ type }}{% if dismissible %} alert-dismissible fade show{% endif %}" role="alert">
-    {% if icon %}<i class="bi bi-{{ icon }}"></i> {% endif %}
+<div class="alert alert--{{ type }}{% if dismissible %} alert--dismissible{% endif %}" role="alert">
+    {% if icon %}<i class="fm fm-{{ icon }}"></i> {% endif %}
     {{ message }}
     {% if dismissible %}
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button class="alert__close" onclick="this.parentElement.remove()">&times;</button>
     {% endif %}
 </div>
 {% endmacro %}
 
 {# Menu card for dashboard #}
 {% macro menu_card(url, icon, icon_color, title, description) %}
-<div class="col-12 col-md-6 col-lg-4">
+<div>
     <a href="{{ url }}" class="text-decoration-none">
         <div class="card h-100 shadow-sm menu-card">
-            <div class="card-body text-center">
-                <i class="bi bi-{{ icon }} display-4 text-{{ icon_color }}"></i>
+            <div class="card__body text-center">
+                <i class="fm fm-{{ icon }} fm-3x text-{{ icon_color }}"></i>
                 <h5 class="card-title mt-3">{{ title }}</h5>
-                <p class="card-text text-muted">{{ description }}</p>
+                <p class="card__text text-muted">{{ description }}</p>
             </div>
         </div>
     </a>

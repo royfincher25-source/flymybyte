@@ -3,11 +3,11 @@
 {% block title %}Удалить — {{ filename }}.txt{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-dash-lg"></i> Удалить из {{ filename }}.txt</h2>
+<div class="flex-between flex-center mb-4">
+    <h2><i class="fm fm-dash-lg"></i> Удалить из {{ filename }}.txt</h2>
     <div>
-        <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Назад
+        <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
 </div>
@@ -15,9 +15,9 @@
 <form method="POST" action="{{ url_for('main.remove_from_bypass', filename=filename) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="card shadow-sm">
-        <div class="card-body">
+        <div class="card__body">
             <h5 class="card-title">Записи для удаления</h5>
-            <p class="card-text text-muted">
+            <p class="card__text text-muted">
                 Введите домены, IP-адреса или другие записи для удаления (каждую с новой строки):
             </p>
             
@@ -25,23 +25,23 @@
                 <textarea 
                     name="entries" 
                     id="entries" 
-                    class="form-control" 
+                    class="input" 
                     rows="10"
                     placeholder="example.com&#10;test.com&#10;192.168.1.1"
                     required
                 ></textarea>
-                <div class="form-text">
+                <div class="small text-muted">
                     Можно вводить несколько записей, каждую с новой строки.
                     Записи, которых нет в списке, будут проигнорированы.
                 </div>
             </div>
             
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-danger">
-                    <i class="bi bi-trash"></i> Удалить
+            <div class="gap-2">
+                <button type="submit" class="btn btn--danger">
+                    <i class="fm fm-trash"></i> Удалить
                 </button>
-                <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn-outline-secondary">
-                    <i class="bi bi-x-lg"></i> Отмена
+                <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn--outline">
+                    <i class="fm fm-x-lg"></i> Отмена
                 </a>
             </div>
         </div>
@@ -50,12 +50,12 @@
 
 {% if entries %}
 <div class="card shadow-sm mt-4">
-    <div class="card-header">
+    <div class="card__header">
         <h5 class="mb-0">Текущие записи в списке ({{ entries|length }})</h5>
     </div>
-    <div class="card-body">
+    <div class="card__body">
         <div class="table-responsive">
-            <table class="table table-sm table-hover">
+            <table class="table table--sm table--hover">
                 <thead>
                     <tr>
                         <th>Запись</th>

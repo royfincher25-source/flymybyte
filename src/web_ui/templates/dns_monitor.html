@@ -3,26 +3,26 @@
 {% block title %}DNS Монитор — FlyMyByte{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-activity"></i> DNS Монитор</h2>
-    <a href="{{ url_for('main.service') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Назад
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-activity"></i> DNS Монитор</h2>
+    <a href="{{ url_for('main.service') }}" class="btn btn--outline">
+        <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
 
 <!-- Status Card -->
 <div class="card shadow-sm mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-hdd-network"></i> Статус монитора</span>
+    <div class="card__header d-flex flex-between">
+        <span><i class="fm fm-hdd-network"></i> Статус монитора</span>
         {% if status.running %}
-        <span class="badge bg-success">Запущен</span>
+        <span class="badge badge--success">Запущен</span>
         {% else %}
-        <span class="badge bg-secondary">Остановлен</span>
+        <span class="badge badge--secondary">Остановлен</span>
         {% endif %}
     </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
+    <div class="card__body">
+        <div class="row row--2col">
+            <div>
                 <h5>Текущий DNS сервер</h5>
                 {% if status.current_server %}
                 <p class="mb-0">
@@ -33,7 +33,7 @@
                 <p class="text-muted">Не выбран</p>
                 {% endif %}
             </div>
-            <div class="col-md-6">
+            <div>
                 <h5>Последняя проверка</h5>
                 {% if status.last_check %}
                 <p class="mb-0">{{ status.last_check }}</p>
@@ -44,8 +44,8 @@
         </div>
 
         {% if status.failures > 0 %}
-        <div class="alert alert-warning mt-3">
-            <i class="bi bi-exclamation-triangle"></i>
+        <div class="alert alert--warning mt-3">
+            <i class="fm fm-exclamation-triangle"></i>
             Последовательных неудач: {{ status.failures }}
             {% if status.failures >= 3 %}
             (будет переключение на резервный)
@@ -58,23 +58,23 @@
             {% if status.running %}
             <form method="POST" action="{{ url_for('main.dns_monitor_stop') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-warning btn-sm">
-                    <i class="bi bi-pause"></i> Остановить
+                <button type="submit" class="btn btn--warning btn--sm">
+                    <i class="fm fm-pause"></i> Остановить
                 </button>
             </form>
             {% else %}
             <form method="POST" action="{{ url_for('main.dns_monitor_start') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-success btn-sm">
-                    <i class="bi bi-play"></i> Запустить
+                <button type="submit" class="btn btn--success btn--sm">
+                    <i class="fm fm-play"></i> Запустить
                 </button>
             </form>
             {% endif %}
 
             <form method="POST" action="{{ url_for('main.dns_monitor_check') }}" class="d-inline ms-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <button type="submit" class="btn btn-info btn-sm">
-                    <i class="bi bi-arrow-repeat"></i> Проверить сейчас
+                <button type="submit" class="btn btn--info btn--sm">
+                    <i class="fm fm-arrow-repeat"></i> Проверить сейчас
                 </button>
             </form>
         </div>
@@ -83,23 +83,23 @@
 
 <!-- DNS Servers List -->
 <div class="card shadow-sm">
-    <div class="card-header">
-        <i class="bi bi-list-ul"></i> Доступные DNS серверы
+    <div class="card__header">
+        <i class="fm fm-list-ul"></i> Доступные DNS серверы
     </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
+    <div class="card__body">
+        <div class="row row--2col">
+            <div>
                 <h6>Основные:</h6>
-                <ul class="list-group">
-                    <li class="list-group-item">Google DNS (8.8.8.8)</li>
-                    <li class="list-group-item">Cloudflare (1.1.1.1)</li>
+                <ul class="list">
+                    <li class="list__item">Google DNS (8.8.8.8)</li>
+                    <li class="list__item">Cloudflare (1.1.1.1)</li>
                 </ul>
             </div>
-            <div class="col-md-6">
+            <div>
                 <h6>Резервные:</h6>
-                <ul class="list-group">
-                    <li class="list-group-item">Quad9 (9.9.9.9)</li>
-                    <li class="list-group-item">OpenDNS (208.67.222.222)</li>
+                <ul class="list">
+                    <li class="list__item">Quad9 (9.9.9.9)</li>
+                    <li class="list__item">OpenDNS (208.67.222.222)</li>
                 </ul>
             </div>
         </div>
@@ -108,10 +108,10 @@
 
 <!-- Info Card -->
 <div class="card shadow-sm mt-4">
-    <div class="card-header">
-        <i class="bi bi-info-circle"></i> Информация
+    <div class="card__header">
+        <i class="fm fm-info-circle"></i> Информация
     </div>
-    <div class="card-body">
+    <div class="card__body">
         <p class="mb-0">
             DNS монитор автоматически проверяет доступность DNS-серверов каждые 30 секунд.
             При обнаружении 3 последовательных неудач происходит автоматическое переключение

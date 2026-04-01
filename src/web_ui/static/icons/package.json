@@ -1,0 +1,11 @@
+{
+  "name": "flymybyte-icons",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "fantasticon"
+  },
+  "devDependencies": {
+    "fantasticon": "^1.2.3"
+  }
+}

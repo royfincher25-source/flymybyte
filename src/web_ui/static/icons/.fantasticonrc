@@ -1,0 +1,11 @@
+{
+  "name": "flymybyte-icons",
+  "inputDir": "H:\\disk_e\\dell\\FlyMyByte\\src\\web_ui\\static\\icons\\svg",
+  "outputDir": "H:\\disk_e\\dell\\FlyMyByte\\src\\web_ui\\static\\fonts",
+  "fontTypes": ["woff2"],
+  "assetTypes": ["css", "json"],
+  "prefix": "fm",
+  "fontHeight": 512,
+  "descent": 64,
+  "normalize": true
+}

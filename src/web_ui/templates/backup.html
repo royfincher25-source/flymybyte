@@ -3,60 +3,60 @@
 {% block title %}Бэкап — FlyMyByte{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-hdd"></i> Бэкап</h2>
-    <a href="{{ url_for('main.service') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Назад
+<div class="flex-between flex-center mb-4">
+    <h2><i class="fm fm-hdd"></i> Бэкап</h2>
+    <a href="{{ url_for('main.service') }}" class="btn btn--outline">
+        <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
-      <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+      <div class="alert alert--{{ 'danger' if category == 'error' else category }} alert--dismissible" role="alert">
         {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <button class="alert__close" onclick="this.parentElement.remove()">&times;</button>
       </div>
     {% endfor %}
   {% endif %}
 {% endwith %}
 
 <div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-download"></i> Создание резервной копии</h5>
+    <div class="card__body">
+        <h5 class="card-title"><i class="fm fm-download"></i> Создание резервной копии</h5>
         <p class="text-muted">Бэкап включает следующие файлы и директории:</p>
-        <ul class="list-unstyled small text-muted">
-            <li><i class="bi bi-folder"></i> /opt/etc/web_ui (веб-интерфейс)</li>
-            <li><i class="bi bi-folder"></i> /opt/etc/xray (VLESS)</li>
-            <li><i class="bi bi-folder"></i> /opt/etc/tor (Tor)</li>
-            <li><i class="bi bi-folder"></i> /opt/etc/unblock (списки обхода)</li>
-            <li><i class="bi bi-folder"></i> /opt/bin (скрипты обхода)</li>
-            <li><i class="bi bi-folder"></i> /opt/etc/ndm (iptables, VPN, ipset)</li>
-            <li><i class="bi bi-folder"></i> /opt/etc/init.d (init скрипты)</li>
-            <li><i class="bi bi-folder"></i> /opt/etc/trojan (Trojan)</li>
-            <li><i class="bi bi-file-text"></i> /opt/etc/dnsmasq.conf</li>
-            <li><i class="bi bi-file-text"></i> /opt/etc/shadowsocks.json</li>
-            <li><i class="bi bi-file-text"></i> /opt/etc/crontab</li>
-            <li><i class="bi bi-file-text"></i> /opt/root/script.sh</li>
+        <ul class="small text-muted">
+            <li><i class="fm fm-folder"></i> /opt/etc/web_ui (веб-интерфейс)</li>
+            <li><i class="fm fm-folder"></i> /opt/etc/xray (VLESS)</li>
+            <li><i class="fm fm-folder"></i> /opt/etc/tor (Tor)</li>
+            <li><i class="fm fm-folder"></i> /opt/etc/unblock (списки обхода)</li>
+            <li><i class="fm fm-folder"></i> /opt/bin (скрипты обхода)</li>
+            <li><i class="fm fm-folder"></i> /opt/etc/ndm (iptables, VPN, ipset)</li>
+            <li><i class="fm fm-folder"></i> /opt/etc/init.d (init скрипты)</li>
+            <li><i class="fm fm-folder"></i> /opt/etc/trojan (Trojan)</li>
+            <li><i class="fm fm-file-text"></i> /opt/etc/dnsmasq.conf</li>
+            <li><i class="fm fm-file-text"></i> /opt/etc/shadowsocks.json</li>
+            <li><i class="fm fm-file-text"></i> /opt/etc/crontab</li>
+            <li><i class="fm fm-file-text"></i> /opt/root/script.sh</li>
         </ul>
         
-        <div class="alert alert-info mt-3">
-            <i class="bi bi-info-circle"></i> Бэкап будет сохранён в /opt/root/backup/
+        <div class="alert alert--info mt-3">
+            <i class="fm fm-info-circle"></i> Бэкап будет сохранён в /opt/root/backup/
         </div>
 
         <form method="POST" action="{{ url_for('main.service_backup') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="create">
-            <button type="submit" class="btn btn-primary">
-                <i class="bi bi-download"></i> Создать бэкап
+            <button type="submit" class="btn btn--primary">
+                <i class="fm fm-download"></i> Создать бэкап
             </button>
         </form>
     </div>
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-folder2-open"></i> Существующие бэкапы</h5>
+    <div class="card__body">
+        <h5 class="card-title"><i class="fm fm-folder2-open"></i> Существующие бэкапы</h5>
         
         {% if backups %}
         <style>
@@ -66,7 +66,7 @@
         }
         </style>
         <div class="table-responsive">
-            <table class="table table-hover table-sm backup-table">
+            <table class="table table--hover table--sm backup-table">
                 <thead>
                     <tr>
                         <th>Дата</th>
@@ -96,8 +96,8 @@
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="backup_name" value="{{ backup.name }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить бэкап {{ backup.name }}?')">
-                                    <i class="bi bi-trash"></i> Удалить
+                                <button type="submit" class="btn btn--sm btn--outline-danger" onclick="return confirm('Удалить бэкап {{ backup.name }}?')">
+                                    <i class="fm fm-trash"></i> Удалить
                                 </button>
                             </form>
                         </td>
@@ -107,8 +107,8 @@
             </table>
         </div>
         {% else %}
-        <div class="alert alert-secondary">
-            <i class="bi bi-inbox"></i> Нет созданных бэкапов
+        <div class="alert alert--secondary">
+            <i class="fm fm-inbox"></i> Нет созданных бэкапов
         </div>
         {% endif %}
     </div>

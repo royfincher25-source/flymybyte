@@ -3,48 +3,48 @@
 {% block title %}Установка — FlyMyByte{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-download"></i> Установка и удаление</h2>
-    <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary">
-        <i class="bi bi-arrow-left"></i> Назад
+<div class="d-flex flex-between flex-center mb-4">
+    <h2><i class="fm fm-download fm-lg"></i> Установка и удаление</h2>
+    <a href="{{ url_for('main.index') }}" class="btn btn--outline">
+        <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
 
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, message in messages %}
-      <div class="alert alert-{{ category }}">{{ message }}</div>
+      <div class="alert alert--{{ category }}">{{ message }}</div>
     {% endfor %}
   {% endif %}
 {% endwith %}
 
-<div class="row g-4">
-    <div class="col-12 col-md-6">
+<div class="row row--2col">
+    <div>
         <div class="card shadow-sm border-success">
-            <div class="card-body text-center">
-                <i class="bi bi-download display-4 text-success"></i>
+            <div class="card__body text-center">
+                <i class="fm fm-download fm-3x text-success"></i>
                 <h5 class="card-title mt-3">Установка</h5>
-                <p class="card-text text-muted">Установить компоненты flymybyte</p>
+                <p class="card__text text-muted">Установить компоненты flymybyte</p>
                 <form method="POST" action="{{ url_for('main.service_install') }}" id="install-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-success btn-lg" onclick="return startInstall(event)">
-                        <i class="bi bi-play"></i> Установить
+                    <button type="submit" class="btn btn--success btn--lg" onclick="return startInstall(event)">
+                        <i class="fm fm-play"></i> Установить
                     </button>
                 </form>
             </div>
         </div>
     </div>
 
-    <div class="col-12 col-md-6">
+    <div>
         <div class="card shadow-sm border-danger">
-            <div class="card-body text-center">
-                <i class="bi bi-trash display-4 text-danger"></i>
+            <div class="card__body text-center">
+                <i class="fm fm-trash fm-3x text-danger"></i>
                 <h5 class="card-title mt-3">Удаление</h5>
-                <p class="card-text text-muted">Удалить компоненты flymybyte</p>
+                <p class="card__text text-muted">Удалить компоненты flymybyte</p>
                 <form method="POST" action="{{ url_for('main.service_remove') }}" id="remove-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-danger btn-lg" onclick="return startRemove(event)">
-                        <i class="bi bi-x-lg"></i> Удалить
+                    <button type="submit" class="btn btn--danger btn--lg" onclick="return startRemove(event)">
+                        <i class="fm fm-x-lg"></i> Удалить
                     </button>
                 </form>
             </div>
@@ -55,10 +55,10 @@
 <!-- Вывод логов -->
 <div id="install-log-container" class="mt-4" style="display: none; margin-bottom: 3.5rem;">
     <div class="card">
-        <div class="card-header">
-            <h5><i class="bi bi-terminal"></i> Вывод установки</h5>
+        <div class="card__header">
+            <h5><i class="fm fm-terminal fm-lg"></i> Вывод установки</h5>
         </div>
-        <div class="card-body">
+        <div class="card__body">
             <pre id="install-log" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></pre>
         </div>
     </div>

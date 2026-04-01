@@ -3,43 +3,43 @@
 {% block title %}Обновления — FlyMyByte{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-arrow-repeat"></i> Обновления</h2>
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-arrow-repeat"></i> Обновления</h2>
     <div>
-        <a href="{{ url_for('main.service') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Назад
+        <a href="{{ url_for('main.service') }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
 </div>
 
 <div class="card shadow-sm mb-4">
-    <div class="card-body">
-        <h5 class="card-title">
+    <div class="card__body">
+        <h5 class="card__title">
             {% if need_update %}
-                <i class="bi bi-exclamation-triangle text-warning"></i> Доступно обновление
+                <i class="fm fm-exclamation-triangle text-warning"></i> Доступно обновление
             {% else %}
-                <i class="bi bi-check-circle text-success"></i> Актуальная версия
+                <i class="fm fm-check-circle text-success"></i> Актуальная версия
             {% endif %}
         </h5>
         
         <div class="version-comparison p-3 rounded {% if need_update %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
             <div class="d-flex align-items-center mb-2">
-                <span class="me-2"><i class="bi bi-pc-display"></i> Установленная:</span>
-                <strong class="fs-5">{{ local_version }}</strong>
+                <span class="me-2"><i class="fm fm-pc-display"></i> Установленная:</span>
+                <strong class="fm-lg">{{ local_version }}</strong>
             </div>
             <div class="d-flex align-items-center">
-                <span class="me-2"><i class="bi bi-cloud-download"></i> Доступная:</span>
+                <span class="me-2"><i class="fm fm-cloud-download"></i> Доступная:</span>
                 {% if need_update %}
-                <strong class="fs-5 text-warning">
+                <strong class="fm-lg text-warning">
                     {{ remote_version }}
-                    <i class="bi bi-arrow-up-circle-fill ms-1"></i>
-                    <span class="badge bg-warning text-dark ms-2">NEW</span>
+                    <i class="fm fm-arrow-up-circle-fill ms-1"></i>
+                    <span class="badge badge--warning text-dark ms-2">NEW</span>
                 </strong>
                 {% else %}
-                <strong class="fs-5 text-success">
+                <strong class="fm-lg text-success">
                     {{ remote_version }}
-                    <i class="bi bi-check-circle-fill ms-1"></i>
-                    <span class="badge bg-success ms-2">Latest</span>
+                    <i class="fm fm-check-circle-fill ms-1"></i>
+                    <span class="badge badge--success ms-2">Latest</span>
                 </strong>
                 {% endif %}
             </div>
@@ -47,29 +47,29 @@
 
         <div id="update-section">
             {% if need_update %}
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle"></i> Доступна новая версия! Рекомендуется обновить.
+                <div class="alert alert--warning">
+                    <i class="fm fm-exclamation-triangle"></i> Доступна новая версия! Рекомендуется обновить.
                 </div>
                 <form id="update-form" method="POST" action="{{ url_for('main.service_updates_run') }}" data-no-preloader="true">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn-primary" id="update-btn">
-                        <i class="bi bi-download"></i> Обновить
+                    <button type="submit" class="btn btn--primary" id="update-btn">
+                        <i class="fm fm-download"></i> Обновить
                     </button>
                 </form>
 
                 <!-- Progress display (hidden by default) -->
                 <div id="progress-container" style="display: none; margin-top: 20px;">
                     <div class="progress mb-3" style="height: 25px;">
-                        <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                        <div id="progress-bar" class="progress__bar progress__bar--stripes progress__bar--animated"
                              role="progressbar" style="width: 0%">0%</div>
                     </div>
                     <div id="progress-text" class="mb-2">Подготовка...</div>
                     <div id="progress-details" class="small text-muted"></div>
-                    <div id="progress-error" class="alert alert-danger mt-2" style="display: none;"></div>
+                    <div id="progress-error" class="alert alert--danger mt-2" style="display: none;"></div>
                 </div>
             {% else %}
-                <div class="alert alert-success">
-                    <i class="bi bi-check-circle"></i> У вас установлена последняя версия.
+                <div class="alert alert--success">
+                    <i class="fm fm-check-circle"></i> У вас установлена последняя версия.
                 </div>
             {% endif %}
         </div>
@@ -77,39 +77,39 @@
 </div>
 
 <div class="card shadow-sm mb-4" style="margin-bottom: 3.5rem;">
-    <div class="card-body">
-        <h5 class="card-title"><i class="bi bi-info-circle"></i> Как работает обновление</h5>
+    <div class="card__body">
+        <h5 class="card__title"><i class="fm fm-info-circle"></i> Как работает обновление</h5>
 
-        <div class="row">
-            <div class="col-md-6">
-                <h6 class="text-success"><i class="bi bi-check-circle"></i> Будет обновлено:</h6>
+        <div class="row row--2col">
+            <div>
+                <h6 class="text-success"><i class="fm fm-check-circle"></i> Будет обновлено:</h6>
                 <ul class="list-unstyled small">
-                    <li><i class="bi bi-folder"></i> /opt/etc/web_ui (код веб-интерфейса)</li>
-                    <li><i class="bi bi-folder"></i> /opt/etc/init.d (init скрипты)</li>
-                    <li><i class="bi bi-folder"></i> /opt/etc/ndm (системные скрипты)</li>
-                    <li><i class="bi bi-folder"></i> /opt/bin (скрипты обхода)</li>
-                    <li><i class="bi bi-file-text"></i> /opt/etc/dnsmasq.conf</li>
-                    <li><i class="bi bi-file-text"></i> /opt/root/script.sh</li>
+                    <li><i class="fm fm-folder"></i> /opt/etc/web_ui (код веб-интерфейса)</li>
+                    <li><i class="fm fm-folder"></i> /opt/etc/init.d (init скрипты)</li>
+                    <li><i class="fm fm-folder"></i> /opt/etc/ndm (системные скрипты)</li>
+                    <li><i class="fm fm-folder"></i> /opt/bin (скрипты обхода)</li>
+                    <li><i class="fm fm-file-text"></i> /opt/etc/dnsmasq.conf</li>
+                    <li><i class="fm fm-file-text"></i> /opt/root/script.sh</li>
                 </ul>
             </div>
-            <div class="col-md-6">
-                <h6 class="text-warning"><i class="bi bi-shield-lock"></i> Сохраняется без изменений:</h6>
+            <div>
+                <h6 class="text-warning"><i class="fm fm-shield-lock"></i> Сохраняется без изменений:</h6>
                 <ul class="list-unstyled small">
-                    <li><i class="bi bi-key"></i> /opt/etc/xray (VLESS ключи)</li>
-                    <li><i class="bi bi-key"></i> /opt/etc/tor (Tor настройки)</li>
-                    <li><i class="bi bi-key"></i> /opt/etc/trojan (Trojan настройки)</li>
-                    <li><i class="bi bi-key"></i> /opt/etc/shadowsocks.json</li>
-                    <li><i class="bi bi-list"></i> /opt/etc/unblock/*.txt (списки обхода)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/xray (VLESS ключи)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/tor (Tor настройки)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/trojan (Trojan настройки)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/shadowsocks.json</li>
+                    <li><i class="fm fm-list"></i> /opt/etc/unblock/*.txt (списки обхода)</li>
                 </ul>
             </div>
         </div>
 
-        <div class="alert alert-info mt-3 d-flex justify-content-between align-items-center">
+        <div class="alert alert--info mt-3 d-flex flex-between">
             <div>
-                <i class="bi bi-info-circle"></i> Перед обновлением автоматически создаётся резервная копия в /opt/root/backup/
+                <i class="fm fm-info-circle"></i> Перед обновлением автоматически создаётся резервная копия в /opt/root/backup/
             </div>
-            <a href="{{ url_for('main.service_backup') }}" class="btn btn-outline-secondary btn-sm ms-3">
-                <i class="bi bi-folder2-open"></i> Резервные копии
+            <a href="{{ url_for('main.service_backup') }}" class="btn btn--outline btn--sm ms-3">
+                <i class="fm fm-folder2-open"></i> Резервные копии
             </a>
         </div>
     </div>
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
             progressInterval = setInterval(updateProgress, 3000);
 
             // Remove animation from progress bar
-            document.getElementById('progress-bar').classList.remove('progress-bar-animated');
+            document.getElementById('progress-bar').classList.remove('progress__bar--animated');
 
             // Submit form via AJAX
             const formData = new FormData(this);
@@ -255,16 +255,16 @@ function showError(message) {
     const errorDiv = document.getElementById('progress-error');
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
-    document.getElementById('progress-bar').classList.remove('progress-bar-animated');
-    document.getElementById('progress-bar').classList.add('bg-danger');
+    document.getElementById('progress-bar').classList.remove('progress__bar--animated');
+    document.getElementById('progress-bar').classList.add('progress__bar--danger');
 }
 
 function showCompletion(message) {
     const progressBar = document.getElementById('progress-bar');
     progressBar.style.width = '100%';
     progressBar.textContent = '100%';
-    progressBar.classList.remove('progress-bar-animated');
-    progressBar.classList.add('bg-success');
+    progressBar.classList.remove('progress__bar--animated');
+    progressBar.classList.add('progress__bar--success');
     document.getElementById('progress-text').textContent = message;
     document.getElementById('progress-details').textContent = '';
 

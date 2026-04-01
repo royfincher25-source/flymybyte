@@ -3,52 +3,52 @@
 {% block title %}DNS-обход AI-доменов — FlyMyByte{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-globe2"></i> DNS-обход AI-доменов</h2>
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-globe2"></i> DNS-обход AI-доменов</h2>
     <div class="d-flex gap-2">
-        <a href="{{ url_for('main.service') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Назад
+        <a href="{{ url_for('main.service') }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
         </a>
-        <a href="{{ url_for('main.bypass') }}" class="btn btn-outline-primary">
-            <i class="bi bi-list-check"></i> Списки обхода
+        <a href="{{ url_for('main.bypass') }}" class="btn btn--outline">
+            <i class="fm fm-list-check"></i> Списки обхода
         </a>
     </div>
 </div>
 
 <!-- Статус DNS-обхода -->
 <div class="card border-info mb-4">
-    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-shield-check"></i> Статус DNS-обхода</span>
-        <span id="status-badge" class="badge bg-secondary">
-            <i class="bi bi-question-circle"></i> Загрузка...
+    <div class="card__header bg-info text-white d-flex flex-between">
+        <span><i class="fm fm-shield-check"></i> Статус DNS-обхода</span>
+        <span id="status-badge" class="badge badge--secondary">
+            <i class="fm fm-question-circle"></i> Загрузка...
         </span>
     </div>
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-6">
-                <h6><i class="bi bi-file-earmark-text"></i> Конфигурация</h6>
+    <div class="card__body">
+        <div class="row row--2col">
+            <div>
+                <h6><i class="fm fm-file-earmark-text"></i> Конфигурация</h6>
                 <p id="config-status" class="mb-0 text-muted">Загрузка...</p>
             </div>
-            <div class="col-md-6">
-                <h6><i class="bi bi-list-ul"></i> Домены</h6>
+            <div>
+                <h6><i class="fm fm-list-ul"></i> Домены</h6>
                 <p id="domains-count" class="mb-0 text-muted">Загрузка...</p>
             </div>
         </div>
         <div class="row mt-3">
-            <div class="col-md-12">
-                <h6><i class="bi bi-hdd-network"></i> dnsmasq</h6>
+            <div>
+                <h6><i class="fm fm-hdd-network"></i> dnsmasq</h6>
                 <p id="dnsmasq-status" class="mb-0 text-muted">Загрузка...</p>
             </div>
         </div>
         <div class="mt-3 d-flex gap-2">
-            <button id="apply-btn" class="btn btn-success" onclick="applyConfig()" disabled>
-                <i class="bi bi-play-fill"></i> Применить
+            <button id="apply-btn" class="btn btn--success" onclick="applyConfig()" disabled>
+                <i class="fm fm-play-fill"></i> Применить
             </button>
-            <button id="disable-btn" class="btn btn-danger" onclick="disableConfig()" disabled>
-                <i class="bi bi-stop-fill"></i> Выключить
+            <button id="disable-btn" class="btn btn--danger" onclick="disableConfig()" disabled>
+                <i class="fm fm-stop-fill"></i> Выключить
             </button>
-            <button class="btn btn-outline-secondary" onclick="refreshStatus()">
-                <i class="bi bi-arrow-clockwise"></i> Обновить
+            <button class="btn btn--outline" onclick="refreshStatus()">
+                <i class="fm fm-arrow-clockwise"></i> Обновить
             </button>
         </div>
     </div>
@@ -56,33 +56,33 @@
 
 <!-- Список доменов -->
 <div class="card border-primary mb-4">
-    <div class="card-header bg-primary text-white">
-        <i class="bi bi-list-task"></i> Список AI-доменов
+    <div class="card__header bg-primary text-white">
+        <i class="fm fm-list-task"></i> Список AI-доменов
     </div>
-    <div class="card-body">
-        <div class="alert alert-info" role="alert">
-            <i class="bi bi-info-circle"></i>
+    <div class="card__body">
+        <div class="alert alert--info" role="alert">
+            <i class="fm fm-info-circle"></i>
             <strong>Как это работает:</strong> DNS-запросы к указанным доменам направляются через VPN DNS (порт 40500),
             что скрывает ваш реальный регион от AI-сервисов.
         </div>
         
         <div class="mb-3">
-            <label for="domains-text" class="form-label">Домены для обхода (по одному в строке):</label>
-            <textarea class="form-control" id="domains-text" rows="10" placeholder="aistudio.google.com&#10;gemini.google.com&#10;colab.research.google.com"></textarea>
-            <div class="form-text">
+            <label for="domains-text" class="label">Домены для обхода (по одному в строке):</label>
+            <textarea class="input" id="domains-text" rows="10" placeholder="aistudio.google.com&#10;gemini.google.com&#10;colab.research.google.com"></textarea>
+            <small class="text-muted">
                 Поддерживаются домены вида <code>example.com</code> и <code>*.example.com</code> (wildcard)
-            </div>
+            </small>
         </div>
         
         <div class="d-flex gap-2">
-            <button class="btn btn-primary" onclick="saveDomains()">
-                <i class="bi bi-save"></i> Сохранить
+            <button class="btn btn--primary" onclick="saveDomains()">
+                <i class="fm fm-save"></i> Сохранить
             </button>
-            <button class="btn btn-outline-secondary" onclick="loadDomains()">
-                <i class="bi bi-arrow-clockwise"></i> Загрузить
+            <button class="btn btn--outline" onclick="loadDomains()">
+                <i class="fm fm-arrow-clockwise"></i> Загрузить
             </button>
-            <button class="btn btn-outline-info" onclick="loadPresetDomains()">
-                <i class="bi bi-download"></i> Загрузить готовый список
+            <button class="btn btn--outline" onclick="loadPresetDomains()">
+                <i class="fm fm-download"></i> Загрузить готовый список
             </button>
         </div>
     </div>
@@ -90,14 +90,14 @@
 
 <!-- Тестирование -->
 <div class="card border-warning mb-4">
-    <div class="card-header bg-warning text-dark">
-        <i class="bi bi-bug"></i> Тестирование DNS
+    <div class="card__header bg-warning text-dark">
+        <i class="fm fm-bug"></i> Тестирование DNS
     </div>
-    <div class="card-body">
-        <div class="input-group mb-3">
-            <input type="text" class="form-control" id="test-domain" placeholder="aistudio.google.com">
-            <button class="btn btn-warning" onclick="testDomain()">
-                <i class="bi bi-search"></i> Тест
+    <div class="card__body">
+        <div class="d-flex gap-2 mb-3">
+            <input type="text" class="input" id="test-domain" placeholder="aistudio.google.com" style="flex: 1;">
+            <button class="btn btn--warning" onclick="testDomain()">
+                <i class="fm fm-search"></i> Тест
             </button>
         </div>
         
@@ -110,15 +110,15 @@
 
 <!-- Логи -->
 <div class="card border-secondary mb-4">
-    <div class="card-header bg-secondary text-white">
-        <i class="bi bi-journal-text"></i> Логи
+    <div class="card__header bg-secondary text-white">
+        <i class="fm fm-journal-text"></i> Логи
     </div>
-    <div class="card-body">
+    <div class="card__body">
         <pre id="logs-output" class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
 Загрузка логов...
         </pre>
-        <button class="btn btn-outline-secondary btn-sm" onclick="loadLogs()">
-            <i class="bi bi-arrow-clockwise"></i> Обновить логи
+        <button class="btn btn--outline btn--sm" onclick="loadLogs()">
+            <i class="fm fm-arrow-clockwise"></i> Обновить логи
         </button>
     </div>
 </div>
@@ -144,13 +144,13 @@ async function refreshStatus() {
         const disableBtn = document.getElementById('disable-btn');
         
         if (data.enabled) {
-            statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> Активен';
-            statusBadge.className = 'badge bg-success';
+            statusBadge.innerHTML = '<i class="fm fm-check-circle-fill"></i> Активен';
+            statusBadge.className = 'badge badge--success';
             applyBtn.disabled = true;
             disableBtn.disabled = false;
         } else {
-            statusBadge.innerHTML = '<i class="bi bi-x-circle-fill"></i> Выключен';
-            statusBadge.className = 'badge bg-secondary';
+            statusBadge.innerHTML = '<i class="fm fm-x-circle-fill"></i> Выключен';
+            statusBadge.className = 'badge badge--secondary';
             applyBtn.disabled = false;
             disableBtn.disabled = true;
         }
@@ -168,8 +168,8 @@ async function refreshStatus() {
     } catch (error) {
         console.error('Error fetching status:', error);
         document.getElementById('status-badge').innerHTML = 
-            '<i class="bi bi-exclamation-triangle-fill"></i> Ошибка';
-        document.getElementById('status-badge').className = 'badge bg-danger';
+            '<i class="fm fm-exclamation-triangle-fill"></i> Ошибка';
+        document.getElementById('status-badge').className = 'badge badge--danger';
     }
 }
 
