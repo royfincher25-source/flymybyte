@@ -35,26 +35,30 @@ import subprocess
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
 
+try:
+    from .constants import (
+        AI_DOMAINS_LIST,
+        DNSMASQ_AI_CONFIG,
+        DNSMASQ_AI_TEMPLATE,
+        VPN_DNS_HOST,
+        VPN_DNS_PORT,
+        MAX_DOMAIN_LENGTH,
+        MAX_DOMAINS_COUNT,
+        INIT_SCRIPTS,
+    )
+except ImportError:
+    from constants import (
+        AI_DOMAINS_LIST,
+        DNSMASQ_AI_CONFIG,
+        DNSMASQ_AI_TEMPLATE,
+        VPN_DNS_HOST,
+        VPN_DNS_PORT,
+        MAX_DOMAIN_LENGTH,
+        MAX_DOMAINS_COUNT,
+        INIT_SCRIPTS,
+    )
+
 logger = logging.getLogger(__name__)
-
-# Configuration paths
-AI_DOMAINS_LIST = '/opt/etc/unblock/ai-domains.txt'
-DNSMASQ_AI_CONFIG = '/opt/etc/unblock-ai.dnsmasq'
-DNSMASQ_AI_CONFIG_TEMPLATE = '/opt/etc/web_ui/resources/config/unblock-ai.dnsmasq.template'
-
-# DNS configuration
-# DNS-спуфинг обходит региональные блокировки AI-сервисов.
-# DNS запросы к AI доменам перенаправляются на VPN DNS (DNS-over-TLS/HTTPS),
-# который возвращает IP-адреса, видимые из другой локации.
-# Провайдерская блокировка (DPI) не отслеживает эти соединения.
-# По умолчанию используется 127.0.0.1:40500 (DNS-over-TLS порт flymybyte)
-# Порт может быть изменён через WebConfig (dnsovertlsport)
-VPN_DNS_HOST = '127.0.0.1'
-VPN_DNS_PORT = 40500  # Будет заменён на dnsovertlsport из WebConfig при установке
-
-# Validation
-MAX_DOMAIN_LENGTH = 253
-MAX_DOMAINS_COUNT = 1000
 
 
 class DNSSpoofing:
@@ -312,7 +316,7 @@ class DNSSpoofing:
         """
         import subprocess
         
-        dnsmasq_init = '/opt/etc/init.d/S56dnsmasq'
+        dnsmasq_init = INIT_SCRIPTS['dnsmasq']
         
         if not Path(dnsmasq_init).exists():
             logger.warning("dnsmasq init script not found")

@@ -168,23 +168,26 @@ def test_update_progress_auto_reset():
 
 
 def test_disk_space_check_in_updates():
-    """Test that disk space check exists in service_updates_run"""
+    """Test that disk space check exists in update service"""
+    update_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'core', 'update_service.py')
     service_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'routes_service.py')
+    with open(update_file, 'r', encoding='utf-8') as f:
+        update_content = f.read()
     with open(service_file, 'r', encoding='utf-8') as f:
-        content = f.read()
-    assert 'statvfs' in content
-    assert 'free_mb' in content
-    assert 'Insufficient disk space' in content or 'Недостаточно места' in content
+        service_content = f.read()
+    combined = update_content + service_content
+    assert 'statvfs' in combined
+    assert 'free_mb' in combined
+    assert 'Insufficient disk space' in combined or 'Недостаточно места' in combined
 
 
 def test_parallel_downloads_in_updates():
     """Test that parallel downloads are used in update process"""
-    service_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'routes_service.py')
-    with open(service_file, 'r', encoding='utf-8') as f:
+    update_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'core', 'update_service.py')
+    with open(update_file, 'r', encoding='utf-8') as f:
         content = f.read()
     assert 'ThreadPoolExecutor' in content
     assert 'max_workers=3' in content
-    assert 'download_executor' in content
 
 
 def test_pgrep_service_status():

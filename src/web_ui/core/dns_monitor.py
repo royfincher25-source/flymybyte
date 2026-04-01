@@ -15,23 +15,13 @@ import traceback
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 
+from .constants import DEFAULT_DNS_SERVERS, DNS_CHECK_INTERVAL, DNS_TIMEOUT, DNS_FAILURE_THRESHOLD
+
 logger = logging.getLogger(__name__)
 
-# Default DNS servers
-DEFAULT_DNS_SERVERS = {
-    'primary': [
-        {'name': 'Google DNS', 'host': '8.8.8.8', 'port': 53},
-        {'name': 'Cloudflare', 'host': '1.1.1.1', 'port': 53},
-    ],
-    'backup': [
-        {'name': 'Quad9', 'host': '9.9.9.9', 'port': 53},
-        {'name': 'OpenDNS', 'host': '208.67.222.222', 'port': 53},
-    ],
-}
-
-CHECK_INTERVAL = 60  # Оптимизировано для KN-1212 (было: 30)
-TIMEOUT = 3  # Оптимизировано для KN-1212 (было: 2)
-FAILURE_THRESHOLD = 3  # Switch after 3 consecutive failures
+CHECK_INTERVAL = DNS_CHECK_INTERVAL
+TIMEOUT = DNS_TIMEOUT
+FAILURE_THRESHOLD = DNS_FAILURE_THRESHOLD
 
 
 def check_dns_server(host: str, port: int = 53, timeout: float = 2.0) -> Dict[str, Any]:

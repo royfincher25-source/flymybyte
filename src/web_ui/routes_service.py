@@ -4,24 +4,40 @@ FlyMyByte Web Interface - Service Routes
 Blueprint for service management, updates, backups, install/remove, DNS monitor, system stats, and logs.
 """
 from flask import Blueprint, render_template, redirect, url_for, request, session, flash, current_app, jsonify
-from functools import wraps
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import os
-import sys
 import stat
 import logging
-import json
 import subprocess
-import requests
+import threading
 
 logger = logging.getLogger(__name__)
 
-executor = ThreadPoolExecutor(max_workers=4)
-
-MAX_ENTRIES_PER_REQUEST = 100
-MAX_ENTRY_LENGTH = 253
-MAX_TOTAL_INPUT_SIZE = 50 * 1024
-
+from core.decorators import login_required, get_csrf_token, validate_csrf_token, csrf_required
+from core.constants import (
+    MAX_ENTRIES_PER_REQUEST,
+    MAX_ENTRY_LENGTH,
+    MAX_TOTAL_INPUT_SIZE,
+    GITHUB_REPO,
+    GITHUB_BRANCH,
+    INIT_SCRIPTS,
+    CONFIG_PATHS,
+    WEB_UI_DIR,
+    BACKUP_DIR,
+    TMP_RESTART_SCRIPT,
+    SCRIPT_EXECUTION_TIMEOUT,
+    FILE_DOWNLOAD_TIMEOUT,
+    SERVICES,
+    FILES_TO_UPDATE,
+    UPDATE_BACKUP_FILES,
+    SCRIPT_INSTALL,
+    SCRIPT_UNBLOCK_UPDATE,
+    SCRIPT_UNBLOCK_DNSMASQ,
+    AI_DOMAINS_LIST,
+    DNSMASQ_CONFIG,
+    UNBLOCK_DIR,
+    INIT_DIR,
+)
 from core.utils import (
     load_bypass_list,
     save_bypass_list,
@@ -36,60 +52,22 @@ from core.services import (
     parse_shadowsocks_key, shadowsocks_config,
     parse_trojan_key, trojan_config,
     parse_tor_bridges, tor_config, write_tor_config,
-    restart_service, check_service_status, create_backup, get_local_version, get_remote_version
+    restart_service, check_service_status, get_local_version, get_remote_version
+)
+from core.backup_service import create_backup, get_backup_list, delete_backup
+from core.update_service import (
+    check_disk_space,
+    create_update_backup,
+    download_all_files,
+    run_update_scripts,
+    schedule_webui_restart,
 )
 from core.app_config import WebConfig
 
 
 bp = Blueprint('main', __name__, template_folder='templates', static_folder='static')
 
-
-# =============================================================================
-# DECORATORS
-# =============================================================================
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
-            is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
-                      'application/json' in request.headers.get('Accept', ''))
-            if is_ajax or request.is_json:
-                return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect(url_for('main.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def get_csrf_token():
-    import secrets
-    if 'csrf_token' not in session:
-        session['csrf_token'] = secrets.token_hex(32)
-    return session['csrf_token']
-
-
-def validate_csrf_token() -> bool:
-    token = session.get('csrf_token')
-    form_token = request.form.get('csrf_token')
-    if not token or not form_token or token != form_token:
-        logger.warning("CSRF token validation failed")
-        return False
-    return True
-
-
-def csrf_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if request.method == 'POST':
-            if not validate_csrf_token():
-                flash('Ошибка безопасности: неверный токен', 'danger')
-                is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
-                          'application/json' in request.headers.get('Accept', ''))
-                if is_ajax or request.is_json:
-                    return jsonify({'success': False, 'error': 'CSRF token validation failed'}), 400
-                return redirect(url_for('main.index'))
-        return f(*args, **kwargs)
-    return decorated_function
+executor = ThreadPoolExecutor(max_workers=4)
 
 
 # =============================================================================
@@ -146,10 +124,10 @@ def status():
 def stats():
     config = WebConfig()
     services = {
-        'vless': {'name': 'VLESS', 'init': '/opt/etc/init.d/S24xray', 'config': '/opt/etc/xray/vless.json'},
-        'shadowsocks': {'name': 'Shadowsocks', 'init': '/opt/etc/init.d/S22shadowsocks', 'config': '/opt/etc/shadowsocks.json'},
-        'trojan': {'name': 'Trojan', 'init': '/opt/etc/init.d/S22trojan', 'config': '/opt/etc/trojan.json'},
-        'tor': {'name': 'Tor', 'init': '/opt/etc/init.d/S35tor', 'config': '/opt/etc/tor/torrc'},
+        'vless': {'name': 'VLESS', 'init': INIT_SCRIPTS['vless'], 'config': CONFIG_PATHS['vless']},
+        'shadowsocks': {'name': 'Shadowsocks', 'init': INIT_SCRIPTS['shadowsocks'], 'config': CONFIG_PATHS['shadowsocks']},
+        'trojan': {'name': 'Trojan', 'init': INIT_SCRIPTS['trojan'], 'config': CONFIG_PATHS['trojan']},
+        'tor': {'name': 'Tor', 'init': INIT_SCRIPTS['tor'], 'config': CONFIG_PATHS['tor']},
     }
     for svc in services.values():
         svc['status'] = check_service_status(svc['init'])
@@ -161,11 +139,11 @@ def stats():
         for filename in os.listdir(unblock_dir):
             if filename.endswith('.txt'):
                 try:
-                    data = load_bypass_list(filename, unblock_dir)
-                    lines = data.get('entries', [])
-                    count = len(lines)
+                    filepath = os.path.join(unblock_dir, filename)
+                    entries = load_bypass_list(filepath)
+                    count = len(entries)
                     total_domains += count
-                    bypass_lists.append({'name': filename, 'count': count, 'path': os.path.join(unblock_dir, filename)})
+                    bypass_lists.append({'name': filename, 'count': count, 'path': filepath})
                 except Exception as e:
                     logger.error(f"stats Exception reading {filename}: {e}")
     active_services = sum(1 for s in services.values() if s['status'] == '✅ Активен')
@@ -212,8 +190,7 @@ def service():
 @login_required
 @csrf_required
 def service_restart_unblock():
-    init_script = '/opt/etc/init.d/S99unblock'
-    success, output = restart_service('Unblock', init_script)
+    success, output = restart_service('Unblock', INIT_SCRIPTS['unblock'])
     if success:
         flash('✅ Unblock-сервис успешно перезапущен', 'success')
     else:
@@ -239,10 +216,10 @@ def service_restart_router():
 @csrf_required
 def service_restart_all():
     services = [
-        ('Shadowsocks', '/opt/etc/init.d/S22shadowsocks'),
-        ('Tor', '/opt/etc/init.d/S35tor'),
-        ('VLESS', '/opt/etc/init.d/S24xray'),
-        ('Trojan', '/opt/etc/init.d/S22trojan'),
+        (SERVICES['shadowsocks']['name'], SERVICES['shadowsocks']['init']),
+        (SERVICES['tor']['name'], SERVICES['tor']['init']),
+        (SERVICES['vless']['name'], SERVICES['vless']['init']),
+        (SERVICES['trojan']['name'], SERVICES['trojan']['init']),
     ]
     results = []
     for name, init_script in services:
@@ -288,33 +265,6 @@ def service_dns_override(action):
     return redirect(url_for('main.service'))
 
 
-def get_backup_list():
-    import re
-    backup_dir = '/opt/root/backup'
-    backups = []
-    if os.path.exists(backup_dir):
-        for item in sorted(os.listdir(backup_dir), reverse=True):
-            if (item.startswith('backup_') or item.startswith('update_backup_')) and item.endswith('.tar.gz'):
-                item_path = os.path.join(backup_dir, item)
-                try:
-                    size = os.path.getsize(item_path)
-                    match = re.match(r'(backup|update_backup)_(\d{8})_(\d{6})\.tar\.gz', item)
-                    if match:
-                        date_str = match.group(2)
-                        time_str = match.group(3)
-                    else:
-                        date_str = item
-                        time_str = ''
-                    backups.append({
-                        'name': item, 'path': item_path, 'size': size,
-                        'date': f"{date_str[6:8]}.{date_str[4:6]}.{date_str[0:4]}",
-                        'time': f"{time_str[0:2]}:{time_str[2:4]}" if time_str else '',
-                    })
-                except Exception as e:
-                    logger.error(f"Error processing backup {item}: {e}")
-    return backups
-
-
 @bp.route('/service/backup', methods=['GET', 'POST'])
 @login_required
 def service_backup():
@@ -333,15 +283,11 @@ def service_backup():
             return redirect(url_for('main.service_backup'))
         elif action == 'delete':
             backup_name = request.form.get('backup_name')
-            backup_path = os.path.join('/opt/root/backup', backup_name)
-            if backup_name and os.path.exists(backup_path):
-                try:
-                    os.remove(backup_path)
-                    flash(f'✅ Бэкап {backup_name} удалён', 'success')
-                except Exception as e:
-                    flash(f'❌ Ошибка удаления: {e}', 'danger')
+            success, message = delete_backup(backup_name)
+            if success:
+                flash(f'✅ {message}', 'success')
             else:
-                flash(f'❌ Бэкап не найден', 'danger')
+                flash(f'❌ {message}', 'danger')
             return redirect(url_for('main.service_backup'))
     return render_template('backup.html', backups=backups)
 
@@ -365,205 +311,38 @@ def service_updates():
 @login_required
 @csrf_required
 def service_updates_run():
-    from datetime import datetime
-    import shutil
-    import tarfile
     from core.update_progress import UpdateProgress
     progress = UpdateProgress()
     try:
         if progress.is_running:
             return jsonify({'success': False, 'error': 'Update already in progress'})
-        # Check available disk space before update
-        try:
-            statvfs = os.statvfs('/opt')
-            free_mb = (statvfs.f_frsize * statvfs.f_bavail) / (1024 * 1024)
-            if free_mb < 10:
-                flash(f'❌ Недостаточно места: {free_mb:.1f} МБ свободно (нужно минимум 10 МБ)', 'danger')
-                return jsonify({'success': False, 'error': f'Insufficient disk space: {free_mb:.1f} MB free'})
-        except Exception as e:
-            logger.warning(f"Could not check disk space: {e}")
+
+        ok, free_mb = check_disk_space()
+        if not ok:
+            flash(f'❌ Недостаточно места: {free_mb:.1f} МБ свободно (нужно минимум 10 МБ)', 'danger')
+            return jsonify({'success': False, 'error': f'Insufficient disk space: {free_mb:.1f} MB free'})
+
         flash('⏳ Создание резервной копии...', 'info')
-        backup_dir = '/opt/root/backup'
-        os.makedirs(backup_dir, exist_ok=True)
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_file = f'{backup_dir}/update_backup_{timestamp}.tar.gz'
-        files_to_backup = [
-            '/opt/etc/web_ui', '/opt/etc/xray', '/opt/etc/tor', '/opt/etc/unblock',
-            '/opt/etc/shadowsocks.json', '/opt/etc/trojan',
-            '/opt/etc/unblock-ai.dnsmasq', '/opt/etc/unblock/ai-domains.txt',
-        ]
-        existing_files = [f for f in files_to_backup if os.path.exists(f)]
-        if existing_files:
-            with tarfile.open(backup_file, 'w:gz', compresslevel=1) as tar:
-                for f in existing_files:
-                    tar.add(f, arcname=os.path.basename(f))
+        backup_file = create_update_backup()
+        if backup_file:
             flash(f'💾 Бэкап сохранён: {backup_file}', 'info')
+
         flash('⏳ Загрузка обновлений...', 'info')
-        github_repo = 'royfincher25-source/flymybyte'
-        github_branch = 'master'
-        files_to_update = {
-            'VERSION': '/opt/etc/web_ui/VERSION',
-            'web_ui/.env.example': '/opt/etc/web_ui/.env.example',
-            'web_ui/__init__.py': '/opt/etc/web_ui/__init__.py',
-            'web_ui/routes_service.py': '/opt/etc/web_ui/routes_service.py',
-            'web_ui/routes_keys.py': '/opt/etc/web_ui/routes_keys.py',
-            'web_ui/routes_bypass.py': '/opt/etc/web_ui/routes_bypass.py',
-            'web_ui/app.py': '/opt/etc/web_ui/app.py',
-            'web_ui/env_parser.py': '/opt/etc/web_ui/env_parser.py',
-            'web_ui/core/__init__.py': '/opt/etc/web_ui/core/__init__.py',
-            'web_ui/core/utils.py': '/opt/etc/web_ui/core/utils.py',
-            'web_ui/core/services.py': '/opt/etc/web_ui/core/services.py',
-            'web_ui/core/dns_monitor.py': '/opt/etc/web_ui/core/dns_monitor.py',
-            'web_ui/core/dns_manager.py': '/opt/etc/web_ui/core/dns_manager.py',
-            'web_ui/core/dns_resolver.py': '/opt/etc/web_ui/core/dns_resolver.py',
-            'web_ui/core/ipset_manager.py': '/opt/etc/web_ui/core/ipset_manager.py',
-            'web_ui/core/app_config.py': '/opt/etc/web_ui/core/app_config.py',
-            'web_ui/core/list_catalog.py': '/opt/etc/web_ui/core/list_catalog.py',
-            'web_ui/core/update_progress.py': '/opt/etc/web_ui/core/update_progress.py',
-            'web_ui/core/dns_spoofing.py': '/opt/etc/web_ui/core/dns_spoofing.py',
-            'web_ui/resources/scripts/S99unblock': '/opt/etc/init.d/S99unblock',
-            'web_ui/resources/scripts/S99web_ui': '/opt/etc/init.d/S99web_ui',
-            'web_ui/resources/scripts/100-redirect.sh': '/opt/etc/ndm/netfilter.d/100-redirect.sh',
-            'web_ui/resources/scripts/100-unblock-vpn.sh': '/opt/etc/ndm/ifstatechanged.d/100-unblock-vpn.sh',
-            'web_ui/resources/scripts/100-ipset.sh': '/opt/etc/ndm/fs.d/100-ipset.sh',
-            'web_ui/resources/scripts/unblock_ipset.sh': '/opt/bin/unblock_ipset.sh',
-            'web_ui/resources/scripts/unblock_dnsmasq.sh': '/opt/bin/unblock_dnsmasq.sh',
-            'web_ui/resources/scripts/unblock_update.sh': '/opt/bin/unblock_update.sh',
-            'web_ui/resources/config/dnsmasq.conf': '/opt/etc/dnsmasq.conf',
-            'web_ui/resources/config/crontab': '/opt/etc/crontab',
-            'web_ui/scripts/script.sh': '/opt/root/script.sh',
-            'web_ui/templates/base.html': '/opt/etc/web_ui/templates/base.html',
-            'web_ui/templates/login.html': '/opt/etc/web_ui/templates/login.html',
-            'web_ui/templates/index.html': '/opt/etc/web_ui/templates/index.html',
-            'web_ui/templates/keys.html': '/opt/etc/web_ui/templates/keys.html',
-            'web_ui/templates/bypass.html': '/opt/etc/web_ui/templates/bypass.html',
-            'web_ui/templates/install.html': '/opt/etc/web_ui/templates/install.html',
-            'web_ui/templates/stats.html': '/opt/etc/web_ui/templates/stats.html',
-            'web_ui/templates/service.html': '/opt/etc/web_ui/templates/service.html',
-            'web_ui/templates/updates.html': '/opt/etc/web_ui/templates/updates.html',
-            'web_ui/templates/bypass_view.html': '/opt/etc/web_ui/templates/bypass_view.html',
-            'web_ui/templates/bypass_add.html': '/opt/etc/web_ui/templates/bypass_add.html',
-            'web_ui/templates/bypass_remove.html': '/opt/etc/web_ui/templates/bypass_remove.html',
-            'web_ui/templates/bypass_catalog.html': '/opt/etc/web_ui/templates/bypass_catalog.html',
-            'web_ui/templates/key_generic.html': '/opt/etc/web_ui/templates/key_generic.html',
-            'web_ui/templates/backup.html': '/opt/etc/web_ui/templates/backup.html',
-            'web_ui/templates/dns_monitor.html': '/opt/etc/web_ui/templates/dns_monitor.html',
-            'web_ui/templates/logs.html': '/opt/etc/web_ui/templates/logs.html',
-            'web_ui/templates/dns_spoofing.html': '/opt/etc/web_ui/templates/dns_spoofing.html',
-            'web_ui/static/style.css': '/opt/etc/web_ui/static/style.css',
-            'web_ui/resources/lists/unblock-ai-domains.txt': '/opt/etc/web_ui/resources/lists/unblock-ai-domains.txt',
-            'web_ui/resources/config/unblock-ai.dnsmasq.template': '/opt/etc/web_ui/resources/config/unblock-ai.dnsmasq.template',
-            'web_ui/resources/scripts/unblock_dnsmasq.sh': '/opt/etc/web_ui/resources/scripts/unblock_dnsmasq.sh',
-        }
-        updated_count = 0
-        error_count = 0
-        total_files = len(files_to_update)
+        total_files = len(FILES_TO_UPDATE)
         progress.start_update(total_files=total_files)
-        
-        # Parallel file downloads using ThreadPoolExecutor (3 workers for KN-1212)
-        download_results = {'success': [], 'errors': []}
-        download_lock = threading.Lock()
-        
-        def download_file(source_path, dest_path, idx):
-            if source_path == 'VERSION':
-                url = f'https://raw.githubusercontent.com/{github_repo}/{github_branch}/VERSION'
-            else:
-                url = f'https://raw.githubusercontent.com/{github_repo}/{github_branch}/src/{source_path}'
-            progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total_files)
-            try:
-                response = requests.get(url, timeout=60)
-                response.raise_for_status()
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                with open(dest_path, 'w', encoding='utf-8') as f:
-                    f.write(response.text)
-                filename = os.path.basename(dest_path)
-                is_executable = filename.endswith('.sh') or filename in ['S99web_ui', 'S99unblock']
-                os.chmod(dest_path, 0o755 if is_executable else 0o644)
-                logger.info(f"Updated {dest_path}")
-                with download_lock:
-                    download_results['success'].append(source_path)
-            except requests.exceptions.RequestException as e:
-                logger.error(f'Error downloading {source_path}: {e}')
-                with download_lock:
-                    download_results['errors'].append(source_path)
-            except OSError as e:
-                logger.error(f'Error writing {dest_path}: {e}')
-                with download_lock:
-                    download_results['errors'].append(source_path)
-        
-        import threading
-        with ThreadPoolExecutor(max_workers=3) as download_executor:
-            futures = []
-            for i, (source_path, dest_path) in enumerate(files_to_update.items(), 1):
-                future = download_executor.submit(download_file, source_path, dest_path, i)
-                futures.append(future)
-            for future in futures:
-                future.result()
-        
-        updated_count = len(download_results['success'])
-        error_count = len(download_results['errors'])
+
+        updated_count, error_count = download_all_files(progress)
+
         try:
-            script_steps = 5
-            total_steps = total_files + script_steps
-            current_step = total_files
-            progress.update_progress('Запуск unblock_update.sh', file='unblock_update.sh', progress=current_step, total=total_steps)
-            if os.path.exists('/opt/bin/unblock_update.sh'):
-                result = subprocess.run(['/opt/bin/unblock_update.sh'], timeout=120, capture_output=True, text=True)
-                if result.returncode != 0:
-                    logger.error(f"unblock_update.sh failed: {result.stderr}")
-            current_step += 1
-            progress.update_progress('Запуск unblock_dnsmasq.sh', file='unblock_dnsmasq.sh', progress=current_step, total=total_steps)
-            if os.path.exists('/opt/bin/unblock_dnsmasq.sh'):
-                result = subprocess.run(['/opt/bin/unblock_dnsmasq.sh'], timeout=120, capture_output=True, text=True)
-                if result.returncode != 0:
-                    logger.error(f"unblock_dnsmasq.sh failed: {result.stderr}")
-            current_step += 1
-            progress.update_progress('Генерация AI DNS config', file='resources/scripts/unblock_dnsmasq.sh', progress=current_step, total=total_steps)
-            if os.path.exists('/opt/etc/web_ui/resources/scripts/unblock_dnsmasq.sh'):
-                result = subprocess.run(['sh', '/opt/etc/web_ui/resources/scripts/unblock_dnsmasq.sh'], timeout=120, capture_output=True, text=True)
-                if result.returncode != 0:
-                    logger.error(f"resources/unblock_dnsmasq.sh failed: {result.stderr}")
-            current_step += 1
-            progress.update_progress('Перезапуск S99unblock', file='S99unblock', progress=current_step, total=total_steps)
-            if os.path.exists('/opt/etc/init.d/S99unblock'):
-                try:
-                    result = subprocess.run(['/opt/etc/init.d/S99unblock', 'restart'], timeout=60, capture_output=True, text=True)
-                    if result.returncode != 0:
-                        logger.warning(f"S99unblock restart failed: {result.stderr}")
-                except (subprocess.TimeoutExpired, Exception) as e:
-                    logger.warning(f"S99unblock restart error: {e}")
-            current_step += 1
-            progress.update_progress('Перезапуск S56dnsmasq', file='S56dnsmasq', progress=current_step, total=total_steps)
-            if os.path.exists('/opt/etc/init.d/S56dnsmasq'):
-                try:
-                    result = subprocess.run(['/opt/etc/init.d/S56dnsmasq', 'restart'], timeout=60, capture_output=True, text=True)
-                    if result.returncode != 0:
-                        logger.warning(f"S56dnsmasq restart failed: {result.stderr}")
-                except (subprocess.TimeoutExpired, Exception) as e:
-                    logger.warning(f"S56dnsmasq restart error: {e}")
-            current_step += 1
-        except subprocess.TimeoutExpired:
-            logger.warning("Script execution timeout")
-            progress.set_error('Script execution timeout')
+            run_update_scripts(progress, total_files)
         except Exception as e:
             logger.warning(f"Failed to run update scripts: {e}")
             progress.set_error(f'Failed to run scripts: {e}')
+
         if error_count == 0:
             progress.complete()
             flash(f'✅ Обновление завершено! Обновлено файлов: {updated_count}', 'success')
-            try:
-                restart_script = '/tmp/restart_webui.sh'
-                with open(restart_script, 'w') as f:
-                    f.write('#!/bin/sh\nsleep 5\n/opt/etc/init.d/S99web_ui restart\nrm -f /tmp/restart_webui.sh\n')
-                os.chmod(restart_script, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-                subprocess.Popen([restart_script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                logger.info("S99web_ui restart scheduled")
-            except Exception as e:
-                logger.warning(f"Failed to schedule restart: {e}")
-                try:
-                    subprocess.Popen(['/opt/etc/init.d/S99web_ui', 'restart'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-                except Exception as e2:
-                    logger.error(f"Fallback restart failed: {e2}")
+            schedule_webui_restart()
             return jsonify({'success': True, 'message': f'✅ Обновление завершено! Обновлено файлов: {updated_count}', 'reload': True, 'reload_delay': 3000})
         else:
             progress.set_error(f'Обновлено: {updated_count}, ошибок: {error_count}')
@@ -580,7 +359,6 @@ def service_updates_run():
 @csrf_required
 def service_install():
     if request.method == 'POST':
-        script_path = '/opt/root/script.sh'
         local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')
         resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
         try:
@@ -590,26 +368,25 @@ def service_install():
                 return redirect(url_for('main.service_install'))
             with open(local_script_path, 'r', encoding='utf-8') as f:
                 script_content = f.read()
-            os.makedirs(os.path.dirname(script_path), exist_ok=True)
-            with open(script_path, 'w', encoding='utf-8') as f:
+            os.makedirs(os.path.dirname(SCRIPT_INSTALL), exist_ok=True)
+            with open(SCRIPT_INSTALL, 'w', encoding='utf-8') as f:
                 f.write(script_content)
-            os.chmod(script_path, 0o755)
+            os.chmod(SCRIPT_INSTALL, 0o755)
             flash('✅ Скрипт скопирован', 'success')
             import shutil
             from datetime import datetime
-            backup_dir = '/opt/etc/web_ui/backup'
+            backup_dir = f'{WEB_UI_DIR}/backup'
             backup_subdir = os.path.join(backup_dir, datetime.now().strftime('%Y%m%d_%H%M%S'))
-            web_ui_dir = '/opt/etc/web_ui'
-            if os.path.exists(web_ui_dir):
+            if os.path.exists(WEB_UI_DIR):
                 try:
                     os.makedirs(backup_dir, exist_ok=True)
-                    shutil.copytree(web_ui_dir, backup_subdir)
+                    shutil.copytree(WEB_UI_DIR, backup_subdir)
                     flash(f'💾 Бэкап создан: {backup_subdir}', 'info')
                 except Exception as e:
                     flash(f'⚠️ Бэкап не создан: {e}', 'warning')
             if os.path.exists(resources_dir):
                 flash('⏳ Копирование ресурсов...', 'info')
-                resources_dest = '/opt/etc/web_ui/resources'
+                resources_dest = f'{WEB_UI_DIR}/resources'
                 os.makedirs(resources_dest, exist_ok=True)
                 for item in os.listdir(resources_dir):
                     src_item = os.path.join(resources_dir, item)
@@ -623,7 +400,8 @@ def service_install():
                 flash('✅ Ресурсы скопированы', 'success')
             flash('⏳ Генерация конфигурации DNS-обхода AI...', 'info')
             try:
-                result = subprocess.run(['sh', '/opt/etc/web_ui/resources/scripts/unblock_dnsmasq.sh'], capture_output=True, text=True, timeout=30)
+                local_dnsmasq_script = f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh'
+                result = subprocess.run(['sh', local_dnsmasq_script], capture_output=True, text=True, timeout=30)
                 if result.returncode == 0:
                     flash('✅ DNS-обход AI сгенерирован', 'success')
                 else:
@@ -635,7 +413,7 @@ def service_install():
             return redirect(url_for('main.service_install'))
         try:
             flash('⏳ Установка началась...', 'info')
-            process = subprocess.Popen([script_path, '-install'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            process = subprocess.Popen([SCRIPT_INSTALL, '-install'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
             for line in process.stdout:
                 flash(f'⏳ {line.strip()}', 'info')
             process.wait(timeout=600)
@@ -645,9 +423,9 @@ def service_install():
                     result = subprocess.run(['sh', '-c', 'ipset list -n'], capture_output=True, text=True, timeout=10)
                     if 'unblocksh' in result.stdout:
                         flash('✅ ipset initialized', 'success')
-                    for script in ['S99unblock', 'S99web_ui']:
-                        if os.path.exists(f'/opt/etc/init.d/{script}'):
-                            flash(f'✅ {script} installed', 'success')
+                    for script_name in ['S99unblock', 'S99web_ui']:
+                        if os.path.exists(f'{INIT_DIR}/{script_name}'):
+                            flash(f'✅ {script_name} installed', 'success')
                 except Exception as e:
                     logger.error(f"Post-install verification error: {e}")
             else:
@@ -664,9 +442,8 @@ def service_install():
 @csrf_required
 def service_remove():
     if request.method == 'POST':
-        script_path = '/opt/root/script.sh'
-        local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')
-        if not os.path.exists(script_path):
+        if not os.path.exists(SCRIPT_INSTALL):
+            local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')
             try:
                 flash('⏳ Копирование скрипта...', 'info')
                 if not os.path.exists(local_script_path):
@@ -674,17 +451,17 @@ def service_remove():
                     return redirect(url_for('main.service_remove'))
                 with open(local_script_path, 'r', encoding='utf-8') as f:
                     script_content = f.read()
-                os.makedirs(os.path.dirname(script_path), exist_ok=True)
-                with open(script_path, 'w', encoding='utf-8') as f:
+                os.makedirs(os.path.dirname(SCRIPT_INSTALL), exist_ok=True)
+                with open(SCRIPT_INSTALL, 'w', encoding='utf-8') as f:
                     f.write(script_content)
-                os.chmod(script_path, 0o755)
+                os.chmod(SCRIPT_INSTALL, 0o755)
                 flash('✅ Скрипт скопирован', 'success')
             except Exception as e:
                 flash(f'❌ Ошибка копирования скрипта: {str(e)}', 'danger')
                 return redirect(url_for('main.service_remove'))
         try:
             flash('⏳ Удаление началось...', 'info')
-            process = subprocess.Popen([script_path, '-remove'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+            process = subprocess.Popen([SCRIPT_INSTALL, '-remove'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
             for line in process.stdout:
                 flash(f'⏳ {line.strip()}', 'info')
             process.wait(timeout=300)
@@ -923,7 +700,7 @@ def dns_spoofing_save_domains():
         from core.dns_spoofing import DNSSpoofing
         spoofing = DNSSpoofing()
         valid_domains = [d for d in domains if spoofing._validate_domain(d)]
-        domains_path = Path('/opt/etc/unblock/ai-domains.txt')
+        domains_path = Path(AI_DOMAINS_LIST)
         domains_path.parent.mkdir(parents=True, exist_ok=True)
         domains_path.write_text('\n'.join(valid_domains), encoding='utf-8')
         logger.info(f"Saved {len(valid_domains)} AI domains")
@@ -937,7 +714,7 @@ def dns_spoofing_save_domains():
 def dns_spoofing_preset():
     try:
         from pathlib import Path
-        preset_path = Path('/opt/etc/web_ui/resources/lists/unblock-ai-domains.txt')
+        preset_path = Path(f'{WEB_UI_DIR}/resources/lists/unblock-ai-domains.txt')
         if not preset_path.exists():
             return jsonify({'success': False, 'error': 'Preset not found'})
         content = preset_path.read_text(encoding='utf-8')

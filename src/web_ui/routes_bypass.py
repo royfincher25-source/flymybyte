@@ -12,11 +12,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Validation constants for embedded devices (128MB RAM)
-MAX_ENTRIES_PER_REQUEST = 100
-MAX_ENTRY_LENGTH = 253
-MAX_TOTAL_INPUT_SIZE = 50 * 1024
-
+from core.decorators import login_required, get_csrf_token, validate_csrf_token, csrf_required
+from core.constants import (
+    MAX_ENTRIES_PER_REQUEST,
+    MAX_ENTRY_LENGTH,
+    MAX_TOTAL_INPUT_SIZE,
+)
 from core.utils import (
     load_bypass_list,
     save_bypass_list,
@@ -29,58 +30,6 @@ from core.app_config import WebConfig
 
 
 bp = Blueprint('bypass', __name__, template_folder='templates', static_folder='static')
-
-
-# =============================================================================
-# DECORATORS
-# =============================================================================
-
-def login_required(f):
-    """Decorator to require authentication for a route."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
-            is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
-                      'application/json' in request.headers.get('Accept', ''))
-            if is_ajax or request.is_json:
-                return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect(url_for('main.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def get_csrf_token():
-    """Generate or get CSRF token for the session."""
-    import secrets
-    if 'csrf_token' not in session:
-        session['csrf_token'] = secrets.token_hex(32)
-    return session['csrf_token']
-
-
-def validate_csrf_token() -> bool:
-    """Validate CSRF token from session and form."""
-    token = session.get('csrf_token')
-    form_token = request.form.get('csrf_token')
-    if not token or not form_token or token != form_token:
-        logger.warning("CSRF token validation failed")
-        return False
-    return True
-
-
-def csrf_required(f):
-    """Decorator to require CSRF token on POST requests."""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if request.method == 'POST':
-            if not validate_csrf_token():
-                flash('Ошибка безопасности: неверный токен', 'danger')
-                is_ajax = (request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
-                          'application/json' in request.headers.get('Accept', ''))
-                if is_ajax or request.is_json:
-                    return jsonify({'success': False, 'error': 'CSRF token validation failed'}), 400
-                return redirect(url_for('main.index'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 # =============================================================================

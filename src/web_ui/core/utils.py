@@ -18,35 +18,42 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Any, Dict
 
 LOG_FILE = os.environ.get('LOG_FILE', '/opt/var/log/web_ui.log')
-LOG_MAX_BYTES = 100 * 1024  # 100KB
-LOG_BACKUP_COUNT = 3  # 3 backup files = 300KB max
+LOG_MAX_BYTES = 100 * 1024
+LOG_BACKUP_COUNT = 3
 
-# Создать logger до использования
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+_logging_initialized = False
 
-if LOG_FILE:
-    try:
-        log_dir = os.path.dirname(LOG_FILE)
-        if log_dir and not os.path.exists(log_dir):
-            os.makedirs(log_dir, exist_ok=True)
-        # RotatingFileHandler с ротацией для embedded-устройств
-        file_handler = RotatingFileHandler(
-            LOG_FILE,
-            maxBytes=LOG_MAX_BYTES,
-            backupCount=LOG_BACKUP_COUNT,
-            encoding='utf-8'  # Явно указываем UTF-8
-        )
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        logging.getLogger().addHandler(file_handler)
-        logger.info(f"Log rotation enabled: {LOG_MAX_BYTES} bytes x {LOG_BACKUP_COUNT} files")
-    except Exception as e:
-        logger.error(f"Failed to setup log rotation: {e}")
-        pass
+
+def setup_logging():
+    """Configure logging with rotation. Called once from app.py."""
+    global _logging_initialized
+    if _logging_initialized:
+        return
+    _logging_initialized = True
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
+    if LOG_FILE:
+        try:
+            log_dir = os.path.dirname(LOG_FILE)
+            if log_dir and not os.path.exists(log_dir):
+                os.makedirs(log_dir, exist_ok=True)
+            file_handler = RotatingFileHandler(
+                LOG_FILE,
+                maxBytes=LOG_MAX_BYTES,
+                backupCount=LOG_BACKUP_COUNT,
+                encoding='utf-8'
+            )
+            file_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+            logging.getLogger().addHandler(file_handler)
+            logger.info(f"Log rotation enabled: {LOG_MAX_BYTES} bytes x {LOG_BACKUP_COUNT} files")
+        except Exception as e:
+            logger.error(f"Failed to setup log rotation: {e}")
 
 
 # =============================================================================
@@ -58,52 +65,28 @@ import threading
 
 class Cache:
     """
-    LRU cache with TTL and memory limit (50 entries for embedded devices).
-
-    Optimized for embedded devices with limited RAM (128MB).
-    Reduced from 100 to 50 entries to save ~15KB memory.
-    Thread-safe with threading.Lock for concurrent access.
-
-    Attributes:
-        _cache: Dictionary storing cached values
-        _timestamps: Dictionary storing cache timestamps
-        _access_order: List tracking access order for LRU eviction
-        _lock: Threading lock for thread safety
-        MAX_ENTRIES: Maximum number of cache entries (default: 50)
+    LRU cache with TTL and memory limit (30 entries for embedded devices).
+    Thread-safe with threading.Lock.
 
     Example:
         >>> Cache.set("key", "value", ttl=60)
         >>> Cache.get("key")
         'value'
-        >>> Cache.is_valid("key")
-        True
     """
 
     _cache: Dict[str, Any] = {}
     _timestamps: Dict[str, float] = {}
     _access_order: OrderedDict[str, None] = OrderedDict()
-    _lock = threading.Lock()  # Thread safety for concurrent access
-    MAX_ENTRIES: int = 30  # Оптимизировано для KN-1212 (128MB RAM)
-    
+    _lock = threading.Lock()
+    MAX_ENTRIES: int = 30
+
     @classmethod
     def set(cls, key: str, value: Any, ttl: int = 60) -> None:
-        """
-        Set cache value with TTL.
-
-        Args:
-            key: Cache key
-            value: Value to cache
-            ttl: Time to live in seconds (default: 60)
-        """
         with cls._lock:
-            # LRU eviction if cache is full
             if len(cls._cache) >= cls.MAX_ENTRIES and key not in cls._cache:
                 cls._evict_oldest()
-
             cls._cache[key] = value
             cls._timestamps[key] = time.time() + ttl
-
-            # Update access order (O(1) with OrderedDict)
             if key in cls._access_order:
                 cls._access_order.move_to_end(key)
             else:
@@ -111,81 +94,49 @@ class Cache:
 
     @classmethod
     def get(cls, key: str, default: Any = None) -> Any:
-        """
-        Get cached value.
-
-        Args:
-            key: Cache key
-            default: Default value if not found or expired
-
-        Returns:
-            Cached value or default
-        """
         with cls._lock:
-            # Check if exists and not expired (inline to avoid reentrant lock)
             if key not in cls._cache:
                 return default
-            
             if time.time() > cls._timestamps.get(key, 0):
-                # Expired - remove
                 cls._remove(key)
                 return default
-
-            # Update access order (O(1) with OrderedDict)
             if key in cls._access_order:
                 cls._access_order.move_to_end(key)
             else:
                 cls._access_order[key] = None
-
             return cls._cache.get(key, default)
 
     @classmethod
     def is_valid(cls, key: str) -> bool:
-        """
-        Check if cache entry is valid (exists and not expired).
-
-        Args:
-            key: Cache key
-
-        Returns:
-            True if valid, False otherwise
-        """
         with cls._lock:
             if key not in cls._cache:
                 return False
-
             if time.time() > cls._timestamps.get(key, 0):
-                # Expired - remove
                 cls._remove(key)
                 return False
-
             return True
-    
+
     @classmethod
     def _remove(cls, key: str) -> None:
-        """Remove cache entry."""
         cls._cache.pop(key, None)
         cls._timestamps.pop(key, None)
         cls._access_order.pop(key, None)
-    
+
     @classmethod
     def _evict_oldest(cls) -> None:
-        """Evict oldest (least recently used) entry."""
         if cls._access_order:
             oldest, _ = cls._access_order.popitem(last=False)
             cls._cache.pop(oldest, None)
             cls._timestamps.pop(oldest, None)
-    
+
     @classmethod
     def clear(cls) -> None:
-        """Clear all cache entries."""
         cls._cache.clear()
         cls._timestamps.clear()
         cls._access_order.clear()
 
     @classmethod
     def get_stats(cls) -> dict:
-        """Get cache statistics."""
         return {
             'entries': len(cls._cache),
             'max_entries': cls.MAX_ENTRIES,
@@ -194,16 +145,6 @@ class Cache:
 
     @classmethod
     def cleanup_expired(cls) -> int:
-        """
-        Remove expired entries from cache.
-        
-        Returns:
-            Number of entries removed
-            
-        Example:
-            >>> removed = Cache.cleanup_expired()
-            >>> print(f"Cleaned up {removed} expired entries")
-        """
         now = time.time()
         expired = [k for k, ts in cls._timestamps.items() if now > ts]
         for key in expired:
