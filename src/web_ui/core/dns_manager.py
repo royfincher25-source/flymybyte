@@ -16,12 +16,13 @@ logger = logging.getLogger(__name__)
 DNSMASQ_RESTART_CMD = [INIT_SCRIPTS['dnsmasq'], 'restart']
 
 
-def update_dnsmasq_dns(server_host: str) -> Tuple[bool, str]:
+def update_dnsmasq_dns(server_host: str, fallback_servers: list = None) -> Tuple[bool, str]:
     """
-    Update dnsmasq to use specific DNS server.
+    Update dnsmasq to use specific DNS server(s) with fallbacks.
 
     Args:
-        server_host: DNS server IP address
+        server_host: Primary DNS server IP address
+        fallback_servers: List of fallback DNS servers (default: ['1.1.1.1'])
 
     Returns:
         Tuple of (success: bool, message: str)
@@ -29,8 +30,12 @@ def update_dnsmasq_dns(server_host: str) -> Tuple[bool, str]:
     Notes:
         - Atomic write via .tmp file to prevent corruption
         - Automatically restarts dnsmasq after config change
-        - Removes existing server= lines before adding new one
+        - Removes existing server= lines before adding new ones
+        - Adds fallback servers for redundancy
     """
+    if fallback_servers is None:
+        fallback_servers = ['1.1.1.1']
+
     try:
         # Read current config
         config_path = Path(DNSMASQ_CONFIG)
@@ -55,15 +60,17 @@ def update_dnsmasq_dns(server_host: str) -> Tuple[bool, str]:
             else:
                 lines.append(line)
 
-        # Add new server line
+        # Add new server lines: primary + fallbacks
         lines.append(f'server={server_host}')
+        for fb in fallback_servers:
+            lines.append(f'server={fb}')
 
         # Atomic write via .tmp file
         tmp_path = config_path.with_suffix('.tmp')
         tmp_path.write_text('\n'.join(lines))
         tmp_path.replace(config_path)
 
-        logger.debug(f"Written new dnsmasq config with server={server_host}")
+        logger.debug(f"Written new dnsmasq config with server={server_host} + {len(fallback_servers)} fallback(s)")
 
         # Restart dnsmasq to apply changes
         result = subprocess.run(
@@ -74,7 +81,7 @@ def update_dnsmasq_dns(server_host: str) -> Tuple[bool, str]:
         )
 
         if result.returncode == 0:
-            logger.info(f"Updated dnsmasq to use {server_host}")
+            logger.info(f"Updated dnsmasq to use {server_host} + {len(fallback_servers)} fallback(s)")
             return True, "OK"
         else:
             error_msg = result.stderr.strip() or result.stdout.strip() or f"dnsmasq restart failed (code {result.returncode})"

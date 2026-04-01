@@ -199,9 +199,10 @@ class DNSMonitor:
             self._current_server = best_server
             logger.info(f"Selected primary DNS: {best_server['name']} ({best_latency}ms)")
 
-            # Update dnsmasq config
+            # Update dnsmasq config with fallbacks
             from .dns_manager import update_dnsmasq_dns
-            success, msg = update_dnsmasq_dns(best_server['host'])
+            fallback = [s['host'] for s in self._servers['primary'] if s['host'] != best_server['host']]
+            success, msg = update_dnsmasq_dns(best_server['host'], fallback_servers=fallback)
             if success:
                 logger.info(f"dnsmasq updated to use {best_server['name']}")
             else:
@@ -220,9 +221,10 @@ class DNSMonitor:
                 self._current_server = server
                 self._failures = 0
 
-                # Update dnsmasq config
+                # Update dnsmasq config with fallbacks
                 from .dns_manager import update_dnsmasq_dns
-                success, msg = update_dnsmasq_dns(server['host'])
+                fallback = [s['host'] for s in self._servers['backup'] if s['host'] != server['host']]
+                success, msg = update_dnsmasq_dns(server['host'], fallback_servers=fallback)
                 if success:
                     logger.info(f"Switched to backup DNS: {server['name']} (dnsmasq updated)")
                 else:
