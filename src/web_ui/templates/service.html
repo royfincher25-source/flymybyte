@@ -307,6 +307,22 @@ setInterval(updateStats, 10000);
         </div>
     </div>
 
+    <!-- Перезапуск веб-интерфейса -->
+    <div>
+        <div class="card shadow-sm">
+            <div class="card__body">
+                <h5 class="card__title"><i class="fm fm-browser"></i> Перезапуск веб-интерфейса</h5>
+                <p class="text-muted small">Перезапуск Flask-приложения (~5 сек)</p>
+                <form method="POST" action="{{ url_for('main.service_restart_webui') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn--secondary btn--sm">
+                        <i class="fm fm-arrow-clockwise"></i> Перезапустить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Бэкап -->
     <div>
         <div class="card shadow-sm">

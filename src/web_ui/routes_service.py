@@ -237,6 +237,20 @@ def service_restart_all():
     return redirect(url_for('main.service'))
 
 
+@bp.route('/service/restart-webui', methods=['POST'])
+@login_required
+@csrf_required
+def service_restart_webui():
+    try:
+        from core.update_service import schedule_webui_restart
+        schedule_webui_restart()
+        flash('✅ Веб-интерфейс будет перезапущен через 5 секунд', 'success')
+    except Exception as e:
+        flash(f'❌ Ошибка: {str(e)}', 'danger')
+        logger.error(f"service_restart_webui Exception: {e}")
+    return redirect(url_for('main.service'))
+
+
 @bp.route('/service/dns-override/<action>', methods=['POST'])
 @login_required
 @csrf_required
