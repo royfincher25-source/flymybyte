@@ -242,6 +242,7 @@ FILES_TO_UPDATE = {
     'web_ui/resources/config/crontab': CRONTAB_FILE,
     'web_ui/scripts/script.sh': SCRIPT_INSTALL,
     'web_ui/templates/base.html': f'{WEB_UI_DIR}/templates/base.html',
+    'web_ui/templates/macros.html': f'{WEB_UI_DIR}/templates/macros.html',
     'web_ui/templates/login.html': f'{WEB_UI_DIR}/templates/login.html',
     'web_ui/templates/index.html': f'{WEB_UI_DIR}/templates/index.html',
     'web_ui/templates/keys.html': f'{WEB_UI_DIR}/templates/keys.html',
