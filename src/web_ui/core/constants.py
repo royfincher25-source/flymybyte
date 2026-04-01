@@ -259,6 +259,8 @@ FILES_TO_UPDATE = {
     'web_ui/templates/logs.html': f'{WEB_UI_DIR}/templates/logs.html',
     'web_ui/templates/dns_spoofing.html': f'{WEB_UI_DIR}/templates/dns_spoofing.html',
     'web_ui/static/style.css': f'{WEB_UI_DIR}/static/style.css',
+    'web_ui/static/fonts/flymybyte-icons.woff2': f'{WEB_UI_DIR}/static/fonts/flymybyte-icons.woff2',
+    'web_ui/static/style.css': f'{WEB_UI_DIR}/static/style.css',
     'web_ui/resources/lists/unblock-ai-domains.txt': AI_DOMAINS_LIST,
     'web_ui/resources/config/unblock-ai.dnsmasq.template': DNSMASQ_AI_TEMPLATE,
     'web_ui/resources/scripts/unblock_dnsmasq.sh': f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh',
