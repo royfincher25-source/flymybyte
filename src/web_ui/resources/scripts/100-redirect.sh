@@ -31,8 +31,8 @@ RULES=$(iptables-save 2>/dev/null)
 IPSETS=$(ipset list -n 2>/dev/null)
 
 for protocol in udp tcp; do
-    if [ -z "$(echo "$RULES" | grep "$protocol --dport 53 -j REDIRECT.*5353")" ]; then
-        iptables -I PREROUTING -w -t nat -p "$protocol" --dport 53 -j REDIRECT --to-ports 5353
+    if [ -z "$(echo "$RULES" | grep "$protocol --dport 53 -j DNAT")" ]; then
+        iptables -I PREROUTING -w -t nat -p "$protocol" --dport 53 -j DNAT --to "$local_ip"
     fi
 done
 
@@ -111,17 +111,6 @@ fi
 
 if [ -z "$table" ]; then
     echo "Применение правил перенаправления трафика..."
-    
-    # DNS redirect to entware dnsmasq (port 5353)
-    echo "  → Перенаправление DNS на порт 5353..."
-    for proto in udp tcp; do
-        if ! iptables -t nat -C PREROUTING -p "$proto" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null; then
-            iptables -t nat -I PREROUTING -w -t nat -p "$proto" --dport 53 -j REDIRECT --to-ports 5353 2>/dev/null && \
-                echo "    ✅ $proto DNS → 5353" || echo "    ⚠️  $proto DNS правило не добавлено"
-        else
-            echo "    ✅ $proto DNS → 5353 (уже есть)"
-        fi
-    done
     
     # Получение локального IP
     local_ip=$(ip -4 addr show br0 | awk '/inet /{print $2}' | cut -d/ -f1 | grep -E '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' | head -n1)

@@ -276,12 +276,12 @@ def service_restore_dns():
     # 2. Remove DNS redirect rules (restore router DNS)
     try:
         for proto in ['udp', 'tcp']:
-            # Remove old DNAT rules
+            # Remove DNAT rules (DNS Override)
             subprocess.run(
                 ['iptables', '-D', 'PREROUTING', '-t', 'nat', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to', '192.168.1.1'],
                 capture_output=True, text=True, timeout=5
             )
-            # Remove new REDIRECT rules
+            # Remove REDIRECT rules (legacy)
             subprocess.run(
                 ['iptables', '-D', 'PREROUTING', '-t', 'nat', '-p', proto, '--dport', '53', '-j', 'REDIRECT', '--to-ports', '5353'],
                 capture_output=True, text=True, timeout=5

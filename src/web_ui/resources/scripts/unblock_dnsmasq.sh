@@ -135,22 +135,13 @@ fi
 
 # Ensure dnsmasq.conf ends with a newline (prevent line concatenation)
 if [ -s /opt/etc/dnsmasq.conf ]; then
-    # Check if file ends with newline
-    if [ "$(tail -c 1 /opt/etc/dnsmasq.conf | wc -l)" -eq 0 ]; then
-        echo "" >> /opt/etc/dnsmasq.conf
-    fi
-fi
-
-# Ensure dnsmasq.conf ends with a newline (prevent line concatenation)
-if [ -s /opt/etc/dnsmasq.conf ]; then
-    # Check if file ends with newline
-    if [ "$(tail -c 1 /opt/etc/dnsmasq.conf | wc -l)" -eq 0 ]; then
-        echo "" >> /opt/etc/dnsmasq.conf
-    fi
+    # Add a newline if file doesn't end with one
+    sed -i -e '$a\' /opt/etc/dnsmasq.conf
 fi
 
 # Add unblock-ai.dnsmasq to dnsmasq.conf if not already present
 if ! grep -q 'conf-file=/opt/etc/unblock-ai.dnsmasq' /opt/etc/dnsmasq.conf; then
+    echo "" >> /opt/etc/dnsmasq.conf
     echo "# AI Domains DNS Spoofing" >> /opt/etc/dnsmasq.conf
     echo "conf-file=/opt/etc/unblock-ai.dnsmasq" >> /opt/etc/dnsmasq.conf
     echo "Added unblock-ai.dnsmasq to dnsmasq.conf" >> "$LOGFILE"
@@ -158,6 +149,31 @@ fi
 
 # Add IPv6 filtering if not already present (prevent IPv6 DNS leaks)
 if ! grep -q 'filter-aaaa' /opt/etc/dnsmasq.conf; then
+    echo "" >> /opt/etc/dnsmasq.conf
+    echo "# IPv6 Filtering (prevent DNS leaks)" >> /opt/etc/dnsmasq.conf
+    echo "filter-aaaa" >> /opt/etc/dnsmasq.conf
+    echo "filter-aaaa-on-local" >> /opt/etc/dnsmasq.conf
+    echo "Added IPv6 filtering to dnsmasq.conf" >> "$LOGFILE"
+fi
+fi
+
+# Ensure dnsmasq.conf ends with a newline (prevent line concatenation)
+if [ -s /opt/etc/dnsmasq.conf ]; then
+    # Add a newline if file doesn't end with one
+    sed -i -e '$a\' /opt/etc/dnsmasq.conf
+fi
+
+# Add unblock-ai.dnsmasq to dnsmasq.conf if not already present
+if ! grep -q 'conf-file=/opt/etc/unblock-ai.dnsmasq' /opt/etc/dnsmasq.conf; then
+    echo "" >> /opt/etc/dnsmasq.conf
+    echo "# AI Domains DNS Spoofing" >> /opt/etc/dnsmasq.conf
+    echo "conf-file=/opt/etc/unblock-ai.dnsmasq" >> /opt/etc/dnsmasq.conf
+    echo "Added unblock-ai.dnsmasq to dnsmasq.conf" >> "$LOGFILE"
+fi
+
+# Add IPv6 filtering if not already present (prevent IPv6 DNS leaks)
+if ! grep -q 'filter-aaaa' /opt/etc/dnsmasq.conf; then
+    echo "" >> /opt/etc/dnsmasq.conf
     echo "# IPv6 Filtering (prevent DNS leaks)" >> /opt/etc/dnsmasq.conf
     echo "filter-aaaa" >> /opt/etc/dnsmasq.conf
     echo "filter-aaaa-on-local" >> /opt/etc/dnsmasq.conf
