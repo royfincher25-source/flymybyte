@@ -342,7 +342,7 @@ def save_bypass_list(filepath: str, sites: List[str]) -> None:
         Cache._cache.pop(cache_key, None)
         Cache._timestamps.pop(cache_key, None)
         if cache_key in Cache._access_order:
-            Cache._access_order.remove(cache_key)
+            del Cache._access_order[cache_key]
     
     except Exception as e:
         logger.error(f"Error saving bypass list {filepath}: {e}")
