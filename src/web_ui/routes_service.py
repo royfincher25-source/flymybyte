@@ -15,11 +15,8 @@ from werkzeug.utils import secure_filename
 from markupsafe import escape
 
 logger = logging.getLogger(__name__)
-logger.info("routes_service.py: module import started")
 
 from core.decorators import login_required, get_csrf_token, validate_csrf_token, csrf_required
-logger.info("routes_service.py: decorators imported")
-
 from core.constants import (
     MAX_ENTRIES_PER_REQUEST,
     MAX_ENTRY_LENGTH,
@@ -44,8 +41,6 @@ from core.constants import (
     UNBLOCK_DIR,
     INIT_DIR,
 )
-logger.info("routes_service.py: constants imported")
-
 from core.utils import (
     load_bypass_list,
     save_bypass_list,
@@ -53,11 +48,7 @@ from core.utils import (
     run_unblock_update,
     is_ip_address
 )
-logger.info("routes_service.py: utils imported")
-
 from core.ipset_manager import bulk_add_to_ipset, ensure_ipset_exists, bulk_remove_from_ipset
-logger.info("routes_service.py: ipset_manager imported")
-
 from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_hysteria2_key, hysteria2_config, write_hysteria2_config,
@@ -66,11 +57,7 @@ from core.services import (
     parse_tor_bridges, tor_config, write_tor_config,
     restart_service, check_service_status, get_local_version, get_remote_version
 )
-logger.info("routes_service.py: services imported")
-
 from core.backup_service import create_backup, get_backup_list, delete_backup
-logger.info("routes_service.py: backup_service imported")
-
 from core.update_service import (
     check_disk_space,
     create_update_backup,
@@ -78,17 +65,12 @@ from core.update_service import (
     run_update_scripts,
     schedule_webui_restart,
 )
-logger.info("routes_service.py: update_service imported")
-
 from core.app_config import WebConfig
-logger.info("routes_service.py: app_config imported")
 
 
 bp = Blueprint('main', __name__, template_folder='templates', static_folder='static')
-logger.info(f"routes_service.py: blueprint '{bp.name}' created")
 
 executor = ThreadPoolExecutor(max_workers=4)
-logger.info("routes_service.py: executor created")
 
 
 # =============================================================================
@@ -791,12 +773,9 @@ def dns_spoofing_logs():
 
 
 # Keys & Bypass routes
-logger.info("routes_service.py: defining keys route")
-
 @bp.route('/keys')
 @login_required
 def keys():
-    logger.info("routes_service.py: keys() called")
     services = {
         'vless': {'name': 'VLESS', 'config': CONFIG_PATHS['vless'], 'init': INIT_SCRIPTS['vless']},
         'hysteria2': {'name': 'Hysteria 2', 'config': CONFIG_PATHS['hysteria2'], 'init': INIT_SCRIPTS['hysteria2']},

@@ -40,11 +40,8 @@ def create_app(config_class=None):
     app.config['SESSION_COOKIE_SECURE'] = False
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
-    logger.info("app.py: about to import routes_service")
     from routes_service import bp as main_bp, shutdown_executor
-    logger.info("app.py: routes_service imported successfully")
     app.register_blueprint(main_bp)
-    logger.info(f"app.py: blueprint '{main_bp.name}' registered with {len(main_bp.deferred_functions)} routes")
 
     @app.context_processor
     def inject_csrf_token():
