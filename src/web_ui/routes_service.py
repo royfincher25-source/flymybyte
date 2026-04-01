@@ -374,7 +374,7 @@ def service_updates_run():
 @bp.route('/install', methods=['GET', 'POST'])
 @login_required
 @csrf_required
-def service_install():
+def install():
     if request.method == 'POST':
         local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')
         resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
@@ -457,7 +457,7 @@ def service_install():
 @bp.route('/remove', methods=['GET', 'POST'])
 @login_required
 @csrf_required
-def service_remove():
+def remove():
     if request.method == 'POST':
         if not os.path.exists(SCRIPT_INSTALL):
             local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')
