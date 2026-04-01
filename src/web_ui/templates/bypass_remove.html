@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Удалить — {{ filename }}.txt{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-dash-lg"></i> Удалить из {{ filename }}.txt</h2>
+    <div>
+        <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+<form method="POST" action="{{ url_for('main.remove_from_bypass', filename=filename) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="card shadow-sm">
+        <div class="card__body">
+            <h5 class="card-title">Записи для удаления</h5>
+            <p class="card__text text-muted">
+                Введите домены, IP-адреса или другие записи для удаления (каждую с новой строки):
+            </p>
+            
+            <div class="mb-3">
+                <textarea 
+                    name="entries" 
+                    id="entries" 
+                    class="input" 
+                    rows="10"
+                    placeholder="example.com&#10;test.com&#10;192.168.1.1"
+                    required
+                ></textarea>
+                <div class="small text-muted">
+                    Можно вводить несколько записей, каждую с новой строки.
+                    Записи, которых нет в списке, будут проигнорированы.
+                </div>
+            </div>
+            
+            <div class="gap-2">
+                <button type="submit" class="btn btn--danger">
+                    <i class="fm fm-trash"></i> Удалить
+                </button>
+                <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn--outline">
+                    <i class="fm fm-x-lg"></i> Отмена
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+{% if entries %}
+<div class="card shadow-sm mt-4">
+    <div class="card__header">
+        <h5 class="mb-0">Текущие записи в списке ({{ entries|length }})</h5>
+    </div>
+    <div class="card__body">
+        <div class="table-responsive">
+            <table class="table table--sm table--hover">
+                <thead>
+                    <tr>
+                        <th>Запись</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in entries %}
+                    <tr>
+                        <td><code>{{ entry }}</code></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

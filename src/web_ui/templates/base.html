@@ -1,0 +1,128 @@
+{% import "macros.html" as m %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}FlyMyByte{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a class="navbar__brand" href="{{ url_for('main.index') }}">
+                <i class="fm fm-shield-check fm-lg"></i>
+                <span>FlyMyByte</span>
+            </a>
+            {% if session.get('authenticated') %}
+            <div class="navbar__nav">
+                <a class="nav-link" href="{{ url_for('main.logout') }}">
+                    <i class="fm fm-box-arrow-right"></i>
+                    <span>Выход</span>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </nav>
+
+    <main class="container mt-4">
+        {{ m.flash_messages() }}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="row row--3col">
+                <div class="text-center text-start">
+                    <small>
+                        <i class="fm fm-shield-check"></i>
+                        <strong>FlyMyByte</strong> Web
+                    </small>
+                </div>
+                <div class="text-center">
+                    <small>
+                        <i class="fm fm-github"></i>
+                        <a href="https://github.com/royfincher25-source/flymybyte" target="_blank" class="text-decoration-none">
+                            GitHub
+                        </a>
+                    </small>
+                </div>
+                <div class="text-center text-end">
+                    <small>
+                        <i class="fm fm-tag"></i>
+                        v{{ app_version }}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Toast container -->
+    <div id="toast-container"></div>
+
+    <!-- Global Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center text-white">
+            <div class="spinner mb-3" style="width: 3rem; height: 3rem;"></div>
+            <div id="loadingText" class="fw-bold">Обработка...</div>
+        </div>
+    </div>
+
+    <script>
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+
+    function showLoading(text) {
+        if (text === void 0) text = 'Обработка...';
+        loadingText.textContent = text;
+        loadingOverlay.classList.add('loading-overlay--visible');
+    }
+
+    function hideLoading() {
+        loadingOverlay.classList.remove('loading-overlay--visible');
+    }
+
+    // Show preloader on form submit (skip forms with data-no-preloader="true")
+    document.addEventListener('submit', function(e) {
+        var form = e.target;
+        if (form.dataset.noPreloader === 'true') return;
+        var button = form.querySelector('button[type="submit"]');
+        if (button && !button.disabled) {
+            button.disabled = true;
+            button.dataset.originalText = button.innerHTML;
+            button.innerHTML = '<span class="spinner spinner--sm"></span> ' + button.textContent.trim();
+            showLoading('Обработка...');
+        }
+    });
+
+    window.addEventListener('load', hideLoading);
+    window.addEventListener('error', hideLoading);
+
+    // Toast notification system
+    function showToast(message, type) {
+        if (type === void 0) type = 'info';
+        var toast = document.createElement('div');
+        toast.className = 'toast toast--' + type;
+        toast.textContent = message;
+        document.getElementById('toast-container').appendChild(toast);
+        requestAnimationFrame(function() { toast.classList.add('toast--show'); });
+        setTimeout(function() {
+            toast.classList.remove('toast--show');
+            setTimeout(function() { toast.remove(); }, 300);
+        }, 3000);
+    }
+
+    // Modal helpers
+    function openModal(id) {
+        var modal = document.getElementById(id);
+        if (modal) modal.classList.add('modal--open');
+    }
+    function closeModal(id) {
+        var modal = document.getElementById(id);
+        if (modal) modal.classList.remove('modal--open');
+    }
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

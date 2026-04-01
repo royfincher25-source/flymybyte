@@ -1,0 +1,24 @@
+# YouTube - основные домены
+youtube.com
+www.youtube.com
+m.youtube.com
+music.youtube.com
+gaming.youtube.com
+youtubekids.com
+
+# YouTube - контент (видео)
+googlevideo.com
+www.googlevideo.com
+ytimg.com
+i.ytimg.com
+s.ytimg.com
+ggpht.com
+www.ggpht.com
+
+# YouTube - короткие ссылки
+youtu.be
+
+# YouTube - сервисные
+youtube-nocookie.com
+youtubeeducation.com
+yt.be

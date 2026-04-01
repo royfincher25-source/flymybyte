@@ -1,0 +1,304 @@
+# AI Services Domains for DNS Spoofing
+# Обход региональных блокировок AI-сервисов через Cloudflare DNS (1.1.1.1)
+# Format: one domain per line (no wildcards, no IPs)
+# Применение: Сервис → DNS-обход AI → Загрузить готовый список → Применить
+
+# ============================================
+# GOOGLE AI
+# ============================================
+# Google AI Studio / Vertex AI
+aistudio.google.com
+ai.google
+ai.google.com
+vertexai.google.com
+cloud.google.com
+console.cloud.google.com
+
+# Gemini
+gemini.google.com
+gemini.googleusercontent.com
+
+# Google Colab
+colab.research.google.com
+colab.google.com
+research.google.com
+colab-api.google.com
+
+# Kaggle
+kaggle.com
+www.kaggle.com
+kaggleusercontent.com
+kaggle-kernels.appspot.com
+
+# Google DeepMind
+deepmind.google
+deepmind.com
+deepmind.ai
+
+# Google Cloud AI
+cloud.googleusercontent.com
+notebooks.googleusercontent.com
+script.google.com
+ml.googleapis.com
+generativelanguage.googleapis.com
+aiplatform.googleapis.com
+
+# TensorFlow
+tensorflow.org
+www.tensorflow.org
+
+# ============================================
+# OPENAI (ChatGPT, GPT-4, DALL-E)
+# ============================================
+# ChatGPT
+chatgpt.com
+chat.openai.com
+auth.openai.com
+api.openai.com
+
+# OpenAI Platform
+openai.com
+www.openai.com
+platform.openai.com
+beta.openai.com
+dashboard.openai.com
+
+# OpenAI Services
+oaiusercontent.com
+openaiapi.azureedge.net
+
+# DALL-E
+dall-e.com
+www.dall-e.com
+
+# ============================================
+# ANTHROPIC (Claude)
+# ============================================
+# Claude AI
+claude.ai
+www.claude.ai
+console.anthropic.com
+api.anthropic.com
+
+# Anthropic Platform
+anthropic.com
+www.anthropic.com
+
+# ============================================
+# MICROSOFT AI (Copilot, Azure AI)
+# ============================================
+# Microsoft Copilot
+copilot.microsoft.com
+copilot.cloud.microsoft
+
+# Bing Chat
+bing.com
+www.bing.com
+sydney.bing.com
+edgeservices.bing.com
+
+# Azure OpenAI
+oai.azure.com
+azure-api.net
+
+# Azure AI Services
+azure.microsoft.com
+portal.azure.com
+cognitiveservices.azure.com
+
+# ============================================
+# META AI (Llama)
+# ============================================
+# Meta AI
+meta.ai
+www.meta.ai
+llama.meta.com
+
+# Facebook AI Research
+ai.facebook.com
+research.facebook.com
+
+# ============================================
+# MIDJOURNEY
+# ============================================
+midjourney.com
+www.midjourney.com
+alpha.midjourney.com
+docs.midjourney.com
+
+# ============================================
+# STABILITY AI (Stable Diffusion)
+# ============================================
+stability.ai
+www.stability.ai
+dreamstudio.ai
+app.dreamstudio.ai
+api.stability.ai
+clipdrop.co
+www.clipdrop.co
+
+# ============================================
+# ADOBE AI
+# ============================================
+adobe.com
+www.adobe.com
+firefly.adobe.com
+sensei.adobe.com
+generativeai.adobe.com
+
+# ============================================
+# NOTION AI
+# ============================================
+notion.so
+www.notion.so
+notion.site
+notion-api.com
+
+# ============================================
+# PERPLEXITY AI
+# ============================================
+perplexity.ai
+www.perplexity.ai
+labs.perplexity.ai
+
+# ============================================
+# CHARACTER.AI
+# ============================================
+character.ai
+www.character.ai
+beta.character.ai
+api.character.ai
+
+# ============================================
+# COHERE
+# ============================================
+cohere.ai
+www.cohere.ai
+dashboard.cohere.ai
+api.cohere.ai
+
+# ============================================
+# AI21 LABS
+# ============================================
+ai21.com
+www.ai21.com
+studio.ai21.com
+api.ai21.com
+
+# ============================================
+# HUGGING FACE
+# ============================================
+huggingface.co
+www.huggingface.co
+inference.huggingface.co
+api-inference.huggingface.co
+spaces.huggingface.co
+
+# ============================================
+# REPLIT AI
+# ============================================
+replit.com
+www.replit.com
+replit.ai
+
+# ============================================
+# GITHUB COPILOT
+# ============================================
+github.com
+www.github.com
+copilot.github.com
+api.github.com
+objects.githubusercontent.com
+
+# ============================================
+# OTHER AI SERVICES
+# ============================================
+# Runway ML
+runwayml.com
+www.runwayml.com
+app.runwayml.com
+
+# Synthesia
+synthesia.io
+www.synthesia.io
+app.synthesia.io
+
+# Descript
+descript.com
+www.descript.com
+app.descript.com
+
+# Otter.ai
+otter.ai
+www.otter.ai
+app.otter.ai
+
+# Grammarly
+grammarly.com
+www.grammarly.com
+api.grammarly.com
+
+# QuillBot
+quillbot.com
+www.quillbot.com
+api.quillbot.com
+
+# Writesonic
+writesonic.com
+www.writesonic.com
+app.writesonic.com
+
+# ElevenLabs
+elevenlabs.io
+www.elevenlabs.io
+api.elevenlabs.io
+app.elevenlabs.io
+
+# ============================================
+# AI AGGREGATORS / PLATFORMS
+# ============================================
+# Poe (Quora)
+poe.com
+www.poe.com
+
+# You.com
+you.com
+www.you.com
+api.you.com
+
+# Phind
+phind.com
+www.phind.com
+
+# ============================================
+# LOCAL AI / OPEN SOURCE
+# ============================================
+# Ollama
+ollama.ai
+www.ollama.ai
+ollama.com
+
+# LM Studio
+lmstudio.ai
+www.lmstudio.ai
+
+# ============================================
+# AI DEVELOPMENT TOOLS
+# ============================================
+# LangChain
+langchain.com
+www.langchain.com
+python.langchain.com
+
+# LlamaIndex
+llamaindex.ai
+www.llamaindex.ai
+
+# Vector Databases
+pinecone.io
+www.pinecone.io
+weaviate.io
+www.weaviate.io
+qdrant.tech
+www.qdrant.tech
+chromadb.dev

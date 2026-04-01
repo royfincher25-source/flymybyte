@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block title %}DNS-обход AI-доменов — FlyMyByte{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-globe2"></i> DNS-обход AI-доменов</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('main.service') }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
+        </a>
+        <a href="{{ url_for('main.bypass') }}" class="btn btn--outline">
+            <i class="fm fm-list-check"></i> Списки обхода
+        </a>
+    </div>
+</div>
+
+<!-- Статус DNS-обхода -->
+<div class="card border-info mb-4">
+    <div class="card__header bg-info text-white d-flex flex-between">
+        <span><i class="fm fm-shield-check"></i> Статус DNS-обхода</span>
+        <span id="status-badge" class="badge badge--secondary">
+            <i class="fm fm-question-circle"></i> Загрузка...
+        </span>
+    </div>
+    <div class="card__body">
+        <div class="row row--2col">
+            <div>
+                <h6><i class="fm fm-file-earmark-text"></i> Конфигурация</h6>
+                <p id="config-status" class="mb-0 text-muted">Загрузка...</p>
+            </div>
+            <div>
+                <h6><i class="fm fm-list-ul"></i> Домены</h6>
+                <p id="domains-count" class="mb-0 text-muted">Загрузка...</p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div>
+                <h6><i class="fm fm-hdd-network"></i> dnsmasq</h6>
+                <p id="dnsmasq-status" class="mb-0 text-muted">Загрузка...</p>
+            </div>
+        </div>
+        <div class="mt-3 d-flex gap-2">
+            <button id="apply-btn" class="btn btn--success" onclick="applyConfig()" disabled>
+                <i class="fm fm-play-fill"></i> Применить
+            </button>
+            <button id="disable-btn" class="btn btn--danger" onclick="disableConfig()" disabled>
+                <i class="fm fm-stop-fill"></i> Выключить
+            </button>
+            <button class="btn btn--outline" onclick="refreshStatus()">
+                <i class="fm fm-arrow-clockwise"></i> Обновить
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Список доменов -->
+<div class="card border-primary mb-4">
+    <div class="card__header bg-primary text-white">
+        <i class="fm fm-list-task"></i> Список AI-доменов
+    </div>
+    <div class="card__body">
+        <div class="alert alert--info" role="alert">
+            <i class="fm fm-info-circle"></i>
+            <strong>Как это работает:</strong> DNS-запросы к указанным доменам направляются через VPN DNS (порт 40500),
+            что скрывает ваш реальный регион от AI-сервисов.
+        </div>
+        
+        <div class="mb-3">
+            <label for="domains-text" class="label">Домены для обхода (по одному в строке):</label>
+            <textarea class="input" id="domains-text" rows="10" placeholder="aistudio.google.com&#10;gemini.google.com&#10;colab.research.google.com"></textarea>
+            <small class="text-muted">
+                Поддерживаются домены вида <code>example.com</code> и <code>*.example.com</code> (wildcard)
+            </small>
+        </div>
+        
+        <div class="d-flex gap-2">
+            <button class="btn btn--primary" onclick="saveDomains()">
+                <i class="fm fm-save"></i> Сохранить
+            </button>
+            <button class="btn btn--outline" onclick="loadDomains()">
+                <i class="fm fm-arrow-clockwise"></i> Загрузить
+            </button>
+            <button class="btn btn--outline" onclick="loadPresetDomains()">
+                <i class="fm fm-download"></i> Загрузить готовый список
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Тестирование -->
+<div class="card border-warning mb-4">
+    <div class="card__header bg-warning text-dark">
+        <i class="fm fm-bug"></i> Тестирование DNS
+    </div>
+    <div class="card__body">
+        <div class="d-flex gap-2 mb-3">
+            <input type="text" class="input" id="test-domain" placeholder="aistudio.google.com" style="flex: 1;">
+            <button class="btn btn--warning" onclick="testDomain()">
+                <i class="fm fm-search"></i> Тест
+            </button>
+        </div>
+        
+        <div id="test-result" class="d-none">
+            <h6>Результат:</h6>
+            <pre id="test-output" class="bg-dark text-light p-3 rounded"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Логи -->
+<div class="card border-secondary mb-4">
+    <div class="card__header bg-secondary text-white">
+        <i class="fm fm-journal-text"></i> Логи
+    </div>
+    <div class="card__body">
+        <pre id="logs-output" class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto;">
+Загрузка логов...
+        </pre>
+        <button class="btn btn--outline btn--sm" onclick="loadLogs()">
+            <i class="fm fm-arrow-clockwise"></i> Обновить логи
+        </button>
+    </div>
+</div>
+
+<script>
+// Initial status load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshStatus();
+    loadDomains();
+    loadLogs();
+});
+
+async function refreshStatus() {
+    try {
+        const resp = await fetch('/dns-spoofing/status');
+        const data = await resp.json();
+        
+        const statusBadge = document.getElementById('status-badge');
+        const configStatus = document.getElementById('config-status');
+        const domainsCount = document.getElementById('domains-count');
+        const dnsmasqStatus = document.getElementById('dnsmasq-status');
+        const applyBtn = document.getElementById('apply-btn');
+        const disableBtn = document.getElementById('disable-btn');
+        
+        if (data.enabled) {
+            statusBadge.innerHTML = '<i class="fm fm-check-circle-fill"></i> Активен';
+            statusBadge.className = 'badge badge--success';
+            applyBtn.disabled = true;
+            disableBtn.disabled = false;
+        } else {
+            statusBadge.innerHTML = '<i class="fm fm-x-circle-fill"></i> Выключен';
+            statusBadge.className = 'badge badge--secondary';
+            applyBtn.disabled = false;
+            disableBtn.disabled = true;
+        }
+        
+        configStatus.textContent = data.config_exists ? 
+            `✅ Конфигурация: ${data.config_path}` : 
+            '❌ Конфигурация не найдена';
+        
+        domainsCount.textContent = `Доменов: ${data.domain_count || 0}`;
+        
+        dnsmasqStatus.textContent = data.dnsmasq_running ?
+            '✅ dnsmasq запущен' : '❌ dnsmasq не запущен';
+        dnsmasqStatus.className = data.dnsmasq_running ? 'text-success' : 'text-danger';
+        
+    } catch (error) {
+        console.error('Error fetching status:', error);
+        document.getElementById('status-badge').innerHTML = 
+            '<i class="fm fm-exclamation-triangle-fill"></i> Ошибка';
+        document.getElementById('status-badge').className = 'badge badge--danger';
+    }
+}
+
+async function applyConfig() {
+    if (!confirm('Применить конфигурацию DNS-обхода? dnsmasq будет перезапущен.')) {
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/dns-spoofing/apply', { method: 'POST' });
+        const data = await resp.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            refreshStatus();
+        } else {
+            alert('❌ Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function disableConfig() {
+    if (!confirm('Выключить DNS-обход AI-доменов?')) {
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/dns-spoofing/disable', { method: 'POST' });
+        const data = await resp.json();
+        
+        if (data.success) {
+            alert('✅ ' + data.message);
+            refreshStatus();
+        } else {
+            alert('❌ Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function loadDomains() {
+    try {
+        const resp = await fetch('/dns-spoofing/domains');
+        const data = await resp.json();
+        
+        if (data.success) {
+            document.getElementById('domains-text').value = data.domains.join('\n');
+        }
+    } catch (error) {
+        console.error('Error loading domains:', error);
+    }
+}
+
+async function saveDomains() {
+    const text = document.getElementById('domains-text').value;
+    const domains = text.split('\n').map(d => d.trim()).filter(d => d);
+    
+    try {
+        const resp = await fetch('/dns-spoofing/domains', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domains: domains })
+        });
+        const data = await resp.json();
+        
+        if (data.success) {
+            alert('✅ Домены сохранены: ' + data.count);
+            refreshStatus();
+        } else {
+            alert('❌ Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function loadPresetDomains() {
+    if (!confirm('Загрузить готовый список AI-доменов? Текущие домены будут заменены.')) {
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/dns-spoofing/preset');
+        const data = await resp.json();
+        
+        if (data.success) {
+            document.getElementById('domains-text').value = data.domains.join('\n');
+            alert('✅ Загружено ' + data.count + ' доменов');
+        } else {
+            alert('❌ Ошибка: ' + data.error);
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function testDomain() {
+    const domain = document.getElementById('test-domain').value.trim();
+    
+    if (!domain) {
+        alert('Введите домен для теста');
+        return;
+    }
+    
+    try {
+        const resp = await fetch('/dns-spoofing/test', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain: domain })
+        });
+        const data = await resp.json();
+        
+        const resultDiv = document.getElementById('test-result');
+        const output = document.getElementById('test-output');
+        
+        resultDiv.classList.remove('d-none');
+        
+        if (data.resolved) {
+            output.textContent = `Домен: ${data.domain}\n` +
+                               `✅ Разрешён\n` +
+                               `IP адреса: ${data.ips.join(', ')}`;
+            output.className = 'bg-dark text-light p-3 rounded';
+        } else {
+            output.textContent = `Домен: ${data.domain}\n` +
+                               `❌ Ошибка: ${data.error}`;
+            output.className = 'bg-danger text-light p-3 rounded';
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function loadLogs() {
+    try {
+        const resp = await fetch('/dns-spoofing/logs');
+        const data = await resp.json();
+        
+        if (data.success) {
+            document.getElementById('logs-output').textContent = data.logs || 'Логов нет';
+        } else {
+            document.getElementById('logs-output').textContent = 'Ошибка загрузки логов';
+        }
+    } catch (error) {
+        document.getElementById('logs-output').textContent = 'Ошибка: ' + error;
+    }
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Ключи и мосты — FlyMyByte{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-key fm-lg"></i> Ключи и мосты</h2>
+    <a href="{{ url_for('main.index') }}" class="btn btn--outline">
+        <i class="fm fm-arrow-left"></i> Назад
+    </a>
+</div>
+
+<div class="row row--2col">
+    {% for service_id, service in services.items() %}
+    <div>
+        <div class="card shadow-sm {% if service.status == '✅ Активен' %}border-success{% endif %}">
+            <div class="card__body">
+                <div class="d-flex flex-between flex-start">
+                    <div>
+                        <h5 class="card-title">
+                            {% if service_id == 'vless' %}
+                                <i class="fm fm-circle-fill text-success"></i> VLESS
+                            {% elif service_id == 'hysteria2' %}
+                                <i class="fm fm-lightning-charge-fill text-warning"></i> Hysteria 2
+                                <span class="badge badge--secondary ms-1">Бета</span>
+                            {% elif service_id == 'shadowsocks' %}
+                                <i class="fm fm-circle-fill text-warning"></i> Shadowsocks
+                            {% elif service_id == 'trojan' %}
+                                <i class="fm fm-circle-fill text-info"></i> Trojan
+                            {% elif service_id == 'tor' %}
+                                <i class="fm fm-circle-fill text-danger"></i> Tor
+                            {% endif %}
+                        </h5>
+                        <p class="card__text text-muted">
+                            {% if service_id == 'tor' %}
+                                Настройка Tor proxy и мостов
+                            {% else %}
+                                Настройка {{ service.name }} proxy
+                            {% endif %}
+                        </p>
+                        <p class="mb-2">
+                            <small class="text-muted">
+                                Статус: <span class="{% if '✅' in service.status %}text-success{% elif '❌' in service.status or '⏱️' in service.status %}text-danger{% else %}text-muted{% endif %}">
+                                    {{ service.status }}
+                                </span>
+                            </small>
+                        </p>
+                    </div>
+                    <div>
+                        <a href="{{ url_for('main.key_config', service=service_id) }}" class="btn btn--primary btn--sm">
+                            <i class="fm fm-gear"></i> {% if service.config_exists %}Изменить{% else %}Настроить{% endif %}
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="card shadow-sm mt-4" style="margin-bottom: 3.5rem;">
+    <div class="card__body">
+        <h5 class="card-title"><i class="fm fm-info-circle fm-lg"></i> Информация</h5>
+        <p class="card__text">
+            Для настройки VPN-сервисов вставьте ключ доступа в соответствующем разделе.
+            Ключи обычно предоставляются вашим VPN-провайдером.
+        </p>
+        <ul class="mb-0">
+            <li><strong>VLESS</strong> — современный протокол на базе Xray-core</li>
+            <li><strong>Hysteria 2</strong> — высокоскоростной протокол на базе QUIC</li>
+            <li><strong>Shadowsocks</strong> — быстрый и лёгкий прокси-протокол</li>
+            <li><strong>Trojan</strong> — маскируется под обычный HTTPS-трафик</li>
+            <li><strong>Tor</strong> — анонимная сеть с поддержкой мостов</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

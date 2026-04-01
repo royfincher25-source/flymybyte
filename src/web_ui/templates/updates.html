@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Обновления — FlyMyByte{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-between mb-4">
+    <h2><i class="fm fm-arrow-repeat"></i> Обновления</h2>
+    <div>
+        <a href="{{ url_for('main.service') }}" class="btn btn--outline">
+            <i class="fm fm-arrow-left"></i> Назад
+        </a>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card__body">
+        <h5 class="card__title">
+            {% if need_update %}
+                <i class="fm fm-exclamation-triangle text-warning"></i> Доступно обновление
+            {% else %}
+                <i class="fm fm-check-circle text-success"></i> Актуальная версия
+            {% endif %}
+        </h5>
+        
+        <div class="version-comparison p-3 rounded {% if need_update %}bg-warning bg-opacity-10{% else %}bg-success bg-opacity-10{% endif %}">
+            <div class="d-flex align-items-center mb-2">
+                <span class="me-2"><i class="fm fm-pc-display"></i> Установленная:</span>
+                <strong class="fm-lg">{{ local_version }}</strong>
+            </div>
+            <div class="d-flex align-items-center">
+                <span class="me-2"><i class="fm fm-cloud-download"></i> Доступная:</span>
+                {% if need_update %}
+                <strong class="fm-lg text-warning">
+                    {{ remote_version }}
+                    <i class="fm fm-arrow-up-circle-fill ms-1"></i>
+                    <span class="badge badge--warning text-dark ms-2">NEW</span>
+                </strong>
+                {% else %}
+                <strong class="fm-lg text-success">
+                    {{ remote_version }}
+                    <i class="fm fm-check-circle-fill ms-1"></i>
+                    <span class="badge badge--success ms-2">Latest</span>
+                </strong>
+                {% endif %}
+            </div>
+        </div>
+
+        <div id="update-section">
+            {% if need_update %}
+                <div class="alert alert--warning">
+                    <i class="fm fm-exclamation-triangle"></i> Доступна новая версия! Рекомендуется обновить.
+                </div>
+                <form id="update-form" method="POST" action="{{ url_for('main.service_updates_run') }}" data-no-preloader="true">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn--primary" id="update-btn">
+                        <i class="fm fm-download"></i> Обновить
+                    </button>
+                </form>
+
+                <!-- Progress display (hidden by default) -->
+                <div id="progress-container" style="display: none; margin-top: 20px;">
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div id="progress-bar" class="progress__bar progress__bar--stripes progress__bar--animated"
+                             role="progressbar" style="width: 0%">0%</div>
+                    </div>
+                    <div id="progress-text" class="mb-2">Подготовка...</div>
+                    <div id="progress-details" class="small text-muted"></div>
+                    <div id="progress-error" class="alert alert--danger mt-2" style="display: none;"></div>
+                </div>
+            {% else %}
+                <div class="alert alert--success">
+                    <i class="fm fm-check-circle"></i> У вас установлена последняя версия.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-4" style="margin-bottom: 3.5rem;">
+    <div class="card__body">
+        <h5 class="card__title"><i class="fm fm-info-circle"></i> Как работает обновление</h5>
+
+        <div class="row row--2col">
+            <div>
+                <h6 class="text-success"><i class="fm fm-check-circle"></i> Будет обновлено:</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="fm fm-folder"></i> /opt/etc/web_ui (код веб-интерфейса)</li>
+                    <li><i class="fm fm-folder"></i> /opt/etc/init.d (init скрипты)</li>
+                    <li><i class="fm fm-folder"></i> /opt/etc/ndm (системные скрипты)</li>
+                    <li><i class="fm fm-folder"></i> /opt/bin (скрипты обхода)</li>
+                    <li><i class="fm fm-file-text"></i> /opt/etc/dnsmasq.conf</li>
+                    <li><i class="fm fm-file-text"></i> /opt/root/script.sh</li>
+                </ul>
+            </div>
+            <div>
+                <h6 class="text-warning"><i class="fm fm-shield-lock"></i> Сохраняется без изменений:</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="fm fm-key"></i> /opt/etc/xray (VLESS ключи)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/tor (Tor настройки)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/trojan (Trojan настройки)</li>
+                    <li><i class="fm fm-key"></i> /opt/etc/shadowsocks.json</li>
+                    <li><i class="fm fm-list"></i> /opt/etc/unblock/*.txt (списки обхода)</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="alert alert--info mt-3 d-flex flex-between">
+            <div>
+                <i class="fm fm-info-circle"></i> Перед обновлением автоматически создаётся резервная копия в /opt/root/backup/
+            </div>
+            <a href="{{ url_for('main.service_backup') }}" class="btn btn--outline btn--sm ms-3">
+                <i class="fm fm-folder2-open"></i> Резервные копии
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// JavaScript for AJAX progress updates
+// Отключаем глобальный прелоадер из base.html для этой страницы
+// Используем собственный прогресс-бар
+
+let progressInterval = null;
+
+// Отменяем стандартный обработчик из base.html для формы обновления
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('update-form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Hide button, show progress
+            document.getElementById('update-btn').style.display = 'none';
+            document.getElementById('progress-container').style.display = 'block';
+
+            // Start progress polling
+            progressInterval = setInterval(updateProgress, 3000);
+
+            // Remove animation from progress bar
+            document.getElementById('progress-bar').classList.remove('progress__bar--animated');
+
+            // Submit form via AJAX
+            const formData = new FormData(this);
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        throw new Error('Требуется аутентификация. Пожалуйста, войдите снова.');
+                    } else if (response.status === 400) {
+                        throw new Error('Ошибка запроса. Проверьте данные и попробуйте снова.');
+                    } else {
+                        throw new Error(`Ошибка сервера: ${response.status}`);
+                    }
+                }
+                return response.json();
+            })
+            .then(data => {
+                clearInterval(progressInterval);
+                if (data.success) {
+                    showCompletion(data.message);
+                    
+                    // Автоматическая перезагрузка если указано в ответе
+                    if (data.reload) {
+                        const delay = data.reload_delay || 3000;
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, delay);
+                    }
+                } else {
+                    showError(data.error || 'Update failed');
+                }
+            })
+            .catch(error => {
+                clearInterval(progressInterval);
+                showError('Ошибка: ' + error.message);
+
+                if (error.message.includes('аутентификация') || error.message.includes('Authentication')) {
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                }
+            });
+        });
+    }
+});
+
+function updateProgress() {
+    fetch('/api/update/progress', {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    console.warn('Authentication required, stopping progress polling');
+                    return null;
+                }
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data !== null) {
+                updateProgressBar(data);
+            }
+        })
+        .catch(error => {
+            console.error('Failed to get progress:', error);
+            if (progressInterval) {
+                clearInterval(progressInterval);
+            }
+        });
+}
+
+function updateProgressBar(data) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressDetails = document.getElementById('progress-details');
+
+    let percentage = 0;
+    if (data.total_files > 0) {
+        percentage = Math.round((data.progress / data.total_files) * 100);
+    }
+
+    progressBar.style.width = percentage + '%';
+    progressBar.textContent = percentage + '%';
+    progressText.textContent = data.message;
+
+    if (data.current_file) {
+        progressDetails.textContent = 'Файл: ' + data.current_file;
+    } else {
+        progressDetails.textContent = '';
+    }
+
+    if (data.status === 'error') {
+        showError(data.error);
+    }
+    
+    // Автоматическая перезагрузка при завершении
+    if (data.status === 'complete' && percentage >= 100) {
+        showCompletion(data.message);
+    }
+}
+
+function showError(message) {
+    const errorDiv = document.getElementById('progress-error');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    document.getElementById('progress-bar').classList.remove('progress__bar--animated');
+    document.getElementById('progress-bar').classList.add('progress__bar--danger');
+}
+
+function showCompletion(message) {
+    const progressBar = document.getElementById('progress-bar');
+    progressBar.style.width = '100%';
+    progressBar.textContent = '100%';
+    progressBar.classList.remove('progress__bar--animated');
+    progressBar.classList.add('progress__bar--success');
+    document.getElementById('progress-text').textContent = message;
+    document.getElementById('progress-details').textContent = '';
+
+    // Reload page after 3 seconds
+    setTimeout(() => {
+        window.location.reload();
+    }, 3000);
+}
+</script>
+{% endblock %}
