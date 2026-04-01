@@ -308,6 +308,22 @@ setInterval(updateStats, 10000);
         </div>
     </div>
 
+    <!-- Восстановление DNS -->
+    <div>
+        <div class="card shadow-sm">
+            <div class="card__body">
+                <h5 class="card__title"><i class="fm fm-exclamation-triangle"></i> Восстановление DNS</h5>
+                <p class="text-muted small">Удаляет правила перенаправления DNS при сбое dnsmasq</p>
+                <form method="POST" action="{{ url_for('main.service_restore_dns') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn--warning btn--sm">
+                        <i class="fm fm-arrow-clockwise"></i> Восстановить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Бэкап -->
     <div>
         <div class="card shadow-sm">

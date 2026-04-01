@@ -254,6 +254,57 @@ def service_restart_webui():
     return redirect(url_for('main.service'))
 
 
+@bp.route('/service/restore-dns', methods=['POST'])
+@login_required
+@csrf_required
+def service_restore_dns():
+    """
+    Restore internet when dnsmasq is broken.
+    Removes DNS redirect rules and tries to restart dnsmasq.
+    """
+    results = []
+    # 1. Check if dnsmasq is running
+    try:
+        result = subprocess.run(['pgrep', 'dnsmasq'], capture_output=True, text=True)
+        if result.returncode == 0:
+            results.append('✅ dnsmasq работает')
+        else:
+            results.append('⚠️ dnsmasq не запущен')
+    except Exception:
+        results.append('⚠️ Не удалось проверить dnsmasq')
+
+    # 2. Remove DNS redirect rules (restore router DNS)
+    try:
+        for proto in ['udp', 'tcp']:
+            subprocess.run(
+                ['iptables', '-D', 'PREROUTING', '-t', 'nat', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to', '192.168.1.1'],
+                capture_output=True, text=True, timeout=5
+            )
+        results.append('✅ Правила перенаправления DNS удалены')
+    except Exception as e:
+        results.append(f'⚠️ Ошибка удаления правил: {e}')
+
+    # 3. Try to fix dnsmasq config and restart
+    try:
+        result = subprocess.run(['dnsmasq', '--test'], capture_output=True, text=True, timeout=5)
+        if result.returncode == 0:
+            # Config OK, try restart
+            for init_script in ['/opt/etc/init.d/S56dnsmasq', '/opt/etc/init.d/S99unblock']:
+                if os.path.exists(init_script):
+                    subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
+                    results.append('✅ dnsmasq перезапущен')
+                    break
+            else:
+                results.append('⚠️ Скрипт запуска dnsmasq не найден')
+        else:
+            results.append(f'⚠️ Ошибка в dnsmasq.conf: {result.stderr.strip()[:100]}')
+    except Exception as e:
+        results.append(f'⚠️ Ошибка проверки dnsmasq: {e}')
+
+    flash('Восстановление DNS: ' + ', '.join(results), 'warning')
+    return redirect(url_for('main.service'))
+
+
 @bp.route('/service/dns-override/<action>', methods=['POST'])
 @login_required
 @csrf_required
