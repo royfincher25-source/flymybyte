@@ -67,6 +67,9 @@ def download_file(source_path: str, dest_path: str, progress, idx: int, total: i
     progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
     try:
         response = requests.get(url, timeout=FILE_DOWNLOAD_TIMEOUT)
+        if response.status_code == 404:
+            logger.info(f"Skipping removed file: {source_path}")
+            return True
         response.raise_for_status()
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
         with open(dest_path, 'w', encoding='utf-8') as f:

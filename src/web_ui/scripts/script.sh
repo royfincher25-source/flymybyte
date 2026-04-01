@@ -242,8 +242,11 @@ if [ "$1" = "-install" ]; then
     [ ! -f "$VLESS_CONFIG" ] && cp "$TEMPLATES_DIR/vless_template.json" "$VLESS_CONFIG" 2>/dev/null && echo "  ✅ VLESS config created" || echo "  ℹ️ VLESS config preserved"
 
     # dnsmasq.conf - ВСЕГДА обновляем (содержит актуальные настройки)
+    # NOTE: 127.0.0.1#40500 intentionally removed from main dnsmasq.conf
+    # to prevent total DNS failure when proxy key expires.
+    # Port 40500 is used ONLY for bypass domains via unblock.dnsmasq.
     curl -sL -o "$DNSMASQ_CONF" "$RESOURCES_URL/config/dnsmasq.conf" && \
-        sed -i -e "s/192.168.1.1/${lanip}/g" -e "s/40500/${dnsovertlsport}/g" -e "s/40508/${dnsoverhttpsport}/g" "$DNSMASQ_CONF" && \
+        sed -i "s/192.168.1.1/${lanip}/g" "$DNSMASQ_CONF" && \
         echo "  ✅ dnsmasq.conf updated" || echo "  ❌ dnsmasq.conf"
 
     # Перезапустить dnsmasq после обновления конфига

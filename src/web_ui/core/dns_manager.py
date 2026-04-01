@@ -41,10 +41,18 @@ def update_dnsmasq_dns(server_host: str) -> Tuple[bool, str]:
 
         content = config_path.read_text()
 
-        # Remove existing server lines to avoid duplicates
+        # Remove existing server= lines that are bare IPs (not domain-specific server=/domain/...)
+        # Keep domain-specific lines like server=/onion/127.0.0.1#9053
         lines = []
         for line in content.split('\n'):
-            if not line.strip().startswith('server='):
+            stripped = line.strip()
+            if stripped.startswith('server=/'):
+                # Domain-specific server line — keep it
+                lines.append(line)
+            elif stripped.startswith('server='):
+                # Bare DNS server line — remove to replace
+                pass
+            else:
                 lines.append(line)
 
         # Add new server line
@@ -69,8 +77,9 @@ def update_dnsmasq_dns(server_host: str) -> Tuple[bool, str]:
             logger.info(f"Updated dnsmasq to use {server_host}")
             return True, "OK"
         else:
-            logger.error(f"dnsmasq restart failed: {result.stderr}")
-            return False, result.stderr
+            error_msg = result.stderr.strip() or result.stdout.strip() or f"dnsmasq restart failed (code {result.returncode})"
+            logger.error(f"dnsmasq restart failed: {error_msg}")
+            return False, error_msg
 
     except subprocess.TimeoutExpired:
         error_msg = "dnsmasq restart timeout"
