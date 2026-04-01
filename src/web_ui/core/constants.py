@@ -211,8 +211,6 @@ FILES_TO_UPDATE = {
     'web_ui/.env.example': f'{WEB_UI_DIR}/.env.example',
     'web_ui/__init__.py': f'{WEB_UI_DIR}/__init__.py',
     'web_ui/routes_service.py': f'{WEB_UI_DIR}/routes_service.py',
-    'web_ui/routes_keys.py': f'{WEB_UI_DIR}/routes_keys.py',
-    'web_ui/routes_bypass.py': f'{WEB_UI_DIR}/routes_bypass.py',
     'web_ui/app.py': f'{WEB_UI_DIR}/app.py',
     'web_ui/env_parser.py': f'{WEB_UI_DIR}/env_parser.py',
     'web_ui/core/__init__.py': f'{WEB_UI_DIR}/core/__init__.py',

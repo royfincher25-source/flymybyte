@@ -11,6 +11,9 @@ import logging
 import subprocess
 import threading
 
+from werkzeug.utils import secure_filename
+from markupsafe import escape
+
 logger = logging.getLogger(__name__)
 
 from core.decorators import login_required, get_csrf_token, validate_csrf_token, csrf_required
@@ -767,6 +770,267 @@ def dns_spoofing_logs():
         return jsonify({'success': True, 'logs': '\n'.join(lines) if lines else 'Логов нет'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+
+# Keys & Bypass routes
+@bp.route('/keys')
+@login_required
+def keys():
+    services = {
+        'vless': {'name': 'VLESS', 'config': CONFIG_PATHS['vless'], 'init': INIT_SCRIPTS['vless']},
+        'hysteria2': {'name': 'Hysteria 2', 'config': CONFIG_PATHS['hysteria2'], 'init': INIT_SCRIPTS['hysteria2']},
+        'shadowsocks': {'name': 'Shadowsocks', 'config': CONFIG_PATHS['shadowsocks'], 'init': INIT_SCRIPTS['shadowsocks']},
+        'trojan': {'name': 'Trojan', 'config': CONFIG_PATHS['trojan'], 'init': INIT_SCRIPTS['trojan']},
+        'tor': {'name': 'Tor', 'config': CONFIG_PATHS['tor'], 'init': INIT_SCRIPTS['tor']},
+    }
+    for service in services.values():
+        if not os.path.exists(service['init']):
+            service['status'] = '❌ Скрипт не найден'
+            service['config_exists'] = False
+        else:
+            service['config_exists'] = os.path.exists(service['config'])
+            service['status'] = '✅ Активен' if service['config_exists'] else '❌ Не настроен'
+    return render_template('keys.html', services=services)
+
+
+@bp.route('/keys/<service>', methods=['GET', 'POST'])
+@login_required
+@csrf_required
+def key_config(service: str):
+    services_config = {
+        'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless']},
+        'hysteria2': {'name': 'Hysteria 2', 'config_path': CONFIG_PATHS['hysteria2'], 'init_script': INIT_SCRIPTS['hysteria2']},
+        'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks']},
+        'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan']},
+        'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor']},
+    }
+    if service not in services_config:
+        flash('Неверный сервис', 'danger')
+        return redirect(url_for('main.keys'))
+    svc = services_config[service]
+    if request.method == 'POST':
+        key = request.form.get('key', '').strip()
+        if not key:
+            flash('Введите ключ', 'warning')
+            return redirect(url_for('main.key_config', service=service))
+        try:
+            if service == 'vless':
+                parsed = parse_vless_key(key)
+                if not parsed.get('server') or not parsed.get('port'):
+                    raise ValueError('Не удалось распарсить ключ VLESS: отсутствуют server/port')
+                cfg = vless_config(key)
+                write_json_config(cfg, svc['config_path'])
+            elif service == 'shadowsocks':
+                parsed = parse_shadowsocks_key(key)
+                if not parsed.get('server') or not parsed.get('port'):
+                    raise ValueError('Не удалось распарсить ключ: отсутствуют server/port')
+                cfg = shadowsocks_config(key)
+                write_json_config(cfg, svc['config_path'])
+            elif service == 'hysteria2':
+                parsed = parse_hysteria2_key(key)
+                if not parsed.get('server') or not parsed.get('port'):
+                    raise ValueError('Не удалось распарсить ключ Hysteria 2: отсутствуют server/port')
+                cfg = hysteria2_config(key)
+                write_hysteria2_config(cfg, svc['config_path'])
+            elif service == 'trojan':
+                parsed = parse_trojan_key(key)
+                if not parsed.get('server') or not parsed.get('port'):
+                    raise ValueError('Не удалось распарсить ключ Trojan: отсутствуют server/port')
+                cfg = trojan_config(key)
+                write_json_config(cfg, svc['config_path'])
+            elif service == 'tor':
+                cfg = tor_config(key)
+                write_tor_config(cfg, svc['config_path'])
+            try:
+                future = executor.submit(restart_service, svc['name'], svc['init_script'])
+                success, output = future.result(timeout=30)
+                if success:
+                    flash(f'✅ {svc["name"]} успешно настроен и перезапущен', 'success')
+                else:
+                    flash(f'⚠️ Конфигурация сохранена, но ошибка перезапуска: {output}', 'warning')
+            except TimeoutError:
+                flash(f'⏱️ Превышено время ожидания перезапуска {svc["name"]} (30с)', 'warning')
+            return redirect(url_for('main.keys'))
+        except ValueError as e:
+            flash(f'❌ Ошибка в ключе: {str(e)}', 'danger')
+        except Exception as e:
+            flash(f'❌ Ошибка: {str(e)}', 'danger')
+    return render_template('key_generic.html', service=service, service_name=svc['name'])
+
+
+@bp.route('/bypass')
+@login_required
+def bypass():
+    config = WebConfig()
+    unblock_dir = config.unblock_dir
+    available_files = []
+    if os.path.exists(unblock_dir):
+        try:
+            available_files = [f.replace('.txt', '') for f in os.listdir(unblock_dir) if f.endswith('.txt')]
+        except Exception as e:
+            logger.error(f"Error listing bypass files: {e}")
+    return render_template('bypass.html', available_files=available_files)
+
+
+@bp.route('/bypass/view/<filename>')
+@login_required
+def view_bypass(filename: str):
+    config = WebConfig()
+    filename = secure_filename(filename)
+    if not filename:
+        flash('Неверное имя файла', 'danger')
+        return redirect(url_for('main.bypass'))
+    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    entries = load_bypass_list(filepath)
+    return render_template('bypass_view.html', filename=filename, entries=entries, filepath=filepath)
+
+
+@bp.route('/bypass/<filename>/add', methods=['GET', 'POST'])
+@login_required
+@csrf_required
+def add_to_bypass(filename: str):
+    config = WebConfig()
+    filename = secure_filename(filename)
+    if not filename:
+        flash('Неверное имя файла', 'danger')
+        return redirect(url_for('main.bypass'))
+    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    if request.method == 'POST':
+        entries_text = request.form.get('entries', '')
+        if len(entries_text) > MAX_TOTAL_INPUT_SIZE:
+            flash(f'Превышен лимит размера ввода (макс. {MAX_TOTAL_INPUT_SIZE // 1024}KB)', 'danger')
+            return redirect(url_for('main.bypass'))
+        new_entries = [e.strip() for e in entries_text.split('\n') if e.strip()]
+        if len(new_entries) > MAX_ENTRIES_PER_REQUEST:
+            flash(f'Превышено количество записей (макс. {MAX_ENTRIES_PER_REQUEST})', 'danger')
+            return redirect(url_for('main.bypass'))
+        for entry in new_entries:
+            if len(entry) > MAX_ENTRY_LENGTH:
+                flash(f'Запись слишком длинная (макс. {MAX_ENTRY_LENGTH} симв.): {escape(entry[:50])}...', 'danger')
+                return redirect(url_for('main.bypass'))
+        current_list = load_bypass_list(filepath)
+        added_count = 0
+        invalid_entries = []
+        ip_entries = []
+        domain_entries = []
+        for entry in new_entries:
+            if entry not in current_list:
+                if validate_bypass_entry(entry):
+                    current_list.append(entry)
+                    added_count += 1
+                    if is_ip_address(entry):
+                        ip_entries.append(entry)
+                    else:
+                        domain_entries.append(entry)
+                else:
+                    invalid_entries.append(entry)
+        save_bypass_list(filepath, current_list)
+        if added_count > 0:
+            if ip_entries and not domain_entries:
+                success, msg = bulk_add_to_ipset('unblock', ip_entries)
+                if success:
+                    flash(f'✅ Успешно добавлено: {added_count} шт. (IP в ipset: {len(ip_entries)})', 'success')
+                else:
+                    success, output = run_unblock_update()
+                    if success:
+                        flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
+                    else:
+                        flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {output}', 'warning')
+            else:
+                success, output = run_unblock_update()
+                if success:
+                    flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
+                else:
+                    flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {output}', 'warning')
+        elif invalid_entries:
+            escaped_invalid = [escape(e) for e in invalid_entries[:5]]
+            flash(f'⚠️ Все записи уже в списке или невалидны. Нераспознанные: {", ".join(escaped_invalid)}', 'warning')
+        else:
+            flash('ℹ️ Все записи уже были в списке', 'info')
+        return redirect(url_for('main.view_bypass', filename=filename))
+    return render_template('bypass_add.html', filename=filename)
+
+
+@bp.route('/bypass/<filename>/remove', methods=['GET', 'POST'])
+@login_required
+@csrf_required
+def remove_from_bypass(filename: str):
+    config = WebConfig()
+    filename = secure_filename(filename)
+    if not filename:
+        flash('Неверное имя файла', 'danger')
+        return redirect(url_for('main.bypass'))
+    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    if request.method == 'POST':
+        entries_text = request.form.get('entries', '')
+        if len(entries_text) > MAX_TOTAL_INPUT_SIZE:
+            flash(f'Превышен лимит размера ввода (макс. {MAX_TOTAL_INPUT_SIZE // 1024}KB)', 'danger')
+            return redirect(url_for('main.view_bypass', filename=filename))
+        to_remove = [e.strip() for e in entries_text.split('\n') if e.strip()]
+        if len(to_remove) > MAX_ENTRIES_PER_REQUEST:
+            flash(f'Превышено количество записей (макс. {MAX_ENTRIES_PER_REQUEST})', 'danger')
+            return redirect(url_for('main.view_bypass', filename=filename))
+        current_list = load_bypass_list(filepath)
+        original_count = len(current_list)
+        current_list = [item for item in current_list if item not in to_remove]
+        removed_count = original_count - len(current_list)
+        save_bypass_list(filepath, current_list)
+        if removed_count > 0:
+            success, output = run_unblock_update()
+            if success:
+                flash(f'✅ Успешно удалено: {removed_count} шт. Изменения применены', 'success')
+            else:
+                flash(f'⚠️ Удалено {removed_count} записей, но ошибка при применении: {output}', 'warning')
+        else:
+            flash('ℹ️ Ни одна запись не найдена в списке', 'info')
+        return redirect(url_for('main.view_bypass', filename=filename))
+    entries = load_bypass_list(filepath)
+    return render_template('bypass_remove.html', filename=filename, entries=entries)
+
+
+@bp.route('/bypass/<filename>/refresh', methods=['POST'])
+@login_required
+@csrf_required
+def refresh_bypass_ipset(filename: str):
+    config = WebConfig()
+    filename = secure_filename(filename)
+    if not filename:
+        flash('Неверное имя файла', 'danger')
+        return redirect(url_for('main.bypass'))
+    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    if not os.path.exists(filepath):
+        flash('Файл не найден', 'danger')
+        return redirect(url_for('main.view_bypass', filename=filename))
+    from core.ipset_manager import refresh_ipset_from_file
+    success, msg = refresh_ipset_from_file(filepath, max_workers=10)
+    if success:
+        flash(f'✅ {msg}', 'success')
+    else:
+        flash(f'❌ Ошибка: {msg}', 'danger')
+    return redirect(url_for('main.view_bypass', filename=filename))
+
+
+@bp.route('/bypass/catalog')
+@login_required
+def bypass_catalog():
+    from core.list_catalog import get_catalog
+    catalog = get_catalog()
+    return render_template('bypass_catalog.html', catalog=catalog)
+
+
+@bp.route('/bypass/catalog/<name>', methods=['POST'])
+@login_required
+@csrf_required
+def download_list(name: str):
+    from core.list_catalog import download_list
+    config = WebConfig()
+    dest_dir = config.unblock_dir
+    success, message, count = download_list(name, dest_dir)
+    if success:
+        flash(f'✅ {message}', 'success')
+    else:
+        flash(f'❌ {message}', 'danger')
+    return redirect(url_for('main.bypass_catalog'))
 
 
 def shutdown_executor():

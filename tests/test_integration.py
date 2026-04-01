@@ -22,39 +22,41 @@ def test_routes_service_exists():
 
 
 def test_routes_keys_exists():
-    """Test that routes_keys.py exists and has keys blueprint"""
-    from routes_keys import bp
-    assert bp.name == 'keys'
+    """Test that keys routes exist in routes_service.py"""
+    from routes_service import keys, key_config
+    assert keys is not None
+    assert key_config is not None
 
 
 def test_routes_bypass_exists():
-    """Test that routes_bypass.py exists and has bypass blueprint"""
-    from routes_bypass import bp
-    assert bp.name == 'bypass'
+    """Test that bypass routes exist in routes_service.py"""
+    from routes_service import bypass, view_bypass, add_to_bypass, remove_from_bypass
+    assert bypass is not None
+    assert view_bypass is not None
+    assert add_to_bypass is not None
+    assert remove_from_bypass is not None
 
 
 def test_blueprint_routes_registered():
-    """Test that all blueprints have their routes registered"""
+    """Test that all routes are registered in routes_service.py"""
     service_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'routes_service.py')
     with open(service_file, 'r', encoding='utf-8') as f:
         content = f.read()
+    # Service routes
     assert "@bp.route('/')" in content
     assert "@bp.route('/login'" in content
     assert "@bp.route('/service/updates/run'" in content
     assert "@bp.route('/dns-spoofing'" in content
     assert "@bp.route('/api/system/stats'" in content
-
-    keys_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'routes_keys.py')
-    with open(keys_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+    # Keys routes
     assert "@bp.route('/keys')" in content
     assert "@bp.route('/keys/<service>'" in content
-
-    bypass_file = os.path.join(os.path.dirname(__file__), '..', 'src', 'web_ui', 'routes_bypass.py')
-    with open(bypass_file, 'r', encoding='utf-8') as f:
-        content = f.read()
+    # Bypass routes
     assert "@bp.route('/bypass')" in content
     assert "@bp.route('/bypass/catalog'" in content
+    assert "@bp.route('/bypass/view/<filename>')" in content
+    assert "@bp.route('/bypass/<filename>/add'" in content
+    assert "@bp.route('/bypass/<filename>/remove'" in content
 
 
 # =============================================================================

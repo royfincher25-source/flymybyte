@@ -41,11 +41,7 @@ def create_app(config_class=None):
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
     from routes_service import bp as main_bp, shutdown_executor
-    from routes_keys import bp as keys_bp
-    from routes_bypass import bp as bypass_bp
     app.register_blueprint(main_bp)
-    app.register_blueprint(keys_bp)
-    app.register_blueprint(bypass_bp)
 
     @app.context_processor
     def inject_csrf_token():
