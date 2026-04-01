@@ -351,7 +351,15 @@ LOG_FILE=/opt/var/log/web_ui.log
   - Бэкап конфигурации
   - Обновление flymybyte
 
-### 🚀 Оптимизации производительности (v1.1)
+### 🚀 Оптимизации производительности (v1.12)
+
+**Рефакторинг кодовой базы:**
+- Централизация всех путей и констант в `core/constants.py`
+- Единый источник декораторов в `core/decorators.py`
+- Выделены сервисные модули: `backup_service.py`, `update_service.py`
+- Устранено дублирование парсеров .env (430 → 208 строк в `app_config.py`)
+- Логирование без side-effects при импорте
+- Экономия ~500 строк кода
 
 **Все функции из test.txt реализованы:**
 
@@ -461,8 +469,12 @@ flymybyte/
 │       │   └── README.md       # Документация scripts/
 │       ├── core/
 │       │   ├── __init__.py
-│       │   ├── config.py       # WebConfig singleton
-│       │   ├── utils.py        # Утилиты, LRU-кэш, логирование
+│       │   ├── constants.py    # Централизованные константы и пути
+│       │   ├── decorators.py   # Декораторы авторизации и CSRF
+│       │   ├── app_config.py   # WebConfig singleton
+│       │   ├── backup_service.py # Логика бэкапов
+│       │   ├── update_service.py # Логика обновлений
+│       │   ├── utils.py        # Утилиты, LRU-кэш, setup_logging()
 │       │   ├── services.py     # Парсеры VPN-ключей
 │       │   ├── dns_spoofing.py # DNS-обход AI-доменов
 │       │   ├── dns_manager.py  # Управление dnsmasq
@@ -487,7 +499,8 @@ flymybyte/
 │       │   └── config/
 │       │       └── unblock-ai.dnsmasq.template # Шаблон dnsmasq
 │       ├── static/
-│       │   └── style.css       # Custom стили
+│       │   ├── fonts/        # Иконочный шрифт (flymybyte-icons.*)
+│       │   └── style.css     # Custom стили
 │       ├── requirements.txt    # Зависимости Python
 │       ├── .env.example       # Пример конфигурации
 │       └── VERSION            # Версия приложения
