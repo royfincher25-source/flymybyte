@@ -558,6 +558,7 @@ img { max-width: 100%; height: auto; }
 .fm-search::before { content: "\f137"; }
 .fm-shield-check::before { content: "\f138"; }
 .fm-shield-lock::before { content: "\f139"; }
+.fm-browser::before { content: "\f142"; }
 .fm-stop-fill::before { content: "\f13a"; }
 .fm-tag::before { content: "\f13b"; }
 .fm-terminal::before { content: "\f13c"; }
@@ -657,7 +658,7 @@ img { max-width: 100%; height: auto; }
 .footer a:hover { color: var(--color-primary) !important; }
 
 /* Main content padding for fixed footer */
-main { padding-bottom: 5rem; }
+main { padding-bottom: 3rem; }
 
 /* --- Responsive --- */
 @media (max-width: 768px) {

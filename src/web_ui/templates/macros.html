@@ -22,7 +22,7 @@
 
 {# Page header with title, icon, and optional buttons #}
 {% macro page_header(title, icon, back_url=None, extra_buttons=None) %}
-<div class="flex-between flex-center mb-4">
+<div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-{{ icon }}"></i> {{ title }}</h2>
     <div>
         {% if extra_buttons %}{{ extra_buttons }}{% endif %}

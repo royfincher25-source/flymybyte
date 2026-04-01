@@ -36,14 +36,12 @@
                 <div class="progress mb-2" style="height: 25px;">
                     <div class="progress__bar progress__bar--warning" id="cpu-bar" role="progressbar" style="width: 0%">0%</div>
                 </div>
-                <small id="cpu-text">Загрузка...</small>
             </div>
             <div>
                 <h6><i class="fm fm-database"></i> Cache</h6>
                 <div class="progress mb-2" style="height: 25px;">
                     <div class="progress__bar progress__bar--info" id="cache-bar" role="progressbar" style="width: 0%">0</div>
                 </div>
-                <small id="cache-text">Загрузка...</small>
             </div>
             <div>
                 <h6><i class="fm fm-wifi"></i> DNS</h6>
@@ -97,18 +95,6 @@ async function updateStats() {
             cacheBar.textContent = `${cacheEntries}/${cacheMax}`;
         }
         
-        // Update cache text with more info
-        let cacheText = `LRU entries: ${cacheEntries}/${cacheMax}`;
-        if (cacheEntries === 0) {
-            cacheText += ' (пусто)';
-        } else if (cacheEntries >= cacheMax) {
-            cacheText += ' (заполнен)';
-        }
-        const cacheTextEl = document.getElementById('cache-text');
-        if (cacheTextEl) {
-            cacheTextEl.textContent = cacheText;
-        }
-        
         // CPU
         const cpuPercent = data.cpu_percent || 0;
         const cpuBar = document.getElementById('cpu-bar');
@@ -117,7 +103,6 @@ async function updateStats() {
         if (cpuPercent > 80) cpuBar.className = 'progress__bar progress__bar--danger';
         else if (cpuPercent > 60) cpuBar.className = 'progress__bar progress__bar--warning';
         else cpuBar.className = 'progress__bar progress__bar--success';
-        document.getElementById('cpu-text').textContent = cpuPercent + '% загрузки';
         
         // DNS
         const dnsInfo = data.dns_status;
