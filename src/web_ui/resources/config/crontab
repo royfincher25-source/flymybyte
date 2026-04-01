@@ -1,3 +1,0 @@
-# FlyMyByte - Cron schedule
-# Update ipset every 6 hours
-0 */6 * * * /opt/bin/unblock_update.sh

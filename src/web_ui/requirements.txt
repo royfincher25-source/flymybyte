@@ -1,9 +1,0 @@
-Flask==3.0.0
-Jinja2==3.1.2
-Werkzeug==3.0.0
-requests>=2.31.0
-waitress==2.1.2
-
-# Embedded optimization:
-# - waitress: production server (~2MB, lighter than gunicorn)
-# - total: ~7MB vs ~5MB without waitress

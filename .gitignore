@@ -1,8 +1,0 @@
-test*
-ssh_scripts/
-logo
-.worktrees/
-*.pyc
-__pycache__/
-.pytest_cache/
-src/web_ui/static/icons/

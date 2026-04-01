@@ -1,5 +1,0 @@
-# Minimal Tor bypass list - add your domains
-facebook.com
-instagram.com
-twitter.com
-telegram.org
