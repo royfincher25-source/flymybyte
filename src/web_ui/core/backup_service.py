@@ -17,6 +17,17 @@ from core.constants import (
 
 logger = logging.getLogger(__name__)
 
+OPT_ROOT = '/opt'
+
+
+def _arcname(path: str) -> str:
+    """Convert absolute path to archive-relative path."""
+    if path.startswith(OPT_ROOT + '/'):
+        return path[len(OPT_ROOT) + 1:]
+    if path.startswith(OPT_ROOT):
+        return path[len(OPT_ROOT):]
+    return os.path.basename(path)
+
 
 def create_backup(backup_type: str = 'full') -> Tuple[bool, str]:
     """Create backup of all flymybyte files."""
@@ -29,7 +40,7 @@ def create_backup(backup_type: str = 'full') -> Tuple[bool, str]:
             return False, 'Нет файлов для бэкапа'
         with tarfile.open(backup_file, 'w:gz') as tar:
             for f in existing_files:
-                tar.add(f, arcname=os.path.basename(f))
+                tar.add(f, arcname=_arcname(f))
         backup_size = os.path.getsize(backup_file)
         size_mb = backup_size / 1024 / 1024
         return True, f'Бэкап создан: {backup_file} ({size_mb:.1f} МБ, {len(existing_files)} объектов)'

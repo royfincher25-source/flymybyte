@@ -45,6 +45,15 @@ def check_disk_space(min_mb: float = 10) -> tuple:
         return True, 0
 
 
+def _arcname(path: str) -> str:
+    """Convert absolute path to archive-relative path."""
+    if path.startswith('/opt/'):
+        return path[5:]
+    if path.startswith('/opt'):
+        return path[4:]
+    return os.path.basename(path)
+
+
 def create_update_backup() -> str:
     """Create backup before update. Returns backup file path."""
     os.makedirs(BACKUP_DIR, exist_ok=True)
@@ -54,7 +63,7 @@ def create_update_backup() -> str:
     if existing_files:
         with tarfile.open(backup_file, 'w:gz', compresslevel=1) as tar:
             for f in existing_files:
-                tar.add(f, arcname=os.path.basename(f))
+                tar.add(f, arcname=_arcname(f))
     return backup_file
 
 

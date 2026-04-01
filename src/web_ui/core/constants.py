@@ -266,21 +266,51 @@ FILES_TO_UPDATE = {
 # =============================================================================
 
 BACKUP_FILES = [
+    # Web UI
     f'{WEB_UI_DIR}',
+    # VPN configs
     f'{XRAY_DIR}',
     f'{TOR_DIR}',
-    f'{UNBLOCK_DIR}',
-    '/opt/bin',
-    DNSMASQ_CONFIG,
-    CRONTAB_FILE,
+    f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
-    TROJAN_CONFIG_DIR,
     HYSTERIA2_CONFIG,
-    f'{NDM_DIR}',
-    INIT_DIR,
-    SCRIPT_INSTALL,
+    # Bypass lists
+    f'{UNBLOCK_DIR}',
     DNSMASQ_AI_CONFIG,
     AI_DOMAINS_LIST,
+    # System configs
+    DNSMASQ_CONFIG,
+    CRONTAB_FILE,
+    # Scripts
+    '/opt/bin',
+    f'{NDM_DIR}',
+    f'{INIT_DIR}',
+    # Install script
+    SCRIPT_INSTALL,
+    # Logs (optional, useful for debugging)
+    WEB_UI_LOG_FILE,
+]
+
+UPDATE_BACKUP_FILES = [
+    # Web UI
+    f'{WEB_UI_DIR}',
+    # VPN configs
+    f'{XRAY_DIR}',
+    f'{TOR_DIR}',
+    f'{TROJAN_CONFIG_DIR}',
+    SHADOWSOCKS_CONFIG,
+    HYSTERIA2_CONFIG,
+    # Bypass lists
+    f'{UNBLOCK_DIR}',
+    DNSMASQ_AI_CONFIG,
+    AI_DOMAINS_LIST,
+    # System configs
+    DNSMASQ_CONFIG,
+    CRONTAB_FILE,
+    # Scripts
+    '/opt/bin',
+    f'{NDM_DIR}',
+    f'{INIT_DIR}',
 ]
 
 UPDATE_BACKUP_FILES = [
