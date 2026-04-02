@@ -209,23 +209,28 @@ def service_restart_router():
 def service_restart_all():
     logger.info("[ROUTES] /service/restart-all")
     services = [
-        (SERVICES['shadowsocks']['name'], SERVICES['shadowsocks']['init']),
-        (SERVICES['tor']['name'], SERVICES['tor']['init']),
-        (SERVICES['vless']['name'], SERVICES['vless']['init']),
-        (SERVICES['trojan']['name'], SERVICES['trojan']['init']),
+        (SERVICES['shadowsocks']['name'], SERVICES['shadowsocks']['init'], SERVICES['shadowsocks']['config']),
+        (SERVICES['tor']['name'], SERVICES['tor']['init'], SERVICES['tor']['config']),
+        (SERVICES['vless']['name'], SERVICES['vless']['init'], SERVICES['vless']['config']),
+        (SERVICES['trojan']['name'], SERVICES['trojan']['init'], SERVICES['trojan']['config']),
     ]
     results = []
-    for name, init_script in services:
+    for name, init_script, config_path in services:
         try:
-            logger.info(f"[ROUTES] Restarting {name} via {init_script}")
-            if os.path.exists(init_script):
-                result = subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=60)
-                status = '✅' if result.returncode == 0 else '❌'
-                results.append(f"{status} {name}")
-                logger.info(f"[ROUTES] {name}: {'OK' if result.returncode == 0 else 'FAILED'} (code={result.returncode})")
-            else:
+            # Skip if not configured (no config file) or init script missing
+            if not os.path.exists(config_path):
+                results.append(f"⏭️ {name} (не настроен)")
+                logger.info(f"[ROUTES] {name}: skipped, no config")
+                continue
+            if not os.path.exists(init_script):
                 results.append(f"⚠️ {name} (скрипт не найден)")
                 logger.warning(f"[ROUTES] {name}: init script not found at {init_script}")
+                continue
+            logger.info(f"[ROUTES] Restarting {name} via {init_script}")
+            result = subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=180)
+            status = '✅' if result.returncode == 0 else '❌'
+            results.append(f"{status} {name}")
+            logger.info(f"[ROUTES] {name}: {'OK' if result.returncode == 0 else 'FAILED'} (code={result.returncode})")
         except Exception as e:
             results.append(f"❌ {name}: {str(e)}")
             logger.error(f"[ROUTES] service_restart_all Exception for {name}: {e}")
@@ -482,7 +487,7 @@ def service_updates_run():
 @bp.route('/install', methods=['GET', 'POST'])
 @login_required
 @csrf_required
-def install():
+def service_install():
     if request.method == 'POST':
         local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')
         resources_dir = os.path.join(os.path.dirname(__file__), 'resources')
@@ -565,7 +570,7 @@ def install():
 @bp.route('/remove', methods=['GET', 'POST'])
 @login_required
 @csrf_required
-def remove():
+def service_remove():
     if request.method == 'POST':
         if not os.path.exists(SCRIPT_INSTALL):
             local_script_path = os.path.join(os.path.dirname(__file__), 'scripts', 'script.sh')

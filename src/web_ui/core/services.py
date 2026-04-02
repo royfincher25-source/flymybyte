@@ -800,7 +800,7 @@ def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
             ['sh', init_script, 'restart'],
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=180
         )
 
         success = result.returncode == 0

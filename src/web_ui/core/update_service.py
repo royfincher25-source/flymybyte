@@ -144,11 +144,12 @@ def schedule_webui_restart():
         with open(TMP_RESTART_SCRIPT, 'w') as f:
             f.write(f'#!/bin/sh\nsleep 5\n{INIT_SCRIPTS["web_ui"]} restart\nrm -f {TMP_RESTART_SCRIPT}\n')
         os.chmod(TMP_RESTART_SCRIPT, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-        subprocess.Popen([TMP_RESTART_SCRIPT], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+        # Use os.system with & for reliable backgrounding on BusyBox
+        os.system(f'{TMP_RESTART_SCRIPT} &')
         logger.info("S99web_ui restart scheduled")
     except Exception as e:
         logger.warning(f"Failed to schedule restart: {e}")
         try:
-            subprocess.Popen([INIT_SCRIPTS['web_ui'], 'restart'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+            os.system(f'{INIT_SCRIPTS["web_ui"]} restart &')
         except Exception as e2:
             logger.error(f"Fallback restart failed: {e2}")
