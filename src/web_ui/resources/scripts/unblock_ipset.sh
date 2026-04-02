@@ -161,6 +161,37 @@ i=0
 
 log "Processing predefined files..."
 
+# Map ipset names to service check commands
+# Only populate ipset if the corresponding service is running
+check_service() {
+    local setname="$1"
+    case "$setname" in
+        unblocksh)
+            # ss-redir on port 1082
+            netstat -lnp 2>/dev/null | grep -q ":1082 "
+            ;;
+        unblockhysteria2)
+            # hysteria2 service
+            ps | grep -q "[h]ysteria"
+            ;;
+        unblocktor)
+            # tor on port 9141
+            netstat -lnp 2>/dev/null | grep -q ":9141 "
+            ;;
+        unblockvless)
+            # vless on port 10810
+            netstat -lnp 2>/dev/null | grep -q ":10810 "
+            ;;
+        unblocktroj)
+            # trojan on port 10829
+            netstat -lnp 2>/dev/null | grep -q ":10829 "
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
 # Process predefined files
 for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/hysteria2.txt:unblockhysteria2" "/opt/etc/unblock/tor.txt:unblocktor" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
     file=$(echo "$entry" | cut -d: -f1)
@@ -168,6 +199,13 @@ for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/hyst
 
     # Ensure ipset exists
     ipset create "$setname" hash:ip 2>/dev/null && log "  Created ipset: $setname" || log "  Ipset exists: $setname"
+
+    # Check if corresponding service is running
+    if ! check_service "$setname"; then
+        log "  SKIP: $setname (service not running) - flushing ipset"
+        ipset flush "$setname" 2>/dev/null
+        continue
+    fi
 
     # Run in background
     process_file "$file" "$setname" $i &

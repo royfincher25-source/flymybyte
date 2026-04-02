@@ -143,6 +143,45 @@ else
     FAIL=$((FAIL + 1))
 fi
 
+# Check for duplicate REDIRECT rules (should be max 2 per ipset: tcp+udp)
+echo "  Checking for duplicate rules..." >> "$RESULT_LOG"
+duplicates=0
+for setname in unblocksh unblocktor unblockvless unblocktroj; do
+    rule_count=$(iptables -t nat -L PREROUTING -n 2>/dev/null | grep -c "$setname")
+    rule_count=${rule_count:-0}
+    if [ "$rule_count" -gt 2 ]; then
+        echo "  [FAIL] $setname: $rule_count rules (expected 2, duplicates!)" >> "$RESULT_LOG"
+        FAIL=$((FAIL + 1))
+        duplicates=$((duplicates + 1))
+    elif [ "$rule_count" -eq 2 ]; then
+        echo "  [PASS] $setname: $rule_count rules (tcp+udp)" >> "$RESULT_LOG"
+        PASS=$((PASS + 1))
+    elif [ "$rule_count" -eq 0 ]; then
+        echo "  [WARN] $setname: no rules (service may not be running)" >> "$RESULT_LOG"
+        WARN=$((WARN + 1))
+    fi
+done
+
+# Check for stale ipset entries (ipset has entries but service not running)
+echo "  Checking for stale ipset entries..." >> "$RESULT_LOG"
+for entry in "unblocksh:1082" "unblocktor:9141" "unblockvless:10810" "unblocktroj:10829"; do
+    setname=$(echo "$entry" | cut -d: -f1)
+    port=$(echo "$entry" | cut -d: -f2)
+    if ipset list "$setname" -n >/dev/null 2>&1; then
+        count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]")
+        count=${count:-0}
+        if [ "$count" -gt 0 ]; then
+            if ! netstat -lnp 2>/dev/null | grep -q ":$port "; then
+                echo "  [FAIL] $setname: $count entries but port $port NOT listening (stale!)" >> "$RESULT_LOG"
+                FAIL=$((FAIL + 1))
+            else
+                echo "  [PASS] $setname: $count entries, port $port listening" >> "$RESULT_LOG"
+                PASS=$((PASS + 1))
+            fi
+        fi
+    fi
+done
+
 # Mangle PREROUTING — VPN mark rules
 mangle_rules=$(iptables -t mangle -L PREROUTING -n 2>/dev/null | grep -c "MARK\|CONNMARK")
 mangle_rules=${mangle_rules:-0}

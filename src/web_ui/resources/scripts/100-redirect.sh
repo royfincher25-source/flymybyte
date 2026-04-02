@@ -95,11 +95,45 @@ else
     log "WARNING: DNS redirect NOT applied — dnsmasq:5353 not available"
 fi
 
+# Check if a service is running for a given ipset
+service_running() {
+    local name="$1"
+    local port="$2"
+    case "$name" in
+        unblocksh)
+            netstat -lnp 2>/dev/null | grep -q ":1082 "
+            ;;
+        unblockhysteria2)
+            ps 2>/dev/null | grep -q "[h]ysteria"
+            ;;
+        unblocktor)
+            netstat -lnp 2>/dev/null | grep -q ":9141 "
+            ;;
+        unblockvless)
+            netstat -lnp 2>/dev/null | grep -q ":10810 "
+            ;;
+        unblocktroj)
+            netstat -lnp 2>/dev/null | grep -q ":10829 "
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 add_redirect() {
     name="$1"
     port="$2"
 
     log "Processing redirect: $name -> port $port"
+
+    # Skip if service is not running
+    if ! service_running "$name" "$port"; then
+        log "  SKIP: service for $name not running on port $port"
+        # Flush ipset to avoid stale entries redirecting traffic
+        ipset flush "$name" 2>/dev/null && log "  Flushed $name"
+        return 0
+    fi
 
     if echo "$IPSETS" | grep -q "^${name}$"; then
         log "  Ipset $name exists"
@@ -121,6 +155,7 @@ add_redirect() {
 }
 
 add_redirect unblocksh 1082
+add_redirect unblockhysteria2 0
 add_redirect unblocktor 9141
 add_redirect unblockvless 10810
 add_redirect unblocktroj 10829
