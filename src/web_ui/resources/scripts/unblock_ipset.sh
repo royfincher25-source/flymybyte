@@ -136,15 +136,18 @@ process_file() {
     
     # Apply ipset commands if file has content
     if [ -s "$temp_file" ]; then
-        cmd_count=$(wc -l < "$temp_file")
-        # Flush before restore to avoid "already added" errors
+        # Deduplicate to avoid "already added" errors
+        dedup_file="${temp_file}.dedup"
+        sort -u "$temp_file" > "$dedup_file"
+        cmd_count=$(wc -l < "$dedup_file")
+        # Flush before restore to start clean
         ipset flush "$setname" 2>/dev/null
-        if ipset restore < "$temp_file" 2>> "$thread_log" 2>&1; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] Applied $cmd_count entries to $setname (resolved=$resolved, direct=$direct_ip, skipped=$skipped)" >> "$LOGFILE"
-        else
-            echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] ERROR: ipset restore failed for $setname" >> "$LOGFILE"
-            cat "$thread_log" >> "$LOGFILE"
-        fi
+        # Use restore; ignore errors for individual entries (partial success is OK)
+        ipset restore < "$dedup_file" 2>> "$thread_log" || true
+        actual_count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]" 2>/dev/null)
+        actual_count=${actual_count:-0}
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] Applied $actual_count/$cmd_count entries to $setname (resolved=$resolved, direct=$direct_ip, skipped=$skipped)" >> "$LOGFILE"
+        rm -f "$dedup_file"
     else
         echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] No entries to add for $setname" >> "$LOGFILE"
     fi
@@ -212,7 +215,8 @@ wait
 log "=== Summary ==="
 for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
     if ipset list "$setname" -n 2>/dev/null | grep -q "^${setname}$"; then
-        count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]" 2>/dev/null || echo 0)
+        count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]")
+        count=${count:-0}
         log "  $setname: $count entries"
     else
         log "  $setname: NOT FOUND"
@@ -225,7 +229,8 @@ for vpn_file in /opt/etc/unblock/vpn-*.txt; do
         vpn_name=$(basename "$vpn_file" .txt)
         setname="unblock$vpn_name"
         if ipset list "$setname" -n 2>/dev/null | grep -q "^${setname}$"; then
-            count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]" 2>/dev/null || echo 0)
+            count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]")
+            count=${count:-0}
             log "  $setname: $count entries"
         else
             log "  $setname: NOT FOUND"
