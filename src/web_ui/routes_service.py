@@ -966,6 +966,39 @@ def key_config(service: str):
     return render_template('key_generic.html', service=service, service_name=svc['name'])
 
 
+@bp.route('/keys/<service>/disable', methods=['POST'])
+@login_required
+@csrf_required
+def key_disable(service: str):
+    services_config = {
+        'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless'], 'ipset': 'unblockvless', 'port': 10810},
+        'hysteria2': {'name': 'Hysteria 2', 'config_path': CONFIG_PATHS['hysteria2'], 'init_script': INIT_SCRIPTS['hysteria2'], 'ipset': 'unblockhysteria2', 'port': 0},
+        'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks'], 'ipset': 'unblocksh', 'port': 1082},
+        'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan'], 'ipset': 'unblocktroj', 'port': 10829},
+        'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor'], 'ipset': 'unblocktor', 'port': 9141},
+    }
+    if service not in services_config:
+        flash('Неверный сервис', 'danger')
+        return redirect(url_for('main.keys'))
+    svc = services_config[service]
+    try:
+        # Stop the service
+        if os.path.exists(svc['init_script']):
+            subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
+        # Remove config file
+        if os.path.exists(svc['config_path']):
+            os.remove(svc['config_path'])
+        # Flush ipset
+        subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
+        # Remove iptables redirect rules for this ipset
+        for proto in ['tcp', 'udp']:
+            subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
+        flash(f'✅ {svc["name"]} отключён, ipset очищен', 'success')
+    except Exception as e:
+        flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
+    return redirect(url_for('main.keys'))
+
+
 @bp.route('/bypass')
 @login_required
 def bypass():
