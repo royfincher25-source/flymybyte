@@ -277,12 +277,14 @@ def load_bypass_list(filepath: str) -> List[str]:
         try:
             mtime = os.path.getmtime(filepath)
             if cached and mtime == cached.get('mtime'):
+                logger.debug(f"[BYPASS] Cache hit for {filepath}: {len(cached['data'])} entries")
                 return cached['data']
         except (OSError, IOError):
             pass
     
     # File doesn't exist
     if not os.path.exists(filepath):
+        logger.warning(f"[BYPASS] File not found: {filepath}")
         return []
     
     # Load from file
@@ -301,11 +303,12 @@ def load_bypass_list(filepath: str) -> List[str]:
             mtime = time.time()
         
         Cache.set(cache_key, {'data': data, 'mtime': mtime}, ttl=60)
+        logger.info(f"[BYPASS] Loaded {len(data)} entries from {filepath}")
         
         return data
     
     except Exception as e:
-        logger.error(f"Error loading bypass list {filepath}: {e}")
+        logger.error(f"[BYPASS] Error loading {filepath}: {e}")
         return []
 
 
@@ -343,9 +346,11 @@ def save_bypass_list(filepath: str, sites: List[str]) -> None:
         Cache._timestamps.pop(cache_key, None)
         if cache_key in Cache._access_order:
             del Cache._access_order[cache_key]
+        
+        logger.info(f"[BYPASS] Saved {len(sites)} entries to {filepath}")
     
     except Exception as e:
-        logger.error(f"Error saving bypass list {filepath}: {e}")
+        logger.error(f"[BYPASS] Error saving {filepath}: {e}")
         # Cleanup temp file on error
         try:
             if os.path.exists(temp_path):
@@ -420,8 +425,10 @@ def run_unblock_update() -> Tuple[bool, str]:
     script_path = get_script_path('unblock_update.sh')
     
     if not script_path:
-        logger.error("unblock_update.sh script not found")
+        logger.error("[UPDATE] unblock_update.sh script not found")
         return False, "Script not found"
+    
+    logger.info(f"[UPDATE] Running unblock_update.sh from {script_path}")
     
     try:
         result = subprocess.run(
@@ -435,17 +442,17 @@ def run_unblock_update() -> Tuple[bool, str]:
         output = result.stdout.strip() or result.stderr.strip()
         
         if success:
-            logger.info(f"unblock_update.sh completed successfully: {output}")
+            logger.info(f"[UPDATE] unblock_update.sh completed: {output}")
         else:
-            logger.error(f"unblock_update.sh failed: {output}")
+            logger.error(f"[UPDATE] unblock_update.sh failed (code={result.returncode}): {output}")
         
         return success, output
     
     except subprocess.TimeoutExpired:
-        logger.error("unblock_update.sh timed out")
+        logger.error("[UPDATE] unblock_update.sh timed out")
         return False, "Timeout"
     except Exception as e:
-        logger.error(f"Error running unblock_update.sh: {e}")
+        logger.error(f"[UPDATE] Error running unblock_update.sh: {e}")
         return False, str(e)
 
 

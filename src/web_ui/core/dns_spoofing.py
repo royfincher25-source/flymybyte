@@ -91,7 +91,7 @@ class DNSSpoofing:
         self._domains_path = AI_DOMAINS_LIST
         
         self._initialized = True
-        logger.debug("DNSSpoofing initialized")
+        logger.info("[DNS-SPOOF] DNSSpoofing initialized")
     
     def load_domains(self) -> List[str]:
         """
@@ -110,11 +110,12 @@ class DNSSpoofing:
         domains_path = Path(self._domains_path)
         
         if not domains_path.exists():
-            logger.warning(f"AI domains list not found: {self._domains_path}")
+            logger.warning(f"[DNS-SPOOF] AI domains list not found: {self._domains_path}")
             return []
         
         try:
             content = domains_path.read_text(encoding='utf-8')
+            logger.debug(f"[DNS-SPOOF] Read {len(content)} bytes from {self._domains_path}")
             
             for line in content.splitlines():
                 line = line.strip()
@@ -130,25 +131,25 @@ class DNSSpoofing:
                 
                 # Skip IP addresses
                 if self._is_ip_address(line):
-                    logger.debug(f"Skipping IP address: {line}")
+                    logger.debug(f"[DNS-SPOOF] Skipping IP address: {line}")
                     continue
                 
                 # Validate domain
                 if self._validate_domain(line):
                     domains.append(line)
                 else:
-                    logger.warning(f"Invalid domain skipped: {line}")
+                    logger.warning(f"[DNS-SPOOF] Invalid domain skipped: {line}")
             
             # Limit domains count
             if len(domains) > MAX_DOMAINS_COUNT:
-                logger.warning(f"Too many domains ({len(domains)}), limiting to {MAX_DOMAINS_COUNT}")
+                logger.warning(f"[DNS-SPOOF] Too many domains ({len(domains)}), limiting to {MAX_DOMAINS_COUNT}")
                 domains = domains[:MAX_DOMAINS_COUNT]
             
             self._domains = domains
-            logger.info(f"Loaded {len(domains)} AI domains from {self._domains_path}")
+            logger.info(f"[DNS-SPOOF] Loaded {len(domains)} AI domains from {self._domains_path}")
             
         except Exception as e:
-            logger.error(f"Error loading AI domains: {e}")
+            logger.error(f"[DNS-SPOOF] Error loading AI domains: {e}")
             return []
         
         return domains
@@ -210,7 +211,7 @@ class DNSSpoofing:
             domains = self.load_domains()
         
         if not domains:
-            logger.warning("No domains to generate config for")
+            logger.warning("[DNS-SPOOF] No domains to generate config for")
             return ""
         
         lines = [
@@ -224,7 +225,7 @@ class DNSSpoofing:
             lines.append(f"server=/{domain}/{VPN_DNS_HOST}#{VPN_DNS_PORT}")
         
         config = '\n'.join(lines)
-        logger.debug(f"Generated dnsmasq config: {len(lines)} lines")
+        logger.info(f"[DNS-SPOOF] Generated config: {len(domains)} domains, {len(lines)} lines")
         
         return config
     
@@ -253,12 +254,12 @@ class DNSSpoofing:
             tmp_path.write_text(config, encoding='utf-8')
             tmp_path.replace(config_path)
             
-            logger.info(f"Written AI domains config to {self._config_path}")
+            logger.info(f"[DNS-SPOOF] Written AI domains config to {self._config_path} ({len(config)} bytes)")
             return True, "OK"
             
         except Exception as e:
             error_msg = f"Error writing config: {e}"
-            logger.error(error_msg)
+            logger.error(f"[DNS-SPOOF] {error_msg}")
             return False, error_msg
     
     def apply_config(self) -> Tuple[bool, str]:

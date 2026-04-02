@@ -148,6 +148,9 @@ CRONTAB_FILE = '/opt/etc/crontab'
 SCRIPT_UNBLOCK_IPSET = '/opt/bin/unblock_ipset.sh'
 SCRIPT_UNBLOCK_DNSMASQ = '/opt/bin/unblock_dnsmasq.sh'
 SCRIPT_UNBLOCK_UPDATE = '/opt/bin/unblock_update.sh'
+SCRIPT_EMERGENCY_RESTORE = '/opt/bin/emergency_restore.sh'
+SCRIPT_DNSMASQ_WATCHDOG = '/opt/bin/dnsmasq_watchdog.sh'
+SCRIPT_ROLLBACK = '/opt/bin/rollback.sh'
 SCRIPT_INSTALL = '/opt/root/script.sh'
 
 # =============================================================================
@@ -263,6 +266,9 @@ FILES_TO_UPDATE = {
     'web_ui/resources/lists/unblock-ai-domains.txt': AI_DOMAINS_LIST,
     'web_ui/resources/config/unblock-ai.dnsmasq.template': DNSMASQ_AI_TEMPLATE,
     'web_ui/resources/scripts/unblock_dnsmasq.sh': f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh',
+    'web_ui/resources/scripts/emergency_restore.sh': SCRIPT_EMERGENCY_RESTORE,
+    'web_ui/resources/scripts/dnsmasq_watchdog.sh': SCRIPT_DNSMASQ_WATCHDOG,
+    'web_ui/resources/scripts/rollback.sh': SCRIPT_ROLLBACK,
 }
 
 # =============================================================================

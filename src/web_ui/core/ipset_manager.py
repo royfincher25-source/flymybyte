@@ -43,33 +43,39 @@ def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
         ...     print(f"Added entries: {msg}")
     """
     if not entries:
-        logger.info(f"ipset {setname}: no entries to add")
+        logger.info(f"[IPSET] {setname}: no entries to add")
         return True, "No entries"
     
     # Memory protection: limit entries for embedded devices
     if len(entries) > MAX_BULK_ENTRIES:
-        logger.error(f"ipset {setname}: too many entries ({len(entries)} > {MAX_BULK_ENTRIES})")
+        logger.error(f"[IPSET] {setname}: too many entries ({len(entries)} > {MAX_BULK_ENTRIES})")
         return False, f"Too many entries (max {MAX_BULK_ENTRIES})"
 
+    logger.debug(f"[IPSET] {setname}: processing {len(entries)} entries (max={MAX_BULK_ENTRIES})")
+
     # Build ipset restore command
-    # Format: ipset restore <<EOF
-    #         add unblock 1.1.1.1
-    #         add unblock 8.8.8.8
-    #         EOF
     commands = []
+    skipped = 0
     for entry in entries:
-        # Sanitize entry to prevent command injection
         sanitized_entry = _sanitize_for_ipset(entry)
-        # Validate entry (IP or domain)
         if _is_valid_entry(sanitized_entry):
             commands.append(f"add {setname} {sanitized_entry}")
+        else:
+            skipped += 1
+
+    if skipped > 0:
+        logger.warning(f"[IPSET] {setname}: skipped {skipped} invalid entries")
 
     if not commands:
+        logger.warning(f"[IPSET] {setname}: no valid entries after sanitization")
         return True, "No valid entries"
+
+    logger.debug(f"[IPSET] {setname}: {len(commands)} valid commands prepared")
 
     # Execute bulk add
     cmd_text = "\n".join(commands)
     try:
+        logger.debug(f"[IPSET] {setname}: executing ipset restore ({len(commands)} commands)")
         result = subprocess.run(
             ['ipset', 'restore'],
             input=cmd_text,
@@ -79,22 +85,21 @@ def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
         )
 
         if result.returncode == 0:
-            logger.info(f"ipset {setname}: added {len(commands)} entries")
+            logger.info(f"[IPSET] {setname}: successfully added {len(commands)} entries")
             return True, f"Added {len(commands)} entries"
         else:
-            logger.error(f"ipset {setname} error: {result.stderr}")
-            # Parse stderr to identify failed entries
+            logger.error(f"[IPSET] {setname} restore failed: {result.stderr[:200]}")
             error_details = _parse_ipset_error(result.stderr, commands)
             return False, error_details
 
     except subprocess.TimeoutExpired:
-        logger.error(f"ipset {setname}: timeout")
+        logger.error(f"[IPSET] {setname}: timeout after 30s")
         return False, "Timeout"
     except FileNotFoundError:
-        logger.error("ipset command not found")
+        logger.error("[IPSET] ipset command not found")
         return False, "ipset not installed"
     except Exception as e:
-        logger.error(f"ipset {setname} exception: {e}")
+        logger.error(f"[IPSET] {setname} exception: {e}")
         return False, str(e)
 
 
@@ -115,18 +120,20 @@ def bulk_remove_from_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]
         ...     print(f"Removed entries: {msg}")
     """
     if not entries:
+        logger.info(f"[IPSET] {setname}: no entries to remove")
         return True, "No entries"
 
     commands = []
     for entry in entries:
-        # Sanitize entry to prevent command injection
         sanitized_entry = _sanitize_for_ipset(entry)
         if _is_valid_entry(sanitized_entry):
             commands.append(f"del {setname} {sanitized_entry}")
 
     if not commands:
+        logger.warning(f"[IPSET] {setname}: no valid entries to remove")
         return True, "No valid entries"
 
+    logger.debug(f"[IPSET] {setname}: removing {len(commands)} entries")
     cmd_text = "\n".join(commands)
     try:
         result = subprocess.run(
@@ -138,20 +145,20 @@ def bulk_remove_from_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]
         )
 
         if result.returncode == 0:
-            logger.info(f"ipset {setname}: removed {len(commands)} entries")
+            logger.info(f"[IPSET] {setname}: successfully removed {len(commands)} entries")
             return True, f"Removed {len(commands)} entries"
         else:
-            logger.error(f"ipset {setname} error: {result.stderr}")
+            logger.error(f"[IPSET] {setname} remove failed: {result.stderr[:200]}")
             return False, result.stderr
 
     except subprocess.TimeoutExpired:
-        logger.error(f"ipset {setname}: timeout")
+        logger.error(f"[IPSET] {setname}: timeout during remove")
         return False, "Timeout"
     except FileNotFoundError:
-        logger.error("ipset command not found")
+        logger.error("[IPSET] ipset command not found")
         return False, "ipset not installed"
     except Exception as e:
-        logger.error(f"ipset {setname} exception: {e}")
+        logger.error(f"[IPSET] {setname} exception during remove: {e}")
         return False, str(e)
 
 
@@ -173,6 +180,7 @@ def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, s
     """
     try:
         # Check if exists
+        logger.debug(f"[IPSET] Checking if {setname} exists (type={settype})")
         result = subprocess.run(
             ['ipset', 'list', setname],
             capture_output=True,
@@ -181,10 +189,11 @@ def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, s
         )
 
         if result.returncode == 0:
-            logger.debug(f"ipset {setname}: already exists")
+            logger.debug(f"[IPSET] {setname}: already exists")
             return True, "Exists"
 
         # Create new
+        logger.info(f"[IPSET] Creating {setname} (type={settype})")
         result = subprocess.run(
             ['ipset', 'create', setname, settype, 'maxelem', '1048576'],
             capture_output=True,
@@ -193,20 +202,20 @@ def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, s
         )
 
         if result.returncode == 0:
-            logger.info(f"ipset {setname}: created")
+            logger.info(f"[IPSET] {setname}: created successfully")
             return True, "Created"
         else:
-            logger.error(f"ipset {setname} create error: {result.stderr}")
+            logger.error(f"[IPSET] {setname} create failed: {result.stderr[:200]}")
             return False, result.stderr
 
     except subprocess.TimeoutExpired:
-        logger.error(f"ipset {setname}: timeout")
+        logger.error(f"[IPSET] {setname}: timeout")
         return False, "Timeout"
     except FileNotFoundError:
-        logger.error("ipset command not found")
+        logger.error("[IPSET] ipset command not found")
         return False, "ipset not installed"
     except Exception as e:
-        logger.error(f"ipset {setname} exception: {e}")
+        logger.error(f"[IPSET] {setname} exception: {e}")
         return False, str(e)
 
 
@@ -269,10 +278,12 @@ def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool,
     try:
         from .dns_resolver import resolve_domains_for_ipset
         
+        logger.info(f"[IPSET] Refreshing from file: {filepath}")
         count = resolve_domains_for_ipset(filepath, max_workers)
+        logger.info(f"[IPSET] Refresh complete: {count} IPs resolved and added from {filepath}")
         return True, f"Resolved and added {count} IPs"
     except Exception as e:
-        logger.error(f"Refresh ipset error: {e}")
+        logger.error(f"[IPSET] Refresh failed for {filepath}: {e}")
         return False, str(e)
 
 

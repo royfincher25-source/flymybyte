@@ -1,26 +1,106 @@
 #!/bin/sh
 # S99unblock - Скрипт автоматического заполнения множества unblock при загрузке
 
+mkdir -p /opt/var/log
+LOGFILE="/opt/var/log/S99unblock.log"
+TAG="S99unblock"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] $1" >> "$LOGFILE"
+}
+
+log_error() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] ERROR: $1" >> "$LOGFILE"
+}
+
+log "=== S99unblock called with action: $1 ==="
+
 case "$1" in
   start)
-    echo "Starting unblock ipset..."
-    /opt/bin/unblock_ipset.sh
-    echo "Setting up iptables redirect rules..."
-    /opt/etc/ndm/netfilter.d/100-redirect.sh
+    log "Starting unblock ipset..."
+
+    # Step 1: Ensure dnsmasq is running (needed for DNS resolution in ipset script)
+    log "Ensuring dnsmasq is running..."
+    if /opt/etc/init.d/S56dnsmasq restart >> "$LOGFILE" 2>&1; then
+        log "  dnsmasq restarted"
+    else
+        log_error "  dnsmasq restart failed, proceeding anyway"
+    fi
+    sleep 2
+
+    # Step 2: Populate ipsets
+    IPSET_OK=false
+    if /opt/bin/unblock_ipset.sh >> "$LOGFILE" 2>&1; then
+        log "unblock_ipset.sh completed successfully"
+        IPSET_OK=true
+    else
+        log_error "unblock_ipset.sh failed (exit code: $?)"
+    fi
+
+    # Step 3: Verify ipsets have entries before applying redirect rules
+    if [ "$IPSET_OK" = "true" ]; then
+        log "Verifying ipset entries..."
+        TOTAL_ENTRIES=0
+        for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
+            count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]" || echo 0)
+            TOTAL_ENTRIES=$((TOTAL_ENTRIES + count))
+            log "  $setname: $count entries"
+        done
+
+        if [ "$TOTAL_ENTRIES" -lt 1 ]; then
+            log_error "No ipset entries found after unblock_ipset.sh — SKIPPING redirect rules to prevent internet loss"
+            IPSET_OK=false
+        else
+            log "Total ipset entries: $TOTAL_ENTRIES"
+        fi
+    fi
+
+    # Step 4: Apply iptables redirect rules ONLY if ipsets are populated
+    if [ "$IPSET_OK" = "true" ]; then
+        log "Setting up iptables redirect rules..."
+        if /opt/etc/ndm/netfilter.d/100-redirect.sh >> "$LOGFILE" 2>&1; then
+            log "100-redirect.sh completed successfully"
+        else
+            log_error "100-redirect.sh failed (exit code: $?)"
+        fi
+    else
+        log_error "SKIPPING 100-redirect.sh — ipsets not ready (would cause internet loss)"
+    fi
+
+    # Step 5: Start dnsmasq watchdog (monitors dnsmasq:5353, removes DNAT on crash)
+    if [ -x "/opt/bin/dnsmasq_watchdog.sh" ]; then
+        killall dnsmasq_watchdog.sh 2>/dev/null
+        /opt/bin/dnsmasq_watchdog.sh &
+        log "Started dnsmasq watchdog (PID: $!)"
+    else
+        log "dnsmasq_watchdog.sh not found, skipping"
+    fi
     ;;
   stop)
-    echo "Stopping unblock ipset..."
-    # Очистка множеств (опционально)
+    log "Stopping unblock ipset..."
+    log "  Stopping dnsmasq watchdog..."
+    killall dnsmasq_watchdog.sh 2>/dev/null && log "  Watchdog stopped" || log "  Watchdog not running"
+    log "  Flushing iptables redirect rules..."
+    for proto in tcp udp; do
+        iptables -t nat -F PREROUTING 2>/dev/null && log "  Flushed PREROUTING ($proto)" || log_error "  Failed to flush PREROUTING ($proto)"
+    done
+    log "  Clearing ipsets..."
+    for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
+        ipset flush "$setname" 2>/dev/null && log "  Flushed $setname" || log "  $setname not found"
+    done
     ;;
   restart)
+    log "Restarting unblock..."
     $0 stop
     sleep 1
     $0 start
     ;;
   *)
+    log_error "Unknown action: $1"
     echo "Usage: $0 {start|stop|restart}"
     exit 1
     ;;
 esac
 
+log "=== S99unblock finished ==="
 exit 0

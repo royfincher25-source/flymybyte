@@ -36,29 +36,33 @@ def update_dnsmasq_dns(server_host: str, fallback_servers: list = None) -> Tuple
     if fallback_servers is None:
         fallback_servers = ['1.1.1.1']
 
+    logger.info(f"[DNS] Updating dnsmasq: primary={server_host}, fallbacks={fallback_servers}")
+
     try:
         # Read current config
         config_path = Path(DNSMASQ_CONFIG)
         if not config_path.exists():
-            # dnsmasq not installed - this is OK, just skip update
-            logger.warning(f"dnsmasq config not found: {DNSMASQ_CONFIG}, skipping update")
+            logger.warning(f"[DNS] dnsmasq config not found: {DNSMASQ_CONFIG}, skipping update")
             return True, "dnsmasq not configured"
 
         content = config_path.read_text()
+        logger.debug(f"[DNS] Read dnsmasq config: {len(content)} bytes")
 
         # Remove existing server= lines that are bare IPs (not domain-specific server=/domain/...)
         # Keep domain-specific lines like server=/onion/127.0.0.1#9053
         lines = []
+        removed_servers = 0
         for line in content.split('\n'):
             stripped = line.strip()
             if stripped.startswith('server=/'):
-                # Domain-specific server line — keep it
                 lines.append(line)
             elif stripped.startswith('server='):
-                # Bare DNS server line — remove to replace
+                removed_servers += 1
                 pass
             else:
                 lines.append(line)
+
+        logger.debug(f"[DNS] Removed {removed_servers} old server= lines, keeping {len(lines)} lines")
 
         # Add new server lines: primary + fallbacks
         lines.append(f'server={server_host}')
@@ -70,9 +74,10 @@ def update_dnsmasq_dns(server_host: str, fallback_servers: list = None) -> Tuple
         tmp_path.write_text('\n'.join(lines))
         tmp_path.replace(config_path)
 
-        logger.debug(f"Written new dnsmasq config with server={server_host} + {len(fallback_servers)} fallback(s)")
+        logger.info(f"[DNS] Written new dnsmasq config: {server_host} + {len(fallback_servers)} fallback(s)")
 
         # Restart dnsmasq to apply changes
+        logger.info(f"[DNS] Restarting dnsmasq: {' '.join(DNSMASQ_RESTART_CMD)}")
         result = subprocess.run(
             DNSMASQ_RESTART_CMD,
             capture_output=True,
@@ -81,19 +86,19 @@ def update_dnsmasq_dns(server_host: str, fallback_servers: list = None) -> Tuple
         )
 
         if result.returncode == 0:
-            logger.info(f"Updated dnsmasq to use {server_host} + {len(fallback_servers)} fallback(s)")
+            logger.info(f"[DNS] dnsmasq restarted successfully")
             return True, "OK"
         else:
             error_msg = result.stderr.strip() or result.stdout.strip() or f"dnsmasq restart failed (code {result.returncode})"
-            logger.error(f"dnsmasq restart failed: {error_msg}")
+            logger.error(f"[DNS] dnsmasq restart failed: {error_msg}")
             return False, error_msg
 
     except subprocess.TimeoutExpired:
         error_msg = "dnsmasq restart timeout"
-        logger.error(error_msg)
+        logger.error(f"[DNS] {error_msg}")
         return False, error_msg
 
     except Exception as e:
         error_msg = f"Error updating dnsmasq: {e}"
-        logger.error(error_msg)
+        logger.error(f"[DNS] {error_msg}")
         return False, error_msg

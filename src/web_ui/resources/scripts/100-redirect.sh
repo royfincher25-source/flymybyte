@@ -2,52 +2,122 @@
 # 100-redirect.sh - Настройка перенаправления трафика
 # Вызывается из системы Keenetic (с переменными $type и $table) или вручную
 
+mkdir -p /opt/var/log
+LOGFILE="/opt/var/log/100-redirect.log"
+TAG="100-redirect.sh"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] $1" >> "$LOGFILE"
+}
+
+log_error() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] ERROR: $1" >> "$LOGFILE"
+}
+
+log "=== Script started (type=$type, table=$table) ==="
+
 # Выход для IPv6
-[ "$type" = "ip6tables" ] && exit 0
+[ "$type" = "ip6tables" ] && { log "IPv6 call, exiting"; exit 0; }
 
 # Ensure all required ipsets exist
+log "Ensuring base ipsets exist..."
 for ipset_name in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
-    ipset create "$ipset_name" hash:net -exist 2>/dev/null
+    if ipset create "$ipset_name" hash:net -exist 2>/dev/null; then
+        log "  Created ipset: $ipset_name"
+    else
+        log "  Ipset already exists: $ipset_name"
+    fi
 done
-echo "IPsets ready"
+log "IPsets ready"
 
 # При ручном запуске (без переменных) — выполняем настройку
 if [ -z "$table" ]; then
-    # Ручной запуск — применяем правила для NAT
-    :
+    log "Manual invocation — will apply NAT rules"
 elif [ "$table" != "mangle" ] && [ "$table" != "nat" ]; then
+    log "Table '$table' not supported, exiting"
     exit 0
 fi
 
 ip4t() {
     if ! iptables -C "$@" &>/dev/null; then
-        iptables -A "$@" || exit 0
+        iptables -A "$@" || { log_error "iptables -A $* failed"; exit 0; }
     fi
 }
 
+# Detect local IP
 local_ip=$(ip -4 addr show br0 | awk '/inet /{print $2}' | cut -d/ -f1 | grep -E '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' | head -n1)
+if [ -z "$local_ip" ]; then
+    log_error "Could not detect local IP on br0"
+    local_ip="192.168.1.1"
+    log "  Using fallback IP: $local_ip"
+else
+    log "Detected local IP: $local_ip"
+fi
 
+# Capture current iptables and ipset state
 RULES=$(iptables-save 2>/dev/null)
 IPSETS=$(ipset list -n 2>/dev/null)
+log "Captured iptables rules ($(echo "$RULES" | wc -l) lines) and ipsets ($(echo "$IPSETS" | wc -l) sets)"
 
-for protocol in udp tcp; do
-    if [ -z "$(echo "$RULES" | grep "$protocol --dport 53 -j DNAT")" ]; then
-        iptables -I PREROUTING -w -t nat -p "$protocol" --dport 53 -j DNAT --to "$local_ip"
+# DNS redirect to dnsmasq:5353 (only if dnsmasq is listening on 5353)
+log "Checking if dnsmasq is listening on port 5353..."
+DNS_REDIRECT_OK=false
+if netstat -tlnp 2>/dev/null | grep -q ":5353 " || ss -tlnp 2>/dev/null | grep -q ":5353 "; then
+    log "  dnsmasq:5353 is listening, enabling DNS redirect"
+    DNS_REDIRECT_OK=true
+else
+    # Try starting dnsmasq and wait briefly
+    log "  dnsmasq:5353 NOT listening, attempting to start..."
+    /opt/etc/init.d/S56dnsmasq restart >> "$LOGFILE" 2>&1
+    sleep 3
+    if netstat -tlnp 2>/dev/null | grep -q ":5353 " || ss -tlnp 2>/dev/null | grep -q ":5353 "; then
+        log "  dnsmasq:5353 started successfully, enabling DNS redirect"
+        DNS_REDIRECT_OK=true
+    else
+        log_error "  dnsmasq:5353 still not listening, SKIPPING DNS redirect to prevent internet loss"
     fi
-done
+fi
+
+if [ "$DNS_REDIRECT_OK" = "true" ]; then
+    for protocol in udp tcp; do
+        if [ -z "$(echo "$RULES" | grep "$protocol --dport 53 -j DNAT")" ]; then
+            log "Adding DNS redirect: $protocol dport 53 -> $local_ip:5353"
+            if iptables -I PREROUTING -w -t nat -p "$protocol" --dport 53 -j DNAT --to "$local_ip:5353" 2>&1; then
+                log "  DNS redirect added for $protocol"
+            else
+                log_error "Failed to add DNS redirect for $protocol"
+            fi
+        else
+            log "DNS redirect for $protocol already exists"
+        fi
+    done
+else
+    log "WARNING: DNS redirect NOT applied — dnsmasq:5353 not available"
+fi
 
 add_redirect() {
     name="$1"
     port="$2"
 
+    log "Processing redirect: $name -> port $port"
+
     if echo "$IPSETS" | grep -q "^${name}$"; then
-        [ -z "$(echo "$RULES" | grep "$name")" ] || return 0
+        log "  Ipset $name exists"
+        if [ -z "$(echo "$RULES" | grep "$name")" ]; then
+            log "  No iptables rule for $name, adding..."
+        else
+            log "  Rule for $name already exists, skipping"
+            return 0
+        fi
     else
-        ipset create "$name" hash:net -exist 2>/dev/null
+        log "  Ipset $name NOT found, creating..."
+        ipset create "$name" hash:net -exist 2>/dev/null || log_error "Failed to create ipset $name"
     fi
 
-    iptables -I PREROUTING -w -t nat -p tcp -m set --match-set "$name" dst -j REDIRECT --to-port "$port"
-    iptables -I PREROUTING -w -t nat -p udp -m set --match-set "$name" dst -j REDIRECT --to-port "$port"
+    iptables -I PREROUTING -w -t nat -p tcp -m set --match-set "$name" dst -j REDIRECT --to-port "$port" 2>&1 && \
+        log "  TCP redirect added for $name -> $port" || log_error "Failed to add TCP redirect for $name"
+    iptables -I PREROUTING -w -t nat -p udp -m set --match-set "$name" dst -j REDIRECT --to-port "$port" 2>&1 && \
+        log "  UDP redirect added for $name -> $port" || log_error "Failed to add UDP redirect for $name"
 }
 
 add_redirect unblocksh 1082
@@ -55,9 +125,9 @@ add_redirect unblocktor 9141
 add_redirect unblockvless 10810
 add_redirect unblocktroj 10829
 
-TAG="100-redirect.sh"
-
+# VPN-specific routing
 if ls -d /opt/etc/unblock/vpn-*.txt >/dev/null 2>&1; then
+    log "Processing VPN files..."
     for vpn_file_name in /opt/etc/unblock/vpn*; do
         vpn_unblock_name=$(echo $vpn_file_name | awk -F '/' '{print $5}' | sed 's/.txt//')
         unblockvpn=$(echo unblock"$vpn_unblock_name")
@@ -65,22 +135,22 @@ if ls -d /opt/etc/unblock/vpn-*.txt >/dev/null 2>&1; then
         vpn_type=$(echo "$unblockvpn" | sed 's/-/ /g' | awk '{print $NF}')
         vpn_link_up=$(curl -s localhost:79/rci/show/interface/"$vpn_type"/link | tr -d '"')
         if [ "$vpn_link_up" = "up" ]; then
+            log "  VPN $vpn_type link is UP"
             vpn_type_lower=$(echo "$vpn_type" | tr [:upper:] [:lower:])
             get_vpn_fwmark_id=$(grep "$vpn_type_lower" /opt/etc/iproute2/rt_tables | awk '{print $1}')
 
             if [ -n "${get_vpn_fwmark_id}" ]; then
                 vpn_table_id=$get_vpn_fwmark_id
             else
+                log_error "  No fwmark for $vpn_type_lower in rt_tables"
                 break
             fi
             vpn_mark_id=$(echo 0xd"$vpn_table_id")
 
             if echo "$RULES" | grep -q "$unblockvpn"; then
-                vpn_rule_ok=$(echo Правила для "$unblockvpn" уже есть.)
-                echo "$vpn_rule_ok"
+                log "  Rules for $unblockvpn already exist"
             else
-                info_vpn_rule=$(echo ipset: "$unblockvpn", mark_id: "$vpn_mark_id")
-                logger -t "$TAG" "$info_vpn_rule"
+                log "  Adding rules for $unblockvpn (mark=$vpn_mark_id)"
 
                 ipset create "$unblockvpn" hash:net -exist 2>/dev/null
 
@@ -88,107 +158,26 @@ if ls -d /opt/etc/unblock/vpn-*.txt >/dev/null 2>&1; then
                 software=$(curl -s localhost:79/rci/show/rc/p lobes | grep software -C1  | head -1 | awk '{print $2}' | tr -d ",")
                 hardware=$(curl -s localhost:79/rci/show/rc/ppe | grep hardware -C1  | head -1 | awk '{print $2}' | tr -d ",")
                 if [ -z "$fastnat" ] && [ "$software" = "false" ] && [ "$hardware" = "false" ]; then
-                    info=$(echo "VPN: fastnat, swnat и hwnat ВЫКЛЮЧЕНЫ, правила добавлены")
-                    logger -t "$TAG" "$info"
-                    iptables -A PREROUTING -w -t mangle -p tcp -m set --match-set "$unblockvpn" dst -j MARK --set-mark "$vpn_mark_id"
-                    iptables -A PREROUTING -w -t mangle -p udp -m set --match-set "$unblockvpn" dst -j MARK --set-mark "$vpn_mark_id"
+                    log "  VPN: fastnat/swnat/hwnat DISABLED, using MARK rules"
+                    iptables -A PREROUTING -w -t mangle -p tcp -m set --match-set "$unblockvpn" dst -j MARK --set-mark "$vpn_mark_id" 2>&1 && \
+                        log "    MARK rule added (tcp)" || log_error "    Failed to add MARK rule (tcp)"
+                    iptables -A PREROUTING -w -t mangle -p udp -m set --match-set "$unblockvpn" dst -j MARK --set-mark "$vpn_mark_id" 2>&1 && \
+                        log "    MARK rule added (udp)" || log_error "    Failed to add MARK rule (udp)"
                 else
-                    info=$(echo "VPN: fastnat, swnat и hwnat ВКЛЮЧЕНЫ, правила добавлены")
-                    logger -t "$TAG" "$info"
-                    iptables -A PREROUTING -w -t mangle -m conntrack --ctstate NEW -m set --match-set "$unblockvpn" dst -j CONNMARK --set-mark "$vpn_mark_id"
-                    iptables -A PREROUTING -w -t mangle -j CONNMARK --restore-mark
+                    log "  VPN: fastnat/swnat/hwnat ENABLED, using CONNMARK rules"
+                    iptables -A PREROUTING -w -t mangle -m conntrack --ctstate NEW -m set --match-set "$unblockvpn" dst -j CONNMARK --set-mark "$vpn_mark_id" 2>&1 && \
+                        log "    CONNMARK rule added" || log_error "    Failed to add CONNMARK rule"
+                    iptables -A PREROUTING -w -t mangle -j CONNMARK --restore-mark 2>&1 && \
+                        log "    CONNMARK restore added" || log_error "    Failed to add CONNMARK restore"
                 fi
             fi
+        else
+            log "  VPN $vpn_type link is DOWN, skipping"
         fi
     done
+else
+    log "No VPN files found in /opt/etc/unblock/"
 fi
 
-# =============================================================================
-# ПРИМЕНЕНИЕ ПРАВИЛ ПРИ РУЧНОМ ЗАПУСКЕ
-# =============================================================================
-# Если скрипт запущен вручную (без переменных $type и $table),
-# применяем правила перенаправления трафика
-
-if [ -z "$table" ]; then
-    echo "Применение правил перенаправления трафика..."
-    
-    # Получение локального IP
-    local_ip=$(ip -4 addr show br0 | awk '/inet /{print $2}' | cut -d/ -f1 | grep -E '^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)' | head -n1)
-    
-    # Проверка ipset (IPv4)
-    for ipset_name in unblocksh unblocktor unblockvless unblocktroj; do
-        if ipset list "$ipset_name" -n 2>/dev/null | grep -q "^${ipset_name}$"; then
-            count=$(ipset list "$ipset_name" 2>/dev/null | grep -c "^[0-9]" || echo 0)
-            echo "  ✅ $ipset_name: $count записей"
-        else
-            echo "  ⚠️  $ipset_name: не создан"
-        fi
-    done
-    
-    # Проверка ipset (IPv6)
-    for ipset_name in unblocksh6 unblocktor6 unblockvless6 unblocktroj6; do
-        if ipset list "$ipset_name" -n 2>/dev/null | grep -q "^${ipset_name}$"; then
-            count=$(ipset list "$ipset_name" 2>/dev/null | grep -c "^[0-9a-f]" || echo 0)
-            echo "  ✅ $ipset_name: $count записей"
-        else
-            echo "  ⚠️  $ipset_name: не создан"
-        fi
-    done
-    
-    # Применение правил для Shadowsocks
-    echo "  → Добавление правил для Shadowsocks (порт 1082)..."
-    iptables -I PREROUTING -w -t nat -p tcp -m set --match-set unblocksh dst -j REDIRECT --to-ports 1082 2>/dev/null && \
-        echo "    ✅ TCP правило добавлено" || echo "    ⚠️  TCP правило не добавлено"
-    iptables -I PREROUTING -w -t nat -p udp -m set --match-set unblocksh dst -j REDIRECT --to-ports 1082 2>/dev/null && \
-        echo "    ✅ UDP правило добавлено" || echo "    ⚠️  UDP правило не добавлено"
-    
-    # Применение правил для Tor
-    echo "  → Добавление правил для Tor (порт 9141)..."
-    iptables -I PREROUTING -w -t nat -p tcp -m set --match-set unblocktor dst -j REDIRECT --to-ports 9141 2>/dev/null && \
-        echo "    ✅ TCP правило добавлено" || echo "    ⚠️  TCP правило не добавлено"
-    iptables -I PREROUTING -w -t nat -p udp -m set --match-set unblocktor dst -j REDIRECT --to-ports 9141 2>/dev/null && \
-        echo "    ✅ UDP правило добавлено" || echo "    ⚠️  UDP правило не добавлено"
-    
-    # Применение правил для VLESS
-    echo "  → Добавление правил для VLESS (порт 10810)..."
-    iptables -I PREROUTING -w -t nat -p tcp -m set --match-set unblockvless dst -j REDIRECT --to-ports 10810 2>/dev/null && \
-        echo "    ✅ TCP правило добавлено" || echo "    ⚠️  TCP правило не добавлено"
-    iptables -I PREROUTING -w -t nat -p udp -m set --match-set unblockvless dst -j REDIRECT --to-ports 10810 2>/dev/null && \
-        echo "    ✅ UDP правило добавлено" || echo "    ⚠️  UDP правило не добавлено"
-    
-    # Применение правил для Trojan
-    echo "  → Добавление правил для Trojan (порт 10829)..."
-    iptables -I PREROUTING -w -t nat -p tcp -m set --match-set unblocktroj dst -j REDIRECT --to-ports 10829 2>/dev/null && \
-        echo "    ✅ TCP правило добавлено" || echo "    ⚠️  TCP правило не добавлено"
-    iptables -I PREROUTING -w -t nat -p udp -m set --match-set unblocktroj dst -j REDIRECT --to-ports 10829 2>/dev/null && \
-        echo "    ✅ UDP правило добавлено" || echo "    ⚠️  UDP правило не добавлено"
-    
-    # =============================================================================
-    # IPv6 ПРАВИЛА
-    # =============================================================================
-    echo ""
-    echo "🔥 Применение IPv6 правил..."
-    
-    # Создание IPv6 ipset
-    ipset create unblocksh6 hash:net family inet6 -exist 2>/dev/null
-    ipset create unblocktor6 hash:net family inet6 -exist 2>/dev/null
-    ipset create unblockvless6 hash:net family inet6 -exist 2>/dev/null
-    ipset create unblocktroj6 hash:net family inet6 -exist 2>/dev/null
-    
-    # Добавление IPv6 диапазонов для популярных сервисов
-    ipset add unblocksh6 2a00:1450::/32 2>/dev/null  # Google/YouTube
-    ipset add unblocksh6 2600:1900::/32 2>/dev/null  # Google Cloud
-    ipset add unblocksh6 2a00:1450:4001::/48 2>/dev/null
-    ipset add unblocksh6 2a00:1450:4010::/48 2>/dev/null
-    
-    # IPv6 правила для Shadowsocks
-    ip6tables -I PREROUTING -w -t nat -p tcp -m set --match-set unblocksh6 dst -j REDIRECT --to-ports 1082 2>/dev/null && \
-        echo "  ✅ IPv6 Shadowsocks правила добавлены" || echo "  ⚠️  IPv6 Shadowsocks правила не добавлены"
-    ip6tables -I PREROUTING -w -t nat -p udp -m set --match-set unblocksh6 dst -j REDIRECT --to-ports 1082 2>/dev/null
-    
-    echo "✅ IPv6 правила применены"
-    
-    echo "✅ Правила маршрутизации применены"
-fi
-
+log "=== Script completed ==="
 exit 0

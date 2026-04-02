@@ -4,13 +4,21 @@
 
 mkdir -p /opt/var/log
 LOGFILE="/opt/var/log/unblock_ipset.log"
-echo "=== $(date '+%Y-%m-%d %H:%M:%S') ===" >> "$LOGFILE"
+TAG="unblock_ipset"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] $1" >> "$LOGFILE"
+}
+
+log_error() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] ERROR: $1" >> "$LOGFILE"
+}
+
+log "=== Script started ==="
 
 # Function to check available memory
 get_free_memory() {
-    # Read MemFree from /proc/meminfo (in kB)
     free_kB=$(grep MemFree /proc/meminfo | awk '{print $2}')
-    # Convert to MB
     free_MB=$((free_kB / 1024))
     echo $free_MB
 }
@@ -20,19 +28,20 @@ get_thread_count() {
     free_MB=$(get_free_memory)
     
     if [ $free_MB -lt 20 ]; then
-        echo 1  # Very low memory, sequential processing
+        echo 1
     elif [ $free_MB -lt 50 ]; then
-        echo 2  # Low memory, 2 threads
+        echo 2
     elif [ $free_MB -lt 100 ]; then
-        echo 3  # Medium memory, 3 threads
+        echo 3
     else
-        echo 4  # Good memory, 4 threads
+        echo 4
     fi
 }
 
 # Get thread count
 THREAD_COUNT=$(get_thread_count)
-echo "Using $THREAD_COUNT threads (free memory: $(get_free_memory)MB)" >> "$LOGFILE"
+FREE_MEM=$(get_free_memory)
+log "Memory: ${FREE_MEM}MB free, using $THREAD_COUNT threads"
 
 # Function to check if DNS is ready
 check_dns_ready() {
@@ -48,35 +57,50 @@ check_dns_ready() {
 }
 
 # Check DNS once at start
+log "Checking DNS availability..."
 if ! check_dns_ready; then
+    log_error "DNS not available after 30 seconds"
     echo "ERROR: DNS not available after 30 seconds" | tee -a "$LOGFILE"
     exit 1
 fi
+log "DNS is available"
 
 # Function to process a single file
 process_file() {
     local file="$1"
     local setname="$2"
     local thread_id="$3"
+    local thread_log="/tmp/ipset_thread_${thread_id}.log"
+    
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] Processing: $file -> $setname" >> "$LOGFILE"
     
     if [ ! -f "$file" ]; then
-        echo "File not found: $file" >> "$LOGFILE"
+        log_error "File not found: $file (thread $thread_id)"
         return
     fi
+    
+    # Count lines in source file
+    line_count=$(wc -l < "$file")
+    echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] File has $line_count lines" >> "$LOGFILE"
     
     # Create temp file for ipset commands
     temp_file="/tmp/ipset_commands_$thread_id.txt"
     > "$temp_file"
     
+    local resolved=0
+    local direct_ip=0
+    local skipped=0
+    
     # Process file line by line
     while read -r line || [ -n "$line" ]; do
-        [ -z "$line" ] && continue
-        [ "${line#?}" = "#" ] && continue
+        [ -z "$line" ] && { skipped=$((skipped + 1)); continue; }
+        [ "${line#?}" = "#" ] && { skipped=$((skipped + 1)); continue; }
         
         # Check for CIDR
         cidr=$(echo "$line" | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}')
         if [ -n "$cidr" ]; then
             echo "add $setname $cidr" >> "$temp_file"
+            direct_ip=$((direct_ip + 1))
             continue
         fi
         
@@ -84,6 +108,7 @@ process_file() {
         range=$(echo "$line" | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}-[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
         if [ -n "$range" ]; then
             echo "add $setname $range" >> "$temp_file"
+            direct_ip=$((direct_ip + 1))
             continue
         fi
         
@@ -91,32 +116,45 @@ process_file() {
         addr=$(echo "$line" | grep -Eo '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}')
         if [ -n "$addr" ]; then
             echo "add $setname $addr" >> "$temp_file"
+            direct_ip=$((direct_ip + 1))
             continue
         fi
         
-        # Resolve domain (skip if empty or comment)
+        # Resolve domain
         if [ -n "$line" ] && echo "$line" | grep -qv '^[[:space:]]*#'; then
-            # Use nslookup to resolve domain
             ips=$(nslookup "$line" 8.8.8.8 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | grep -v '8\.8\.8\.8')
-            for ip in $ips; do
-                echo "add $setname $ip" >> "$temp_file"
-            done
+            if [ -n "$ips" ]; then
+                for ip in $ips; do
+                    echo "add $setname $ip" >> "$temp_file"
+                done
+                resolved=$((resolved + 1))
+            else
+                echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] WARNING: Could not resolve $line" >> "$LOGFILE"
+            fi
         fi
     done < "$file"
     
     # Apply ipset commands if file has content
     if [ -s "$temp_file" ]; then
-        ipset restore < "$temp_file" 2>> "$LOGFILE"
-        count=$(wc -l < "$temp_file")
-        echo "Processed $count entries from $file (thread $thread_id)" >> "$LOGFILE"
+        cmd_count=$(wc -l < "$temp_file")
+        if ipset restore < "$temp_file" 2>> "$thread_log" 2>&1; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] Applied $cmd_count entries to $setname (resolved=$resolved, direct=$direct_ip, skipped=$skipped)" >> "$LOGFILE"
+        else
+            echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] ERROR: ipset restore failed for $setname" >> "$LOGFILE"
+            cat "$thread_log" >> "$LOGFILE"
+        fi
+    else
+        echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] No entries to add for $setname" >> "$LOGFILE"
     fi
     
     # Cleanup
-    rm -f "$temp_file"
+    rm -f "$temp_file" "$thread_log"
 }
 
 # Process files in parallel
 i=0
+
+log "Processing predefined files..."
 
 # Process predefined files
 for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/hysteria2.txt:unblockhysteria2" "/opt/etc/unblock/tor.txt:unblocktor" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
@@ -124,41 +162,74 @@ for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/hyst
     setname=$(echo "$entry" | cut -d: -f2)
 
     # Ensure ipset exists
-    ipset create "$setname" hash:ip 2>/dev/null || true
+    ipset create "$setname" hash:ip 2>/dev/null && log "  Created ipset: $setname" || log "  Ipset exists: $setname"
 
     # Run in background
     process_file "$file" "$setname" $i &
+    log "  Started thread $i: $file -> $setname"
     i=$((i + 1))
 
     # Limit concurrent processes to thread count
     if [ $i -ge $THREAD_COUNT ]; then
+        log "  Waiting for batch of $THREAD_COUNT threads..."
         wait
         i=0
     fi
 done
 
 # Add and process VPN files
+if ls /opt/etc/unblock/vpn-*.txt >/dev/null 2>&1; then
+    log "Processing VPN files..."
+    for vpn_file in /opt/etc/unblock/vpn-*.txt; do
+        if [ -f "$vpn_file" ]; then
+            vpn_name=$(basename "$vpn_file" .txt)
+            setname="unblock$vpn_name"
+            
+            ipset create "$setname" hash:ip 2>/dev/null && log "  Created ipset: $setname" || log "  Ipset exists: $setname"
+            
+            process_file "$vpn_file" "$setname" $i &
+            log "  Started thread $i: $vpn_file -> $setname"
+            i=$((i + 1))
+            
+            if [ $i -ge $THREAD_COUNT ]; then
+                log "  Waiting for batch of $THREAD_COUNT threads..."
+                wait
+                i=0
+            fi
+        fi
+    done
+else
+    log "No VPN files found"
+fi
+
+# Wait for all background jobs
+log "Waiting for all threads to complete..."
+wait
+
+# Summary
+log "=== Summary ==="
+for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
+    if ipset list "$setname" -n 2>/dev/null | grep -q "^${setname}$"; then
+        count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]" 2>/dev/null || echo 0)
+        log "  $setname: $count entries"
+    else
+        log "  $setname: NOT FOUND"
+    fi
+done
+
+# Check VPN ipsets
 for vpn_file in /opt/etc/unblock/vpn-*.txt; do
     if [ -f "$vpn_file" ]; then
         vpn_name=$(basename "$vpn_file" .txt)
         setname="unblock$vpn_name"
-        
-        # Ensure ipset exists
-        ipset create "$setname" hash:ip 2>/dev/null || true
-        
-        # Run in background
-        process_file "$vpn_file" "$setname" $i &
-        i=$((i + 1))
-        
-        # Limit concurrent processes to thread count
-        if [ $i -ge $THREAD_COUNT ]; then
-            wait
-            i=0
+        if ipset list "$setname" -n 2>/dev/null | grep -q "^${setname}$"; then
+            count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]" 2>/dev/null || echo 0)
+            log "  $setname: $count entries"
+        else
+            log "  $setname: NOT FOUND"
         fi
     fi
 done
 
-# Wait for all background jobs
-wait
-
+log "=== Script completed ==="
 echo "✅ IPSET заполнен" | tee -a "$LOGFILE"

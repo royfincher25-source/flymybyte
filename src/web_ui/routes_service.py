@@ -164,26 +164,13 @@ def stats():
 def service():
     dns_override_enabled = False
     try:
-        which_result = subprocess.run(['which', 'ndmc'], capture_output=True, text=True)
-        if which_result.returncode == 0:
-            commands_to_try = [
-                'ndmc -c "show running" | grep -i dns-override',
-                'ndmc -c "show dns-override"',
-                'ndmc -c "show dns override"',
-            ]
-            for cmd in commands_to_try:
-                try:
-                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=5, shell=True)
-                    if result.returncode == 0 and result.stdout.strip():
-                        output = result.stdout.lower()
-                        if 'dns-override' in output or 'dns override' in output:
-                            dns_override_enabled = True
-                            break
-                        if 'enabled' in output and 'disabled' not in output:
-                            dns_override_enabled = True
-                            break
-                except (subprocess.TimeoutExpired, Exception):
-                    continue
+        result = subprocess.run(
+            ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            if 'dpt:53' in result.stdout and 'DNAT' in result.stdout:
+                dns_override_enabled = True
     except Exception as e:
         logger.error(f"Error checking DNS Override status: {e}")
     return render_template('service.html', dns_override_enabled=dns_override_enabled)
@@ -193,6 +180,7 @@ def service():
 @login_required
 @csrf_required
 def service_restart_unblock():
+    logger.info("[ROUTES] /service/restart-unblock")
     success, output = restart_service('Unblock', INIT_SCRIPTS['unblock'])
     if success:
         flash('✅ Unblock-сервис успешно перезапущен', 'success')
@@ -205,12 +193,13 @@ def service_restart_unblock():
 @login_required
 @csrf_required
 def service_restart_router():
+    logger.info("[ROUTES] /service/restart-router")
     try:
         subprocess.run(['ndmc', '-c', 'system', 'reboot'], timeout=30)
         flash('✅ Команда на перезагрузку отправлена', 'success')
     except Exception as e:
         flash(f'❌ Ошибка: {str(e)}', 'danger')
-        logger.error(f"service_reboot Exception: {e}")
+        logger.error(f"[ROUTES] service_reboot Exception: {e}")
     return redirect(url_for('main.service'))
 
 
@@ -218,6 +207,7 @@ def service_restart_router():
 @login_required
 @csrf_required
 def service_restart_all():
+    logger.info("[ROUTES] /service/restart-all")
     services = [
         (SERVICES['shadowsocks']['name'], SERVICES['shadowsocks']['init']),
         (SERVICES['tor']['name'], SERVICES['tor']['init']),
@@ -227,15 +217,18 @@ def service_restart_all():
     results = []
     for name, init_script in services:
         try:
+            logger.info(f"[ROUTES] Restarting {name} via {init_script}")
             if os.path.exists(init_script):
                 result = subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=60)
                 status = '✅' if result.returncode == 0 else '❌'
                 results.append(f"{status} {name}")
+                logger.info(f"[ROUTES] {name}: {'OK' if result.returncode == 0 else 'FAILED'} (code={result.returncode})")
             else:
                 results.append(f"⚠️ {name} (скрипт не найден)")
+                logger.warning(f"[ROUTES] {name}: init script not found at {init_script}")
         except Exception as e:
             results.append(f"❌ {name}: {str(e)}")
-            logger.error(f"service_restart_all Exception for {name}: {e}")
+            logger.error(f"[ROUTES] service_restart_all Exception for {name}: {e}")
     flash('Перезапуск сервисов: ' + ', '.join(results), 'success')
     return redirect(url_for('main.service'))
 
@@ -244,13 +237,14 @@ def service_restart_all():
 @login_required
 @csrf_required
 def service_restart_webui():
+    logger.info("[ROUTES] /service/restart-webui")
     try:
         from core.update_service import schedule_webui_restart
         schedule_webui_restart()
         flash('✅ Веб-интерфейс будет перезапущен через 5 секунд', 'success')
     except Exception as e:
         flash(f'❌ Ошибка: {str(e)}', 'danger')
-        logger.error(f"service_restart_webui Exception: {e}")
+        logger.error(f"[ROUTES] service_restart_webui Exception: {e}")
     return redirect(url_for('main.service'))
 
 
@@ -262,14 +256,17 @@ def service_restore_dns():
     Restore internet when dnsmasq is broken.
     Removes DNS redirect rules and tries to restart dnsmasq.
     """
+    logger.info("[ROUTES] /service/restore-dns - Starting DNS restoration")
     results = []
     # 1. Check if dnsmasq is running
     try:
         result = subprocess.run(['pgrep', 'dnsmasq'], capture_output=True, text=True)
         if result.returncode == 0:
             results.append('✅ dnsmasq работает')
+            logger.info("[ROUTES] DNS restore: dnsmasq is running")
         else:
             results.append('⚠️ dnsmasq не запущен')
+            logger.warning("[ROUTES] DNS restore: dnsmasq NOT running")
     except Exception:
         results.append('⚠️ Не удалось проверить dnsmasq')
 
@@ -278,7 +275,11 @@ def service_restore_dns():
         for proto in ['udp', 'tcp']:
             # Remove DNAT rules (DNS Override)
             subprocess.run(
-                ['iptables', '-D', 'PREROUTING', '-t', 'nat', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to', '192.168.1.1'],
+                ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to-destination', '192.168.1.1:5353'],
+                capture_output=True, text=True, timeout=5
+            )
+            subprocess.run(
+                ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to-destination', '192.168.1.1'],
                 capture_output=True, text=True, timeout=5
             )
             # Remove REDIRECT rules (legacy)
@@ -287,8 +288,10 @@ def service_restore_dns():
                 capture_output=True, text=True, timeout=5
             )
         results.append('✅ Правила перенаправления DNS удалены')
+        logger.info("[ROUTES] DNS restore: redirect rules removed")
     except Exception as e:
         results.append(f'⚠️ Ошибка удаления правил: {e}')
+        logger.error(f"[ROUTES] DNS restore: failed to remove rules: {e}")
 
     # 3. Try to fix dnsmasq config and restart
     try:
@@ -297,16 +300,21 @@ def service_restore_dns():
             # Config OK, try restart
             for init_script in ['/opt/etc/init.d/S56dnsmasq', '/opt/etc/init.d/S99unblock']:
                 if os.path.exists(init_script):
+                    logger.info(f"[ROUTES] DNS restore: restarting via {init_script}")
                     subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
                     results.append('✅ dnsmasq перезапущен')
                     break
             else:
                 results.append('⚠️ Скрипт запуска dnsmasq не найден')
+                logger.error("[ROUTES] DNS restore: dnsmasq init script not found")
         else:
             results.append(f'⚠️ Ошибка в dnsmasq.conf: {result.stderr.strip()[:100]}')
+            logger.error(f"[ROUTES] DNS restore: dnsmasq config invalid: {result.stderr.strip()[:100]}")
     except Exception as e:
         results.append(f'⚠️ Ошибка проверки dnsmasq: {e}')
+        logger.error(f"[ROUTES] DNS restore: dnsmasq check error: {e}")
 
+    logger.info(f"[ROUTES] DNS restore completed: {results}")
     flash('Восстановление DNS: ' + ', '.join(results), 'warning')
     return redirect(url_for('main.service'))
 
@@ -317,25 +325,68 @@ def service_restore_dns():
 def service_dns_override(action):
     import time
     enable = (action == 'on')
+    logger.info(f"[ROUTES] /service/dns-override/{action} - {'enabling' if enable else 'disabling'}")
     try:
-        result = subprocess.run(['which', 'ndmc'], capture_output=True, text=True)
-        if result.returncode != 0:
-            flash('⚠️ ndmc не найден. DNS Override недоступен.', 'warning')
-            return redirect(url_for('main.service'))
-        cmd = ['ndmc', '-c', 'opkg dns-override'] if enable else ['ndmc', '-c', 'no opkg dns-override']
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-        if result.returncode != 0:
-            flash(f'❌ Ошибка: {result.stderr}', 'danger')
-            logger.error(f"DNS Override error: {result.stderr}")
-            return redirect(url_for('main.service'))
-        time.sleep(2)
-        subprocess.run(['ndmc', '-c', 'system', 'configuration', 'save'], timeout=10)
-        flash('✅ DNS Override ' + ('включен' if enable else 'выключен') + '. Роутер будет перезагружен...', 'success')
-        logger.info("DNS Override changed, rebooting...")
-        subprocess.Popen(['ndmc', '-c', 'system', 'reboot'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        local_ip = subprocess.run(
+            ['sh', '-c', "ip -4 addr show br0 | awk '/inet /{print $2}' | cut -d/ -f1 | grep -E '^(192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.)' | head -n1"],
+            capture_output=True, text=True, timeout=5
+        ).stdout.strip()
+        if not local_ip:
+            local_ip = '192.168.1.1'
+        logger.info(f"[ROUTES] DNS Override: local_ip={local_ip}")
+
+        if enable:
+            logger.info("[ROUTES] DNS Override: enabling...")
+            # Flush old DNS redirect rules
+            logger.debug("[ROUTES] Flushing PREROUTING rules")
+            subprocess.run(['iptables', '-t', 'nat', '-F', 'PREROUTING'], capture_output=True, text=True, timeout=5)
+            # Start dnsmasq on port 5353
+            logger.debug("[ROUTES] Restarting dnsmasq")
+            subprocess.run(['/opt/etc/init.d/S56dnsmasq', 'restart'], capture_output=True, text=True, timeout=15)
+            time.sleep(1)
+            # Run unblock_dnsmasq to generate bypass rules
+            logger.debug("[ROUTES] Running unblock_dnsmasq.sh")
+            subprocess.run(['/opt/bin/unblock_dnsmasq.sh'], capture_output=True, text=True, timeout=30)
+            # Re-add proxy redirect rules
+            redirect_script = '/opt/etc/ndm/netfilter.d/100-redirect.sh'
+            if os.path.exists(redirect_script):
+                logger.debug(f"[ROUTES] Running {redirect_script}")
+                subprocess.run(['sh', redirect_script], capture_output=True, text=True, timeout=15)
+            else:
+                logger.warning(f"[ROUTES] Redirect script not found: {redirect_script}")
+            # Add DNAT rules for DNS to dnsmasq:5353
+            for proto in ['udp', 'tcp']:
+                logger.debug(f"[ROUTES] Adding DNAT rule for {proto}")
+                subprocess.run(
+                    ['iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', proto, '--dport', '53',
+                     '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
+                    capture_output=True, text=True, timeout=5
+                )
+            flash('✅ DNS Override включен', 'success')
+            logger.info("[ROUTES] DNS Override enabled successfully")
+        else:
+            logger.info("[ROUTES] DNS Override: disabling...")
+            # Remove all DNAT rules for port 53
+            for proto in ['udp', 'tcp']:
+                logger.debug(f"[ROUTES] Removing DNAT rules for {proto}")
+                subprocess.run(
+                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
+                     '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
+                    capture_output=True, text=True, timeout=5
+                )
+                subprocess.run(
+                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
+                     '-j', 'DNAT', '--to-destination', local_ip],
+                    capture_output=True, text=True, timeout=5
+                )
+            # Stop dnsmasq
+            logger.debug("[ROUTES] Stopping dnsmasq")
+            subprocess.run(['/opt/etc/init.d/S56dnsmasq', 'stop'], capture_output=True, text=True, timeout=10)
+            flash('✅ DNS Override выключен', 'success')
+            logger.info("[ROUTES] DNS Override disabled successfully")
     except Exception as e:
         flash(f'❌ Ошибка: {str(e)}', 'danger')
-        logger.error(f"service_dns_override Exception: {e}")
+        logger.error(f"[ROUTES] DNS Override exception: {e}")
     return redirect(url_for('main.service'))
 
 
@@ -920,12 +971,16 @@ def key_config(service: str):
 def bypass():
     config = WebConfig()
     unblock_dir = config.unblock_dir
+    logger.info(f"[ROUTES] /bypass - unblock_dir={unblock_dir}")
     available_files = []
     if os.path.exists(unblock_dir):
         try:
             available_files = [f.replace('.txt', '') for f in os.listdir(unblock_dir) if f.endswith('.txt')]
+            logger.info(f"[ROUTES] Found {len(available_files)} bypass files: {available_files}")
         except Exception as e:
-            logger.error(f"Error listing bypass files: {e}")
+            logger.error(f"[ROUTES] Error listing bypass files: {e}")
+    else:
+        logger.warning(f"[ROUTES] Unblock dir does not exist: {unblock_dir}")
     return render_template('bypass.html', available_files=available_files)
 
 
@@ -952,12 +1007,14 @@ def add_to_bypass(filename: str):
         flash('Неверное имя файла', 'danger')
         return redirect(url_for('main.bypass'))
     filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    logger.info(f"[ROUTES] /bypass/{filename}/add - filepath={filepath}")
     if request.method == 'POST':
         entries_text = request.form.get('entries', '')
         if len(entries_text) > MAX_TOTAL_INPUT_SIZE:
             flash(f'Превышен лимит размера ввода (макс. {MAX_TOTAL_INPUT_SIZE // 1024}KB)', 'danger')
             return redirect(url_for('main.bypass'))
         new_entries = [e.strip() for e in entries_text.split('\n') if e.strip()]
+        logger.info(f"[ROUTES] Adding {len(new_entries)} entries to {filepath}")
         if len(new_entries) > MAX_ENTRIES_PER_REQUEST:
             flash(f'Превышено количество записей (макс. {MAX_ENTRIES_PER_REQUEST})', 'danger')
             return redirect(url_for('main.bypass'))
@@ -982,18 +1039,22 @@ def add_to_bypass(filename: str):
                 else:
                     invalid_entries.append(entry)
         save_bypass_list(filepath, current_list)
+        logger.info(f"[ROUTES] Saved {added_count} new entries (IPs: {len(ip_entries)}, domains: {len(domain_entries)}, invalid: {len(invalid_entries)})")
         if added_count > 0:
             if ip_entries and not domain_entries:
+                logger.info(f"[ROUTES] Adding {len(ip_entries)} IPs directly to ipset")
                 success, msg = bulk_add_to_ipset('unblock', ip_entries)
                 if success:
                     flash(f'✅ Успешно добавлено: {added_count} шт. (IP в ipset: {len(ip_entries)})', 'success')
                 else:
+                    logger.warning(f"[ROUTES] ipset add failed, falling back to unblock_update: {msg}")
                     success, output = run_unblock_update()
                     if success:
                         flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
                     else:
                         flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {output}', 'warning')
             else:
+                logger.info(f"[ROUTES] Running unblock_update for {added_count} mixed entries")
                 success, output = run_unblock_update()
                 if success:
                     flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
@@ -1018,19 +1079,18 @@ def remove_from_bypass(filename: str):
         flash('Неверное имя файла', 'danger')
         return redirect(url_for('main.bypass'))
     filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    logger.info(f"[ROUTES] /bypass/{filename}/remove - filepath={filepath}")
     if request.method == 'POST':
         entries_text = request.form.get('entries', '')
         if len(entries_text) > MAX_TOTAL_INPUT_SIZE:
             flash(f'Превышен лимит размера ввода (макс. {MAX_TOTAL_INPUT_SIZE // 1024}KB)', 'danger')
             return redirect(url_for('main.view_bypass', filename=filename))
         to_remove = [e.strip() for e in entries_text.split('\n') if e.strip()]
-        if len(to_remove) > MAX_ENTRIES_PER_REQUEST:
-            flash(f'Превышено количество записей (макс. {MAX_ENTRIES_PER_REQUEST})', 'danger')
-            return redirect(url_for('main.view_bypass', filename=filename))
         current_list = load_bypass_list(filepath)
         original_count = len(current_list)
         current_list = [item for item in current_list if item not in to_remove]
         removed_count = original_count - len(current_list)
+        logger.info(f"[ROUTES] Removing {removed_count} entries from {filepath} (was {original_count}, now {len(current_list)})")
         save_bypass_list(filepath, current_list)
         if removed_count > 0:
             success, output = run_unblock_update()
@@ -1055,14 +1115,17 @@ def refresh_bypass_ipset(filename: str):
         flash('Неверное имя файла', 'danger')
         return redirect(url_for('main.bypass'))
     filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    logger.info(f"[ROUTES] /bypass/{filename}/refresh - filepath={filepath}")
     if not os.path.exists(filepath):
         flash('Файл не найден', 'danger')
         return redirect(url_for('main.view_bypass', filename=filename))
     from core.ipset_manager import refresh_ipset_from_file
     success, msg = refresh_ipset_from_file(filepath, max_workers=10)
     if success:
+        logger.info(f"[ROUTES] Refresh succeeded: {msg}")
         flash(f'✅ {msg}', 'success')
     else:
+        logger.error(f"[ROUTES] Refresh failed: {msg}")
         flash(f'❌ Ошибка: {msg}', 'danger')
     return redirect(url_for('main.view_bypass', filename=filename))
 

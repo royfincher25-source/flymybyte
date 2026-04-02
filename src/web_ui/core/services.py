@@ -789,10 +789,10 @@ def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
     Returns:
         Tuple of (success: bool, output: str)
     """
-    logger.info(f"restart_service: {service_name} via {init_script}")
+    logger.info(f"[SVC] Restarting {service_name} via {init_script}")
 
     if not os.path.exists(init_script):
-        logger.error(f"Init script not found: {init_script}")
+        logger.error(f"[SVC] Init script not found: {init_script}")
         return False, f"Скрипт {init_script} не найден"
 
     try:
@@ -807,17 +807,17 @@ def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
         output = result.stdout.strip() or result.stderr.strip()
 
         if success:
-            logger.info(f"{service_name} restarted successfully")
+            logger.info(f"[SVC] {service_name} restarted successfully")
         else:
-            logger.error(f"{service_name} restart failed: {output}")
+            logger.error(f"[SVC] {service_name} restart failed (code={result.returncode}): {output}")
 
         return success, output
 
     except subprocess.TimeoutExpired:
-        logger.error(f"{service_name} restart timed out")
+        logger.error(f"[SVC] {service_name} restart timed out")
         return False, "Превышено время ожидания"
     except Exception as e:
-        logger.error(f"{service_name} restart error: {e}")
+        logger.error(f"[SVC] {service_name} restart error: {e}")
         return False, str(e)
 
 
@@ -839,16 +839,17 @@ def check_service_status(init_script: str) -> str:
     if cached_status:
         return cached_status
 
-    logger.debug(f"Checking status for {init_script}")
+    logger.debug(f"[SVC] Checking status for {init_script}")
     
     if not os.path.exists(init_script):
-        logger.warning(f"Init script not found: {init_script}")
+        logger.warning(f"[SVC] Init script not found: {init_script}")
         status = "❌ Скрипт не найден"
     else:
         try:
             # Try pgrep first (faster than running init script)
             script_name = os.path.basename(init_script)
             proc_name = script_name.replace('S', '').split('init')[0]
+            logger.debug(f"[SVC] pgrep -f {init_script}")
             pgrep_result = subprocess.run(
                 ['pgrep', '-f', init_script],
                 capture_output=True, text=True, timeout=5
@@ -856,17 +857,18 @@ def check_service_status(init_script: str) -> str:
             if pgrep_result.returncode == 0:
                 status = "✅ Активен"
                 Cache.set(cache_key, status, ttl=30)
+                logger.debug(f"[SVC] {init_script}: ACTIVE (via pgrep)")
                 return status
 
             # Fallback to init script status check
-            logger.debug(f"Running: sh {init_script} status")
+            logger.debug(f"[SVC] Running: sh {init_script} status")
             result = subprocess.run(
                 ['sh', init_script, 'status'],
                 capture_output=True,
                 text=True,
                 timeout=10
             )
-            logger.debug(f"Status result: returncode={result.returncode}, stdout={result.stdout[:100] if result.stdout else 'empty'}")
+            logger.debug(f"[SVC] Status result: returncode={result.returncode}, stdout={result.stdout[:100] if result.stdout else 'empty'}")
 
             if result.returncode == 0:
                 status = "✅ Активен"
