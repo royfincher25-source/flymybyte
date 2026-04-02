@@ -42,7 +42,12 @@ case "$1" in
         log "Verifying ipset entries..."
         TOTAL_ENTRIES=0
         for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
-            count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]" || echo 0)
+            if ipset list "$setname" -n >/dev/null 2>&1; then
+                count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]")
+                count=${count:-0}
+            else
+                count=0
+            fi
             TOTAL_ENTRIES=$((TOTAL_ENTRIES + count))
             log "  $setname: $count entries"
         done

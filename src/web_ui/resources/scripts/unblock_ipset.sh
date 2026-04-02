@@ -137,6 +137,8 @@ process_file() {
     # Apply ipset commands if file has content
     if [ -s "$temp_file" ]; then
         cmd_count=$(wc -l < "$temp_file")
+        # Flush before restore to avoid "already added" errors
+        ipset flush "$setname" 2>/dev/null
         if ipset restore < "$temp_file" 2>> "$thread_log" 2>&1; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') [thread-$thread_id] Applied $cmd_count entries to $setname (resolved=$resolved, direct=$direct_ip, skipped=$skipped)" >> "$LOGFILE"
         else
