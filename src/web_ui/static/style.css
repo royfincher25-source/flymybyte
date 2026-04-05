@@ -488,14 +488,6 @@ img { max-width: 100%; height: auto; }
 .loading-overlay--visible { display: flex; }
 
 /* --- Icon Font --- */
-@font-face {
-  font-family: 'FlyMyByte Icons';
-  src: url('fonts/flymybyte-icons.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-  font-display: block;
-}
-
 .fm {
   display: inline-block;
   font: normal normal normal 1em/1 'FlyMyByte Icons';
@@ -514,72 +506,7 @@ img { max-width: 100%; height: auto; }
 .fm-3x { font-size: 3em; }
 .fm-4x { font-size: 4em; }
 
-.fm-activity::before { content: "\f101"; }
-.fm-arrow-clockwise::before { content: "\f102"; }
-.fm-arrow-left::before { content: "\f103"; }
-.fm-arrow-repeat::before { content: "\f104"; }
-.fm-arrow-right::before { content: "\f105"; }
-.fm-arrow-up-circle-fill::before { content: "\f106"; }
-.fm-box-arrow-in-right::before { content: "\f107"; }
-.fm-box-arrow-right::before { content: "\f108"; }
-.fm-bug::before { content: "\f109"; }
-.fm-check-circle-fill::before { content: "\f10a"; }
-.fm-check-circle::before { content: "\f10b"; }
-.fm-check-lg::before { content: "\f10c"; }
-.fm-circle-fill::before { content: "\f10d"; }
-.fm-cloud-download::before { content: "\f10e"; }
-.fm-collection::before { content: "\f10f"; }
-.fm-cpu::before { content: "\f110"; }
-.fm-dash-lg::before { content: "\f111"; }
-.fm-database::before { content: "\f112"; }
-.fm-download::before { content: "\f113"; }
-.fm-exclamation-triangle-fill::before { content: "\f114"; }
-.fm-exclamation-triangle::before { content: "\f115"; }
-.fm-eye::before { content: "\f116"; }
-.fm-file-earmark-text::before { content: "\f117"; }
-.fm-file-text::before { content: "\f118"; }
-.fm-folder::before { content: "\f119"; }
-.fm-folder2-open::before { content: "\f11a"; }
-.fm-gear::before { content: "\f11b"; }
-.fm-github::before { content: "\f11c"; }
-.fm-globe::before { content: "\f11d"; }
-.fm-globe2::before { content: "\f11e"; }
-.fm-graph-up::before { content: "\f11f"; }
-.fm-hdd-network::before { content: "\f120"; }
-.fm-hdd::before { content: "\f121"; }
-.fm-inbox::before { content: "\f122"; }
-.fm-info-circle::before { content: "\f123"; }
-.fm-journal-text::before { content: "\f124"; }
-.fm-key::before { content: "\f125"; }
-.fm-lightning-charge-fill::before { content: "\f126"; }
-.fm-lightning::before { content: "\f127"; }
-.fm-list-check::before { content: "\f128"; }
-.fm-list-task::before { content: "\f129"; }
-.fm-list-ul::before { content: "\f12a"; }
-.fm-list::before { content: "\f12b"; }
-.fm-lock::before { content: "\f12c"; }
-.fm-memory::before { content: "\f12d"; }
-.fm-menu-app::before { content: "\f12e"; }
-.fm-pause::before { content: "\f12f"; }
-.fm-pc-display::before { content: "\f130"; }
-.fm-play-fill::before { content: "\f131"; }
-.fm-play::before { content: "\f132"; }
-.fm-plus-lg::before { content: "\f133"; }
-.fm-question-circle::before { content: "\f134"; }
-.fm-router::before { content: "\f135"; }
-.fm-save::before { content: "\f136"; }
-.fm-search::before { content: "\f137"; }
-.fm-shield-check::before { content: "\f138"; }
-.fm-shield-lock::before { content: "\f139"; }
-.fm-browser::before { content: "\f142"; }
-.fm-stop-fill::before { content: "\f13a"; }
-.fm-tag::before { content: "\f13b"; }
-.fm-terminal::before { content: "\f13c"; }
-.fm-trash::before { content: "\f13d"; }
-.fm-wifi::before { content: "\f13e"; }
-.fm-x-circle-fill::before { content: "\f13f"; }
-.fm-x-circle::before { content: "\f140"; }
-.fm-x-lg::before { content: "\f141"; }
+/* Icon definitions moved to fonts/flymybyte-icons.css */
 
 /* --- Utility Classes --- */
 .d-flex { display: flex; }

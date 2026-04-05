@@ -6,3 +6,4 @@ logo
 __pycache__/
 .pytest_cache/
 src/web_ui/static/icons/
+update*

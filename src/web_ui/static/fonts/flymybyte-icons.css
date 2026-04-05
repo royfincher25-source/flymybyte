@@ -1,10 +1,10 @@
 @font-face {
-    font-family: "flymybyte-icons";
+    font-family: "FlyMyByte Icons";
     src: url("./flymybyte-icons.woff2?e011d902ddbe0f9d3227d7772b4d1dcd") format("woff2");
 }
 
 i[class^="fm-"]:before, i[class*=" fm-"]:before {
-    font-family: flymybyte-icons !important;
+    font-family: "FlyMyByte Icons" !important;
     font-style: normal;
     font-weight: normal !important;
     font-variant: normal;

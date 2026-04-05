@@ -17,15 +17,23 @@ stop() {
     if [ -f "$PIDFILE" ]; then
         kill $(cat "$PIDFILE") 2>/dev/null || true
         rm -f "$PIDFILE"
-    else
-        killall python3 2>/dev/null || true
     fi
+    # Also kill any remaining python3 app.py processes
+    killall -9 python3 2>/dev/null || true
+    # Wait for port 8080 to be released
+    i=0
+    while [ $i -lt 10 ]; do
+        if ! netstat -tlnp 2>/dev/null | grep -q ":8080 "; then
+            break
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
     echo "Web UI stopped"
 }
 
 restart() {
     stop
-    sleep 2
     start
 }
 

@@ -4,8 +4,18 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git push *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(pytest *)"
     ]
   },
-  "$version": 3
+  "$version": 3,
+  "general": {
+    "terminalBell": false
+  },
+  "ui": {
+    "enableUserFeedback": false,
+    "accessibility": {
+      "enableLoadingPhrases": false
+    }
+  }
 }

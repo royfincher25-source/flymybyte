@@ -29,6 +29,7 @@ Example:
 """
 import os
 import re
+import time
 import threading
 import logging
 import subprocess
@@ -311,39 +312,79 @@ class DNSSpoofing:
     def _restart_dnsmasq(self) -> Tuple[bool, str]:
         """
         Restart dnsmasq service.
-        
+
+        Uses SIGHUP to reload config without full restart, which preserves
+        DNS Override settings (dnsmasq on port 5353 with DNAT rules).
+
         Returns:
             Tuple of (success: bool, message: str)
         """
         import subprocess
-        
-        dnsmasq_init = INIT_SCRIPTS['dnsmasq']
-        
-        if not Path(dnsmasq_init).exists():
-            logger.warning("dnsmasq init script not found")
-            return False, "dnsmasq not installed"
-        
+
         try:
-            result = subprocess.run(
-                [dnsmasq_init, 'restart'],
+            # Find dnsmasq PID
+            pid_result = subprocess.run(
+                ['pgrep', 'dnsmasq'],
                 capture_output=True,
                 text=True,
-                timeout=10
+                timeout=5
             )
-            
-            if result.returncode == 0:
-                logger.info("dnsmasq restarted successfully")
-                return True, "OK"
+
+            if pid_result.returncode == 0 and pid_result.stdout.strip():
+                # dnsmasq is running, send SIGHUP to reload config
+                pid = pid_result.stdout.strip().split('\n')[0]
+                logger.debug(f"Sending SIGHUP to dnsmasq (PID {pid})")
+                kill_result = subprocess.run(
+                    ['kill', '-HUP', pid],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if kill_result.returncode == 0:
+                    time.sleep(1)  # Give dnsmasq time to reload
+                    logger.info("dnsmasq config reloaded via SIGHUP")
+                    return True, "OK"
+                else:
+                    error_msg = kill_result.stderr.strip() or "kill -HUP failed"
+                    logger.error(f"dnsmasq SIGHUP failed: {error_msg}")
+                    return False, error_msg
             else:
-                error_msg = result.stderr.strip() or "Unknown error"
-                logger.error(f"dnsmasq restart failed: {error_msg}")
-                return False, error_msg
-                
+                # dnsmasq not running, try full restart
+                dnsmasq_init = INIT_SCRIPTS['dnsmasq']
+                if not Path(dnsmasq_init).exists():
+                    logger.warning("dnsmasq init script not found")
+                    return False, "dnsmasq not installed"
+
+                result = subprocess.run(
+                    [dnsmasq_init, 'start'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+
+                # Log full output for diagnostics
+                if result.stdout.strip():
+                    logger.debug(f"dnsmasq start stdout: {result.stdout.strip()}")
+                if result.stderr.strip():
+                    logger.debug(f"dnsmasq start stderr: {result.stderr.strip()}")
+                logger.debug(f"dnsmasq start returncode: {result.returncode}")
+
+                time.sleep(1)
+                dnsmasq_running = self._check_dnsmasq_status()
+
+                if dnsmasq_running:
+                    logger.info("dnsmasq started successfully")
+                    return True, "OK"
+                else:
+                    error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                    logger.error(f"dnsmasq start failed: returncode={result.returncode}, stdout='{result.stdout.strip()}', stderr='{result.stderr.strip()}'")
+                    return False, f"dnsmasq not running after start: {error_msg}"
+
         except subprocess.TimeoutExpired:
-            error_msg = "dnsmasq restart timeout"
+            error_msg = "dnsmasq operation timeout"
             logger.error(error_msg)
             return False, error_msg
-            
+
         except Exception as e:
             error_msg = f"Error restarting dnsmasq: {e}"
             logger.error(error_msg)
@@ -352,31 +393,33 @@ class DNSSpoofing:
     def disable(self) -> Tuple[bool, str]:
         """
         Disable DNS spoofing (remove config and restart dnsmasq).
-        
+
         Returns:
             Tuple of (success: bool, message: str)
         """
         config_path = Path(self._config_path)
-        
+
         try:
             if config_path.exists():
                 config_path.unlink()
                 logger.info(f"Removed AI domains config: {self._config_path}")
-            
+
             # Restart dnsmasq
             success, msg = self._restart_dnsmasq()
-            
+
             if success:
                 self._enabled = False
                 self._domains = []
                 logger.info("AI domains DNS spoofing disabled")
                 return True, "Disabled"
             else:
-                logger.warning(f"Config removed but dnsmasq restart failed: {msg}")
+                # Config was removed but dnsmasq restart failed
+                # This is a partial success - config is gone but service may not be in desired state
                 self._enabled = False
                 self._domains = []
-                return True, f"Config removed (dnsmasq restart: {msg})"
-                
+                logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq restart issue: {msg}")
+                return True, f"Config removed (dnsmasq: {msg})"
+
         except Exception as e:
             error_msg = f"Error disabling DNS spoofing: {e}"
             logger.error(error_msg)
