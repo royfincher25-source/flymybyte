@@ -1826,51 +1826,34 @@ class DNSSpoofing:
                 config_path.unlink()
                 logger.info(f"Removed AI domains config: {self._config_path}")
 
-            dnsmasq_init = INIT_SCRIPTS['dnsmasq']
-            if not Path(dnsmasq_init).exists():
-                logger.warning("dnsmasq init script not found")
-                self._enabled = False
-                self._domains = []
-                return True, "Config removed (dnsmasq not installed)"
-
+            # Use SIGHUP instead of restart — restart can fail on Keenetic
+            # and leave dnsmasq stopped, breaking all DNS for the network
             try:
-                result = subprocess.run(
-                    [dnsmasq_init, 'restart'],
+                pid_result = subprocess.run(
+                    ['pgrep', 'dnsmasq'],
                     capture_output=True,
                     text=True,
-                    timeout=10
+                    timeout=5
                 )
-                if result.stdout.strip():
-                    logger.debug(f"dnsmasq restart stdout: {result.stdout.strip()}")
-                if result.stderr.strip():
-                    logger.debug(f"dnsmasq restart stderr: {result.stderr.strip()}")
 
-                time.sleep(1)
-                dnsmasq_running = self._check_dnsmasq_status()
-
-                if dnsmasq_running:
-                    self._enabled = False
-                    self._domains = []
-                    logger.info("AI domains DNS spoofing disabled (dnsmasq restarted)")
-                    return True, "Disabled"
+                if pid_result.returncode == 0 and pid_result.stdout.strip():
+                    pid = pid_result.stdout.strip().split('\n')[0]
+                    subprocess.run(
+                        ['kill', '-HUP', pid],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    time.sleep(1)
+                    logger.info("AI domains DNS spoofing disabled (dnsmasq reloaded via SIGHUP)")
                 else:
-                    self._enabled = False
-                    self._domains = []
-                    error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
-                    logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq may not be running: {error_msg}")
-                    return True, f"Config removed (dnsmasq: {error_msg})"
+                    logger.warning("dnsmasq not running, config removed — restart manually if needed")
+            except Exception:
+                pass  # Config removed, don't fail hard
 
-            except subprocess.TimeoutExpired:
-                self._enabled = False
-                self._domains = []
-                logger.warning("DNS spoofing disabled, but dnsmasq restart timed out")
-                return True, "Config removed (restart timeout)"
-
-            except Exception as e:
-                self._enabled = False
-                self._domains = []
-                logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq restart error: {e}")
-                return True, f"Config removed (restart error: {e})"
+            self._enabled = False
+            self._domains = []
+            return True, "Disabled"
 
         except Exception as e:
             error_msg = f"Error disabling DNS spoofing: {e}"
