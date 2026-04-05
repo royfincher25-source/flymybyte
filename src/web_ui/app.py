@@ -43,8 +43,21 @@ def create_app(config_class=None):
     app.config['SESSION_COOKIE_SECURE'] = False
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=24)
 
-    from routes_service import bp as main_bp, shutdown_executor
-    app.register_blueprint(main_bp)
+    # Register all 5 blueprints
+    from routes_core import bp as core_bp, login_required as core_login_required
+    app.register_blueprint(core_bp)
+
+    from routes_system import bp as system_bp, schedule_webui_restart, shutdown_executor as system_shutdown
+    app.register_blueprint(system_bp)
+
+    from routes_vpn import bp as vpn_bp, shutdown_executor as vpn_shutdown
+    app.register_blueprint(vpn_bp)
+
+    from routes_bypass import bp as bypass_bp
+    app.register_blueprint(bypass_bp)
+
+    from routes_updates import bp as updates_bp
+    app.register_blueprint(updates_bp)
 
     @app.context_processor
     def inject_csrf_token():
@@ -72,7 +85,8 @@ def create_app(config_class=None):
     def graceful_shutdown(signum=None, frame=None):
         logger.info("Graceful shutdown initiated...")
         dns_monitor.stop()
-        shutdown_executor()
+        vpn_shutdown()
+        system_shutdown()
         logger.info("All services stopped")
 
     atexit.register(graceful_shutdown)

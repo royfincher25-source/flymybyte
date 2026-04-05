@@ -6,13 +6,13 @@
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-journal-text"></i> Списки обхода</h2>
     <div>
-        <a href="{{ url_for('main.bypass_catalog') }}" class="btn btn--primary btn--sm">
+        <a href="{{ url_for('bypass.bypass_catalog') }}" class="btn btn--primary btn--sm">
             <i class="fm fm-collection"></i> Каталог списков
         </a>
-        <a href="{{ url_for('main.view_logs') }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('system.view_logs') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-file-text"></i> Логи
         </a>
-        <a href="{{ url_for('main.index') }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('core.index') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
@@ -40,7 +40,7 @@
                     <i class="fm fm-file-earmark-text"></i> {{ file }}.txt
                 </span>
                 <div>
-                    <a href="{{ url_for('main.view_bypass', filename=file) }}" class="btn btn--sm btn--primary">
+                    <a href="{{ url_for('bypass.view_bypass', filename=file) }}" class="btn btn--sm btn--primary">
                         <i class="fm fm-eye"></i> Управление
                     </a>
                 </div>

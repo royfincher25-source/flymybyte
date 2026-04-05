@@ -6,13 +6,13 @@
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-plus-lg"></i> Добавить в {{ filename }}.txt</h2>
     <div>
-        <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('bypass.view_bypass', filename=filename) }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
 </div>
 
-<form method="POST" action="{{ url_for('main.add_to_bypass', filename=filename) }}">
+<form method="POST" action="{{ url_for('bypass.add_to_bypass', filename=filename) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="card shadow-sm">
         <div class="card__body">
@@ -40,7 +40,7 @@
                 <button type="submit" class="btn btn--success">
                     <i class="fm fm-check-lg"></i> Добавить
                 </button>
-                <a href="{{ url_for('main.view_bypass', filename=filename) }}" class="btn btn--outline">
+                <a href="{{ url_for('bypass.view_bypass', filename=filename) }}" class="btn btn--outline">
                     <i class="fm fm-x-lg"></i> Отмена
                 </a>
             </div>

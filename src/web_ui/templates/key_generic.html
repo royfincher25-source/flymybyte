@@ -19,13 +19,13 @@
         {% endif %}
     </h2>
     <div>
-        <a href="{{ url_for('main.keys') }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('vpn.keys') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
 </div>
 
-<form method="POST" action="{{ url_for('main.key_config', service=service) }}">
+<form method="POST" action="{{ url_for('vpn.key_config', service=service) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <div class="card shadow-sm">
         <div class="card__body">
@@ -135,7 +135,7 @@ bridge obfs4 192.0.2.2:8443 ... cert=... iat-mode=..."
                 <button type="submit" class="btn btn--primary">
                     <i class="fm fm-check-lg"></i> Сохранить и перезапустить
                 </button>
-                <a href="{{ url_for('main.keys') }}" class="btn btn--outline">
+                <a href="{{ url_for('vpn.keys') }}" class="btn btn--outline">
                     <i class="fm fm-x-lg"></i> Отмена
                 </a>
             </div>

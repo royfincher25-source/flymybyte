@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-download fm-lg"></i> Установка и удаление</h2>
-    <a href="{{ url_for('main.index') }}" class="btn btn--outline btn--sm">
+    <a href="{{ url_for('core.index') }}" class="btn btn--outline btn--sm">
         <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
@@ -25,7 +25,7 @@
                 <i class="fm fm-download fm-3x text-success"></i>
                 <h5 class="card-title mt-3">Установка</h5>
                 <p class="card__text text-muted">Установить компоненты flymybyte</p>
-                <form method="POST" action="{{ url_for('main.service_install') }}" id="install-form">
+                <form method="POST" action="{{ url_for('updates.service_install') }}" id="install-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn--success btn--lg" onclick="return startInstall(event)">
                         <i class="fm fm-play"></i> Установить
@@ -41,7 +41,7 @@
                 <i class="fm fm-trash fm-3x text-danger"></i>
                 <h5 class="card-title mt-3">Удаление</h5>
                 <p class="card__text text-muted">Удалить компоненты flymybyte</p>
-                <form method="POST" action="{{ url_for('main.service_remove') }}" id="remove-form">
+                <form method="POST" action="{{ url_for('updates.service_remove') }}" id="remove-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn--danger btn--lg" onclick="return startRemove(event)">
                         <i class="fm fm-x-lg"></i> Удалить
@@ -74,7 +74,7 @@ function startInstall(event) {
     const form = document.getElementById('install-form');
     const formData = new FormData(form);
     
-    fetch('{{ url_for("main.service_install") }}', {
+    fetch('{{ url_for("updates.service_install") }}', {
         method: 'POST',
         body: formData
     })
@@ -100,7 +100,7 @@ function startRemove(event) {
     const form = document.getElementById('remove-form');
     const formData = new FormData(form);
     
-    fetch('{{ url_for("main.service_remove") }}', {
+    fetch('{{ url_for("updates.service_remove") }}', {
         method: 'POST',
         body: formData
     })

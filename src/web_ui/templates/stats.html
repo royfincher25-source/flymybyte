@@ -6,10 +6,10 @@
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-graph-up fm-lg"></i> Статистика</h2>
     <div>
-        <a href="{{ url_for('main.service') }}" class="btn btn--outline btn--sm me-2">
+        <a href="{{ url_for('system.service') }}" class="btn btn--outline btn--sm me-2">
             <i class="fm fm-gear"></i> Сервис
         </a>
-        <a href="{{ url_for('main.index') }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('core.index') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
@@ -96,7 +96,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <a href="{{ url_for('main.key_config', service=service_id) }}" class="btn btn--sm btn--outline">
+                            <a href="{{ url_for('vpn.key_config', service=service_id) }}" class="btn btn--sm btn--outline">
                                 <i class="fm fm-gear"></i> {% if service.config_exists %}Изменить{% else %}Настроить{% endif %}
                             </a>
                         </td>

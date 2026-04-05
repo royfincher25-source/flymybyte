@@ -6,7 +6,7 @@
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-file-earmark-text"></i> {{ filename }}.txt</h2>
     <div>
-        <a href="{{ url_for('main.bypass') }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('bypass.bypass') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
@@ -19,10 +19,10 @@
             <div class="card__body">
                 <h5 class="card-title">Действия</h5>
                 <div class="gap-2">
-                    <a href="{{ url_for('main.add_to_bypass', filename=filename) }}" class="btn btn--success">
+                    <a href="{{ url_for('bypass.add_to_bypass', filename=filename) }}" class="btn btn--success">
                         <i class="fm fm-plus-lg"></i> Добавить в список
                     </a>
-                    <a href="{{ url_for('main.remove_from_bypass', filename=filename) }}" class="btn btn--danger">
+                    <a href="{{ url_for('bypass.remove_from_bypass', filename=filename) }}" class="btn btn--danger">
                         <i class="fm fm-dash-lg"></i> Удалить из списка
                     </a>
                 </div>

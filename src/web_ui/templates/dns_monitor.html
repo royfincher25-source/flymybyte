@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-activity"></i> DNS Монитор</h2>
-    <a href="{{ url_for('main.service') }}" class="btn btn--outline btn--sm">
+    <a href="{{ url_for('system.service') }}" class="btn btn--outline btn--sm">
         <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
@@ -56,14 +56,14 @@
         <!-- Controls -->
         <div class="mt-4">
             {% if status.running %}
-            <form method="POST" action="{{ url_for('main.dns_monitor_stop') }}" class="d-inline">
+            <form method="POST" action="{{ url_for('system.dns_monitor_stop') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn--warning btn--sm">
                     <i class="fm fm-pause"></i> Остановить
                 </button>
             </form>
             {% else %}
-            <form method="POST" action="{{ url_for('main.dns_monitor_start') }}" class="d-inline">
+            <form method="POST" action="{{ url_for('system.dns_monitor_start') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn--success btn--sm">
                     <i class="fm fm-play"></i> Запустить
@@ -71,7 +71,7 @@
             </form>
             {% endif %}
 
-            <form method="POST" action="{{ url_for('main.dns_monitor_check') }}" class="d-inline ms-2">
+            <form method="POST" action="{{ url_for('system.dns_monitor_check') }}" class="d-inline ms-2">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn--info btn--sm">
                     <i class="fm fm-arrow-repeat"></i> Проверить сейчас

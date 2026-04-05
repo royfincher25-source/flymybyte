@@ -12,13 +12,13 @@
 <body>
     <nav class="navbar">
         <div class="container">
-            <a class="navbar__brand" href="{{ url_for('main.index') }}">
+            <a class="navbar__brand" href="{{ url_for('core.index') }}">
                 <i class="fm fm-shield-check fm-lg"></i>
                 <span>FlyMyByte</span>
             </a>
             {% if session.get('authenticated') %}
             <div class="navbar__nav">
-                <a class="nav-link" href="{{ url_for('main.logout') }}">
+                <a class="nav-link" href="{{ url_for('core.logout') }}">
                     <i class="fm fm-box-arrow-right"></i>
                     <span>Выход</span>
                 </a>

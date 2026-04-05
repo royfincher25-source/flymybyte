@@ -6,7 +6,7 @@
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-collection"></i> Каталог списков</h2>
     <div>
-        <a href="{{ url_for('main.bypass') }}" class="btn btn--outline btn--sm">
+        <a href="{{ url_for('bypass.bypass') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
@@ -33,7 +33,7 @@
                 </p>
                 {% endif %}
                 
-                <form method="POST" action="{{ url_for('main.download_list', name=list_id) }}">
+                <form method="POST" action="{{ url_for('bypass.download_list_from_catalog', name=list_id) }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn--primary btn--sm">
                         <i class="fm fm-download"></i> Загрузить

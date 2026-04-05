@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-file-text"></i> Логи приложения</h2>
-    <a href="{{ url_for('main.service') }}" class="btn btn--outline btn--sm">
+    <a href="{{ url_for('system.service') }}" class="btn btn--outline btn--sm">
         <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
@@ -15,13 +15,13 @@
         <small class="text-muted">Файл: {{ log_file }}</small>
     </div>
     <div class="col-auto">
-        <form method="POST" action="{{ url_for('main.clear_logs') }}" style="display:inline;">
+        <form method="POST" action="{{ url_for('system.clear_logs') }}" style="display:inline;">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn--danger btn--sm" onclick="return confirm('Очистить все логи?')">
                 🗑️ Очистить логи
             </button>
         </form>
-        <a href="{{ url_for('main.view_logs') }}" class="btn btn--secondary btn--sm">
+        <a href="{{ url_for('system.view_logs') }}" class="btn btn--secondary btn--sm">
             🔄 Обновить
         </a>
     </div>

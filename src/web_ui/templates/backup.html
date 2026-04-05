@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-hdd"></i> Бэкап</h2>
-    <a href="{{ url_for('main.service') }}" class="btn btn--outline btn--sm">
+    <a href="{{ url_for('system.service') }}" class="btn btn--outline btn--sm">
         <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
@@ -44,7 +44,7 @@
             <i class="fm fm-info-circle"></i> Бэкап будет сохранён в /opt/root/backup/
         </div>
 
-        <form method="POST" action="{{ url_for('main.service_backup') }}">
+        <form method="POST" action="{{ url_for('system.service_backup') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="action" value="create">
             <button type="submit" class="btn btn--primary">
@@ -92,7 +92,7 @@
                             {% endif %}
                         </td>
                         <td>
-                            <form method="POST" action="{{ url_for('main.service_backup') }}" class="d-inline">
+                            <form method="POST" action="{{ url_for('system.service_backup') }}" class="d-inline">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="action" value="delete">
                                 <input type="hidden" name="backup_name" value="{{ backup.name }}">
