@@ -47,7 +47,7 @@ def create_app(config_class=None):
     from routes_core import bp as core_bp, login_required as core_login_required
     app.register_blueprint(core_bp)
 
-    from routes_system import bp as system_bp, schedule_webui_restart, shutdown_executor as system_shutdown
+    from routes_system import bp as system_bp, schedule_webui_restart
     app.register_blueprint(system_bp)
 
     from routes_vpn import bp as vpn_bp, shutdown_executor as vpn_shutdown
@@ -86,7 +86,6 @@ def create_app(config_class=None):
         logger.info("Graceful shutdown initiated...")
         dns_monitor.stop()
         vpn_shutdown()
-        system_shutdown()
         logger.info("All services stopped")
 
     atexit.register(graceful_shutdown)
