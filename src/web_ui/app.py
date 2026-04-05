@@ -64,7 +64,7 @@ def create_app(config_class=None):
     def inject_version():
         return dict(app_version=_app_version)
 
-    from core.dns_monitor import DNSMonitor
+    from core.dns_ops import DNSMonitor
     dns_monitor = DNSMonitor()
     dns_monitor.start()
     logger.info("DNS monitor initialized and started")
