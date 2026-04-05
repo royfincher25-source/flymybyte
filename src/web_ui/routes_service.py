@@ -113,14 +113,17 @@ from core.utils import (
     run_unblock_update,
     is_ip_address
 )
-from core.ipset_manager import bulk_add_to_ipset, ensure_ipset_exists, bulk_remove_from_ipset
 from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_hysteria2_key, hysteria2_config, write_hysteria2_config,
     parse_shadowsocks_key, shadowsocks_config,
     parse_trojan_key, trojan_config,
     parse_tor_bridges, tor_config, write_tor_config,
-    restart_service, check_service_status, get_local_version, get_remote_version
+    restart_service, check_service_status, get_local_version, get_remote_version,
+    bulk_add_to_ipset, ensure_ipset_exists, bulk_remove_from_ipset,
+    get_catalog, download_list,
+    DNSSpoofing, apply_dns_spoofing, disable_dns_spoofing,
+    get_dns_spoofing_status,
 )
 from core.app_config import WebConfig
 
@@ -414,7 +417,6 @@ def stats():
 
     # DNS spoofing status
     try:
-        from core.dns_spoofing import DNSSpoofing
         spoofing = DNSSpoofing()
         dns_status = spoofing.get_status()
     except Exception:
@@ -1055,7 +1057,6 @@ def dns_spoofing():
 @login_required
 def dns_spoofing_status():
     try:
-        from core.dns_spoofing import get_dns_spoofing_status
         status = get_dns_spoofing_status()
         return jsonify(status)
     except Exception as e:
@@ -1067,7 +1068,6 @@ def dns_spoofing_status():
 @login_required
 def dns_spoofing_apply():
     try:
-        from core.dns_spoofing import apply_dns_spoofing
         success, message = apply_dns_spoofing()
         if success:
             return jsonify({'success': True, 'message': message})
@@ -1082,7 +1082,6 @@ def dns_spoofing_apply():
 @login_required
 def dns_spoofing_disable():
     try:
-        from core.dns_spoofing import disable_dns_spoofing
         success, message = disable_dns_spoofing()
         if success:
             return jsonify({'success': True, 'message': message})
@@ -1097,7 +1096,6 @@ def dns_spoofing_disable():
 @login_required
 def dns_spoofing_get_domains():
     try:
-        from core.dns_spoofing import DNSSpoofing
         spoofing = DNSSpoofing()
         domains = spoofing.load_domains()
         return jsonify({'success': True, 'domains': domains})
@@ -1114,7 +1112,6 @@ def dns_spoofing_save_domains():
         domains = data.get('domains', [])
         if not isinstance(domains, list):
             return jsonify({'success': False, 'error': 'Invalid domains format'})
-        from core.dns_spoofing import DNSSpoofing
         spoofing = DNSSpoofing()
         valid_domains = [d for d in domains if spoofing._validate_domain(d)]
         domains_path = Path(AI_DOMAINS_LIST)
@@ -1149,7 +1146,6 @@ def dns_spoofing_test():
         domain = data.get('domain', '')
         if not domain:
             return jsonify({'success': False, 'error': 'Domain required'})
-        from core.dns_spoofing import DNSSpoofing
         spoofing = DNSSpoofing()
         result = spoofing.test_domain(domain)
         return jsonify(result)
@@ -1494,7 +1490,6 @@ def refresh_bypass_ipset(filename: str):
     if not os.path.exists(filepath):
         flash('Файл не найден', 'danger')
         return redirect(url_for('main.view_bypass', filename=filename))
-    from core.ipset_manager import refresh_ipset_from_file
     success, msg = refresh_ipset_from_file(filepath, max_workers=10)
     if success:
         logger.info(f"[ROUTES] Refresh succeeded: {msg}")
@@ -1508,7 +1503,6 @@ def refresh_bypass_ipset(filename: str):
 @bp.route('/bypass/catalog')
 @login_required
 def bypass_catalog():
-    from core.list_catalog import get_catalog
     catalog = get_catalog()
     return render_template('bypass_catalog.html', catalog=catalog)
 
@@ -1516,8 +1510,7 @@ def bypass_catalog():
 @bp.route('/bypass/catalog/<name>', methods=['POST'])
 @login_required
 @csrf_required
-def download_list(name: str):
-    from core.list_catalog import download_list
+def download_list_from_catalog(name: str):
     config = WebConfig()
     dest_dir = config.unblock_dir
     success, message, count = download_list(name, dest_dir)

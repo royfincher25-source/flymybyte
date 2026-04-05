@@ -1062,3 +1062,951 @@ def get_remote_version():
     except Exception as e:
         logger.error(f'Error fetching remote version: {e}')
         return 'N/A'
+
+
+# =============================================================================
+# IPSET MANAGER (merged from ipset_manager.py)
+# =============================================================================
+
+# Memory limit for embedded devices (128MB RAM)
+# Prevents OOM when adding thousands of entries in single operation
+IPSET_MAX_BULK_ENTRIES = 5000  # Maximum entries per bulk operation
+IPSET_BATCH_SIZE = 1000  # Process entries in batches of 1000
+
+
+def _sanitize_for_ipset(text: str) -> str:
+    """
+    Sanitize text for safe use in ipset commands.
+
+    Removes dangerous characters that could be used for command injection.
+
+    Args:
+        text: Input text to sanitize
+
+    Returns:
+        Sanitized text safe for ipset commands
+    """
+    if not text:
+        raise ValueError("Empty entry")
+
+    # Remove dangerous shell characters
+    dangerous_pattern = r'[;|&`$(){}<>\\!#~*?\[\]\r\n]'
+    sanitized = re.sub(dangerous_pattern, '', text)
+
+    # Strip whitespace
+    sanitized = sanitized.strip()
+
+    if not sanitized:
+        raise ValueError("Invalid entry after sanitization")
+
+    return sanitized
+
+
+def _is_valid_ipset_entry(entry: str) -> bool:
+    """
+    Validate entry (IP address or domain).
+
+    Args:
+        entry: IP or domain string
+
+    Returns:
+        True if valid
+    """
+    if not entry or len(entry) > 253:
+        return False
+
+    # IPv4 pattern
+    ipv4_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+    if re.match(ipv4_pattern, entry):
+        parts = entry.split('.')
+        try:
+            return all(0 <= int(p) <= 255 for p in parts)
+        except ValueError:
+            return False
+
+    # IPv6 pattern (simplified)
+    if ':' in entry:
+        return True
+
+    # Domain pattern
+    domain_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
+    return bool(re.match(domain_pattern, entry))
+
+
+def _parse_ipset_error(stderr: str, commands: List[str]) -> str:
+    """
+    Parse ipset restore error output to identify failed entries.
+
+    Args:
+        stderr: Error output from ipset restore
+        commands: List of commands that were executed
+
+    Returns:
+        Detailed error message with failed entries
+    """
+    error_lines = stderr.strip().split('\n')
+    failed_entries = []
+
+    for line in error_lines:
+        match = re.search(r'line (\d+)', line, re.IGNORECASE)
+        if match:
+            line_num = int(match.group(1))
+            if 1 <= line_num <= len(commands):
+                failed_cmd = commands[line_num - 1]
+                parts = failed_cmd.split()
+                if len(parts) >= 3:
+                    failed_entries.append(parts[2])
+
+    if failed_entries:
+        sample = failed_entries[:5]
+        remaining = len(failed_entries) - len(sample)
+        msg = f"Failed entries: {', '.join(sample)}"
+        if remaining > 0:
+            msg += f" (and {remaining} more)"
+        logger.error(f"ipset restore failed for {len(failed_entries)} entries")
+        return msg
+    else:
+        return stderr[:200]
+
+
+def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
+    """
+    Bulk add entries to ipset using 'ipset restore'.
+
+    Args:
+        setname: Name of ipset (e.g., 'unblock')
+        entries: List of IP addresses or domains
+
+    Returns:
+        Tuple of (success: bool, output: str)
+    """
+    if not entries:
+        logger.info(f"[IPSET] {setname}: no entries to add")
+        return True, "No entries"
+
+    if len(entries) > IPSET_MAX_BULK_ENTRIES:
+        logger.error(f"[IPSET] {setname}: too many entries ({len(entries)} > {IPSET_MAX_BULK_ENTRIES})")
+        return False, f"Too many entries (max {IPSET_MAX_BULK_ENTRIES})"
+
+    logger.debug(f"[IPSET] {setname}: processing {len(entries)} entries (max={IPSET_MAX_BULK_ENTRIES})")
+
+    commands = []
+    skipped = 0
+    for entry in entries:
+        try:
+            sanitized_entry = _sanitize_for_ipset(entry)
+            if _is_valid_ipset_entry(sanitized_entry):
+                commands.append(f"add {setname} {sanitized_entry}")
+            else:
+                skipped += 1
+        except ValueError:
+            skipped += 1
+
+    if skipped > 0:
+        logger.warning(f"[IPSET] {setname}: skipped {skipped} invalid entries")
+
+    if not commands:
+        logger.warning(f"[IPSET] {setname}: no valid entries after sanitization")
+        return True, "No valid entries"
+
+    logger.debug(f"[IPSET] {setname}: {len(commands)} valid commands prepared")
+
+    cmd_text = "\n".join(commands)
+    try:
+        logger.debug(f"[IPSET] {setname}: executing ipset restore ({len(commands)} commands)")
+        result = subprocess.run(
+            ['ipset', 'restore'],
+            input=cmd_text,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            logger.info(f"[IPSET] {setname}: successfully added {len(commands)} entries")
+            return True, f"Added {len(commands)} entries"
+        else:
+            logger.error(f"[IPSET] {setname} restore failed: {result.stderr[:200]}")
+            error_details = _parse_ipset_error(result.stderr, commands)
+            return False, error_details
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"[IPSET] {setname}: timeout after 30s")
+        return False, "Timeout"
+    except FileNotFoundError:
+        logger.error("[IPSET] ipset command not found")
+        return False, "ipset not installed"
+    except Exception as e:
+        logger.error(f"[IPSET] {setname} exception: {e}")
+        return False, str(e)
+
+
+def bulk_remove_from_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
+    """
+    Bulk remove entries from ipset using 'ipset restore'.
+
+    Args:
+        setname: Name of ipset
+        entries: List of entries to remove
+
+    Returns:
+        Tuple of (success: bool, output: str)
+    """
+    if not entries:
+        logger.info(f"[IPSET] {setname}: no entries to remove")
+        return True, "No entries"
+
+    commands = []
+    for entry in entries:
+        try:
+            sanitized_entry = _sanitize_for_ipset(entry)
+            if _is_valid_ipset_entry(sanitized_entry):
+                commands.append(f"del {setname} {sanitized_entry}")
+        except ValueError:
+            pass
+
+    if not commands:
+        logger.warning(f"[IPSET] {setname}: no valid entries to remove")
+        return True, "No valid entries"
+
+    logger.debug(f"[IPSET] {setname}: removing {len(commands)} entries")
+    cmd_text = "\n".join(commands)
+    try:
+        result = subprocess.run(
+            ['ipset', 'restore'],
+            input=cmd_text,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        if result.returncode == 0:
+            logger.info(f"[IPSET] {setname}: successfully removed {len(commands)} entries")
+            return True, f"Removed {len(commands)} entries"
+        else:
+            logger.error(f"[IPSET] {setname} remove failed: {result.stderr[:200]}")
+            return False, result.stderr
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"[IPSET] {setname}: timeout during remove")
+        return False, "Timeout"
+    except FileNotFoundError:
+        logger.error("[IPSET] ipset command not found")
+        return False, "ipset not installed"
+    except Exception as e:
+        logger.error(f"[IPSET] {setname} exception during remove: {e}")
+        return False, str(e)
+
+
+def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, str]:
+    """
+    Ensure ipset exists, create if not.
+
+    Args:
+        setname: Name of ipset
+        settype: Type (hash:ip, hash:net, etc.)
+
+    Returns:
+        Tuple of (success: bool, output: str)
+    """
+    try:
+        logger.debug(f"[IPSET] Checking if {setname} exists (type={settype})")
+        result = subprocess.run(
+            ['ipset', 'list', setname],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode == 0:
+            logger.debug(f"[IPSET] {setname}: already exists")
+            return True, "Exists"
+
+        logger.info(f"[IPSET] Creating {setname} (type={settype})")
+        result = subprocess.run(
+            ['ipset', 'create', setname, settype, 'maxelem', '1048576'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode == 0:
+            logger.info(f"[IPSET] {setname}: created successfully")
+            return True, "Created"
+        else:
+            logger.error(f"[IPSET] {setname} create failed: {result.stderr[:200]}")
+            return False, result.stderr
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"[IPSET] {setname}: timeout")
+        return False, "Timeout"
+    except FileNotFoundError:
+        logger.error("[IPSET] ipset command not found")
+        return False, "ipset not installed"
+    except Exception as e:
+        logger.error(f"[IPSET] {setname} exception: {e}")
+        return False, str(e)
+
+
+def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool, str]:
+    """
+    Refresh ipset from bypass list file (resolve domains + add IPs).
+
+    Args:
+        filepath: Path to bypass list file
+        max_workers: Parallel workers for DNS (default: 10)
+
+    Returns:
+        Tuple of (success: bool, message: str)
+    """
+    try:
+        from .dns_ops import resolve_domains_for_ipset
+
+        logger.info(f"[IPSET] Refreshing from file: {filepath}")
+        count = resolve_domains_for_ipset(filepath, max_workers)
+        logger.info(f"[IPSET] Refresh complete: {count} IPs resolved and added from {filepath}")
+        return True, f"Resolved and added {count} IPs"
+    except Exception as e:
+        logger.error(f"[IPSET] Refresh failed for {filepath}: {e}")
+        return False, str(e)
+
+
+# =============================================================================
+# LIST CATALOG (merged from list_catalog.py)
+# =============================================================================
+
+# Catalog of available bypass lists
+LIST_CATALOG: Dict[str, Dict[str, Any]] = {
+    'anticensor': {
+        'name': 'Антицензор',
+        'description': 'Обход блокировок Роскомнадзора',
+        'url': 'https://raw.githubusercontent.com/zhovner/zaborona_help/master/hosts.txt',
+        'format': 'hosts',
+    },
+    'reestr': {
+        'name': 'Реестр запрещённых сайтов',
+        'description': 'Официальный реестр запрещённых сайтов РФ',
+        'url': 'https://raw.githubusercontent.com/zhovner/zaborona_help/master/reestr.txt',
+        'format': 'domains',
+    },
+    'social': {
+        'name': 'Соцсети',
+        'description': 'Facebook, Instagram, Twitter, TikTok',
+        'domains': [
+            'facebook.com',
+            'instagram.com',
+            'twitter.com',
+            'tiktok.com',
+            'whatsapp.com',
+            'telegram.org',
+        ],
+        'format': 'domains',
+    },
+    'streaming': {
+        'name': 'Стриминговые сервисы',
+        'description': 'Netflix, Spotify, Disney+',
+        'domains': [
+            'netflix.com',
+            'spotify.com',
+            'disneyplus.com',
+            'hulu.com',
+            'amazonprime.com',
+        ],
+        'format': 'domains',
+    },
+    'torrents': {
+        'name': 'Торрент-трекеры',
+        'description': 'RuTracker, ThePirateBay, 1337x',
+        'domains': [
+            'rutracker.org',
+            'thepiratebay.org',
+            '1337x.to',
+            'torrentz2.eu',
+        ],
+        'format': 'domains',
+    },
+}
+
+
+def get_catalog() -> Dict[str, Dict[str, Any]]:
+    """Get full catalog"""
+    return LIST_CATALOG
+
+
+def get_list_info(name: str) -> Dict[str, Any]:
+    """Get info about specific list"""
+    return LIST_CATALOG.get(name, {})
+
+
+def _parse_list_content(content: str, fmt: str) -> List[str]:
+    """
+    Parse list content based on format.
+
+    Args:
+        content: Raw file content
+        fmt: 'hosts' or 'domains'
+
+    Returns:
+        List of domains
+    """
+    domains = []
+
+    for line in content.split('\n'):
+        line = line.strip()
+
+        if not line or line.startswith('#'):
+            continue
+
+        if fmt == 'hosts':
+            parts = line.split()
+            if len(parts) >= 2 and not parts[0].startswith('#'):
+                domain = parts[1]
+                if domain != 'localhost':
+                    domains.append(domain)
+        else:
+            domains.append(line)
+
+    return domains
+
+
+def download_list(name: str, dest_dir: str) -> tuple:
+    """
+    Download list from catalog and save to file.
+
+    Args:
+        name: List name from catalog
+        dest_dir: Destination directory
+
+    Returns:
+        Tuple of (success: bool, message: str, count: int)
+    """
+    if name not in LIST_CATALOG:
+        return False, f"List '{name}' not found", 0
+
+    list_info = LIST_CATALOG[name]
+    filename = f"{name}.txt"
+    filepath = os.path.join(dest_dir, filename)
+
+    try:
+        if 'url' in list_info:
+            logger.info(f"Downloading {name} from {list_info['url']}")
+            import requests
+            response = requests.get(list_info['url'], timeout=30)
+            response.raise_for_status()
+            domains = _parse_list_content(response.text, list_info['format'])
+
+        elif 'domains' in list_info:
+            domains = list_info['domains']
+
+        else:
+            return False, "No data source", 0
+
+        # Atomic write
+        temp_path = filepath + '.tmp'
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            for domain in domains:
+                f.write(f"{domain}\n")
+
+        os.replace(temp_path, filepath)
+
+        logger.info(f"Saved {len(domains)} domains to {filepath}")
+        return True, f"Downloaded {len(domains)} domains", len(domains)
+
+    except requests.RequestException as e:
+        logger.error(f"Download error: {e}")
+        return False, f"Download error: {e}", 0
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return False, str(e), 0
+
+
+# =============================================================================
+# DNS SPOOFING (merged from dns_spoofing.py)
+# =============================================================================
+
+try:
+    from .constants import (
+        AI_DOMAINS_LIST,
+        DNSMASQ_AI_CONFIG,
+        VPN_DNS_HOST,
+        VPN_DNS_PORT,
+        MAX_DOMAIN_LENGTH,
+        MAX_DOMAINS_COUNT,
+        INIT_SCRIPTS,
+    )
+except ImportError:
+    from constants import (
+        AI_DOMAINS_LIST,
+        DNSMASQ_AI_CONFIG,
+        VPN_DNS_HOST,
+        VPN_DNS_PORT,
+        MAX_DOMAIN_LENGTH,
+        MAX_DOMAINS_COUNT,
+        INIT_SCRIPTS,
+    )
+
+
+class DNSSpoofing:
+    """
+    DNS Spoofing for AI domain bypass.
+
+    Generates dnsmasq configuration to route AI domain DNS queries through VPN.
+    Thread-safe singleton pattern.
+    """
+
+    _instance: Optional['DNSSpoofing'] = None
+    _lock = threading.Lock()
+
+    def __new__(cls) -> 'DNSSpoofing':
+        """Singleton pattern with thread safety"""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        """Initialize DNS spoofing module"""
+        if hasattr(self, '_initialized'):
+            return
+
+        self._domains: List[str] = []
+        self._enabled: bool = False
+        self._config_path = DNSMASQ_AI_CONFIG
+        self._domains_path = AI_DOMAINS_LIST
+
+        self._initialized = True
+        logger.info("[DNS-SPOOF] DNSSpoofing initialized")
+
+    def load_domains(self) -> List[str]:
+        """
+        Load AI domains from list file.
+
+        Returns:
+            List of valid domain names
+        """
+        domains = []
+        domains_path = Path(self._domains_path)
+
+        if not domains_path.exists():
+            logger.warning(f"[DNS-SPOOF] AI domains list not found: {self._domains_path}")
+            return []
+
+        try:
+            content = domains_path.read_text(encoding='utf-8')
+            logger.debug(f"[DNS-SPOOF] Read {len(content)} bytes from {self._domains_path}")
+
+            for line in content.splitlines():
+                line = line.strip()
+
+                if not line or line.startswith('#'):
+                    continue
+
+                if line.startswith('*.'):
+                    line = line[2:]
+
+                if self._is_ip_address(line):
+                    logger.debug(f"[DNS-SPOOF] Skipping IP address: {line}")
+                    continue
+
+                if self._validate_domain(line):
+                    domains.append(line)
+                else:
+                    logger.warning(f"[DNS-SPOOF] Invalid domain skipped: {line}")
+
+            if len(domains) > MAX_DOMAINS_COUNT:
+                logger.warning(f"[DNS-SPOOF] Too many domains ({len(domains)}), limiting to {MAX_DOMAINS_COUNT}")
+                domains = domains[:MAX_DOMAINS_COUNT]
+
+            self._domains = domains
+            logger.info(f"[DNS-SPOOF] Loaded {len(domains)} AI domains from {self._domains_path}")
+
+        except Exception as e:
+            logger.error(f"[DNS-SPOOF] Error loading AI domains: {e}")
+            return []
+
+        return domains
+
+    def _validate_domain(self, domain: str) -> bool:
+        """Validate domain name format."""
+        if not domain:
+            return False
+
+        if len(domain) > MAX_DOMAIN_LENGTH:
+            return False
+
+        pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)+$'
+        return bool(re.match(pattern, domain))
+
+    def _is_ip_address(self, entry: str) -> bool:
+        """Check if entry is an IP address."""
+        ip_pattern = r'^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$'
+        return bool(re.match(ip_pattern, entry))
+
+    def generate_config(self, domains: Optional[List[str]] = None) -> str:
+        """
+        Generate dnsmasq configuration for AI domains.
+
+        Args:
+            domains: List of domains (default: load from file)
+
+        Returns:
+            dnsmasq configuration string
+        """
+        if domains is None:
+            domains = self.load_domains()
+
+        if not domains:
+            logger.warning("[DNS-SPOOF] No domains to generate config for")
+            return ""
+
+        lines = [
+            "# AI Domains DNS Spoofing",
+            "# Generated by dns_spoofing.py",
+            f"# Domains count: {len(domains)}",
+            "",
+        ]
+
+        for domain in domains:
+            lines.append(f"server=/{domain}/{VPN_DNS_HOST}#{VPN_DNS_PORT}")
+
+        config = '\n'.join(lines)
+        logger.info(f"[DNS-SPOOF] Generated config: {len(domains)} domains, {len(lines)} lines")
+        return config
+
+    def write_config(self, config: str) -> Tuple[bool, str]:
+        """
+        Write dnsmasq configuration to file (atomic write).
+
+        Args:
+            config: Configuration string
+
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        config_path = Path(self._config_path)
+
+        try:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+
+            tmp_path = config_path.with_suffix('.tmp')
+            tmp_path.write_text(config, encoding='utf-8')
+            tmp_path.replace(config_path)
+
+            logger.info(f"[DNS-SPOOF] Written AI domains config to {self._config_path} ({len(config)} bytes)")
+            return True, "OK"
+
+        except Exception as e:
+            error_msg = f"Error writing config: {e}"
+            logger.error(f"[DNS-SPOOF] {error_msg}")
+            return False, error_msg
+
+    def apply_config(self) -> Tuple[bool, str]:
+        """
+        Apply dnsmasq configuration and restart dnsmasq.
+
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        domains = self.load_domains()
+
+        if not domains:
+            error_msg = "No AI domains to apply"
+            logger.warning(error_msg)
+            return False, error_msg
+
+        config = self.generate_config(domains)
+
+        if not config:
+            error_msg = "Failed to generate config"
+            logger.error(error_msg)
+            return False, error_msg
+
+        success, msg = self.write_config(config)
+
+        if not success:
+            return False, msg
+
+        success, msg = self._restart_dnsmasq()
+
+        if success:
+            self._enabled = True
+            logger.info(f"AI domains DNS spoofing enabled ({len(domains)} domains)")
+            return True, f"Enabled ({len(domains)} domains)"
+        else:
+            logger.error(f"Failed to restart dnsmasq: {msg}")
+            return False, msg
+
+    def _restart_dnsmasq(self) -> Tuple[bool, str]:
+        """
+        Restart dnsmasq service using SIGHUP to reload config.
+
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        try:
+            pid_result = subprocess.run(
+                ['pgrep', 'dnsmasq'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if pid_result.returncode == 0 and pid_result.stdout.strip():
+                pid = pid_result.stdout.strip().split('\n')[0]
+                logger.debug(f"Sending SIGHUP to dnsmasq (PID {pid})")
+                kill_result = subprocess.run(
+                    ['kill', '-HUP', pid],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if kill_result.returncode == 0:
+                    time.sleep(1)
+                    logger.info("dnsmasq config reloaded via SIGHUP")
+                    return True, "OK"
+                else:
+                    error_msg = kill_result.stderr.strip() or "kill -HUP failed"
+                    logger.error(f"dnsmasq SIGHUP failed: {error_msg}")
+                    return False, error_msg
+            else:
+                dnsmasq_init = INIT_SCRIPTS['dnsmasq']
+                if not Path(dnsmasq_init).exists():
+                    logger.warning("dnsmasq init script not found")
+                    return False, "dnsmasq not installed"
+
+                result = subprocess.run(
+                    [dnsmasq_init, 'start'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+
+                if result.stdout.strip():
+                    logger.debug(f"dnsmasq start stdout: {result.stdout.strip()}")
+                if result.stderr.strip():
+                    logger.debug(f"dnsmasq start stderr: {result.stderr.strip()}")
+                logger.debug(f"dnsmasq start returncode: {result.returncode}")
+
+                time.sleep(1)
+                dnsmasq_running = self._check_dnsmasq_status()
+
+                if dnsmasq_running:
+                    logger.info("dnsmasq started successfully")
+                    return True, "OK"
+                else:
+                    error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                    logger.error(f"dnsmasq start failed: returncode={result.returncode}, stdout='{result.stdout.strip()}', stderr='{result.stderr.strip()}'")
+                    return False, f"dnsmasq not running after start: {error_msg}"
+
+        except subprocess.TimeoutExpired:
+            error_msg = "dnsmasq operation timeout"
+            logger.error(error_msg)
+            return False, error_msg
+
+        except Exception as e:
+            error_msg = f"Error restarting dnsmasq: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def disable(self) -> Tuple[bool, str]:
+        """
+        Disable DNS spoofing (remove config and FULL restart dnsmasq).
+
+        Returns:
+            Tuple of (success: bool, message: str)
+        """
+        config_path = Path(self._config_path)
+
+        try:
+            if config_path.exists():
+                config_path.unlink()
+                logger.info(f"Removed AI domains config: {self._config_path}")
+
+            dnsmasq_init = INIT_SCRIPTS['dnsmasq']
+            if not Path(dnsmasq_init).exists():
+                logger.warning("dnsmasq init script not found")
+                self._enabled = False
+                self._domains = []
+                return True, "Config removed (dnsmasq not installed)"
+
+            try:
+                result = subprocess.run(
+                    [dnsmasq_init, 'restart'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.stdout.strip():
+                    logger.debug(f"dnsmasq restart stdout: {result.stdout.strip()}")
+                if result.stderr.strip():
+                    logger.debug(f"dnsmasq restart stderr: {result.stderr.strip()}")
+
+                time.sleep(1)
+                dnsmasq_running = self._check_dnsmasq_status()
+
+                if dnsmasq_running:
+                    self._enabled = False
+                    self._domains = []
+                    logger.info("AI domains DNS spoofing disabled (dnsmasq restarted)")
+                    return True, "Disabled"
+                else:
+                    self._enabled = False
+                    self._domains = []
+                    error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                    logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq may not be running: {error_msg}")
+                    return True, f"Config removed (dnsmasq: {error_msg})"
+
+            except subprocess.TimeoutExpired:
+                self._enabled = False
+                self._domains = []
+                logger.warning("DNS spoofing disabled, but dnsmasq restart timed out")
+                return True, "Config removed (restart timeout)"
+
+            except Exception as e:
+                self._enabled = False
+                self._domains = []
+                logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq restart error: {e}")
+                return True, f"Config removed (restart error: {e})"
+
+        except Exception as e:
+            error_msg = f"Error disabling DNS spoofing: {e}"
+            logger.error(error_msg)
+            return False, error_msg
+
+    def get_status(self) -> Dict[str, Any]:
+        """
+        Get current DNS spoofing status.
+
+        Returns:
+            Dict with status information
+        """
+        config_path = Path(self._config_path)
+        domains_path = Path(self._domains_path)
+
+        config_exists = config_path.exists()
+
+        if not self._domains and domains_path.exists():
+            self.load_domains()
+
+        dnsmasq_running = self._check_dnsmasq_status()
+
+        return {
+            'enabled': self._enabled or config_exists,
+            'domain_count': len(self._domains),
+            'config_exists': config_exists,
+            'dnsmasq_running': dnsmasq_running,
+            'config_path': self._config_path,
+            'domains_path': self._domains_path,
+        }
+
+    def _check_dnsmasq_status(self) -> bool:
+        """Check if dnsmasq is running."""
+        try:
+            result = subprocess.run(
+                ['pgrep', 'dnsmasq'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    def test_domain(self, domain: str) -> Dict[str, Any]:
+        """
+        Test DNS resolution for a domain.
+
+        Args:
+            domain: Domain to test
+
+        Returns:
+            Dict with test results
+        """
+        result = {
+            'domain': domain,
+            'resolved': False,
+            'ips': [],
+            'dns_server': f'{VPN_DNS_HOST}:{VPN_DNS_PORT}',
+            'error': None,
+        }
+
+        try:
+            try:
+                proc_result = subprocess.run(
+                    f'nslookup {domain} {VPN_DNS_HOST} 2>/dev/null',
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if proc_result.returncode == 0:
+                    ips = re.findall(
+                        r'Address(?:es)?\s*\d*:\s*([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})',
+                        proc_result.stdout
+                    )
+                    ips = [ip for ip in ips if ip != VPN_DNS_HOST]
+                    ips = list(set(ips))
+
+                    if ips:
+                        result['resolved'] = True
+                        result['ips'] = ips
+                        result['dns_server'] = f'{VPN_DNS_HOST}:{VPN_DNS_PORT} (VPN)'
+                        return result
+
+            except Exception as e:
+                logger.debug(f"nslookup error: {e}")
+                pass
+
+            try:
+                proc_result = subprocess.run(
+                    f'nslookup {domain} 2>/dev/null',
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+
+                if proc_result.stdout.strip():
+                    ips = re.findall(
+                        r'([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})',
+                        proc_result.stdout
+                    )
+
+                    if ips:
+                        result['error'] = f'Домен существует, но не резолвится через VPN DNS (порт {VPN_DNS_PORT}). Проверьте, запущен ли dnsmasq/stubby и применена ли конфигурация.'
+                        result['ips'] = ips
+                        return result
+
+            except Exception:
+                pass
+
+            result['error'] = 'No IPs found'
+
+        except subprocess.TimeoutExpired:
+            result['error'] = 'Timeout'
+        except Exception as e:
+            result['error'] = str(e)
+
+        return result
+
+
+# Module-level convenience functions for DNS spoofing
+
+def apply_dns_spoofing() -> Tuple[bool, str]:
+    """Apply DNS spoofing configuration"""
+    spoofing = DNSSpoofing()
+    return spoofing.apply_config()
+
+
+def disable_dns_spoofing() -> Tuple[bool, str]:
+    """Disable DNS spoofing"""
+    spoofing = DNSSpoofing()
+    return spoofing.disable()
+
+
+def get_dns_spoofing_status() -> Dict[str, Any]:
+    """Get DNS spoofing status"""
+    spoofing = DNSSpoofing()
+    return spoofing.get_status()

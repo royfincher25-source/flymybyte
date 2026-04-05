@@ -430,7 +430,7 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS) -> 
         Number of IPs added to ipset
     """
     from .utils import load_bypass_list
-    from .ipset_manager import bulk_add_to_ipset, ensure_ipset_exists
+    from .services import bulk_add_to_ipset, ensure_ipset_exists
 
     entries = load_bypass_list(filepath)
     domains = [e for e in entries if not is_ip_address(e)]
