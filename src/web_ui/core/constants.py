@@ -326,17 +326,6 @@ UPDATE_BACKUP_FILES = [
     f'{INIT_DIR}',
 ]
 
-UPDATE_BACKUP_FILES = [
-    f'{WEB_UI_DIR}',
-    f'{XRAY_DIR}',
-    f'{TOR_DIR}',
-    f'{UNBLOCK_DIR}',
-    SHADOWSOCKS_CONFIG,
-    f'{INIT_DIR}/trojan.json',
-    DNSMASQ_AI_CONFIG,
-    AI_DOMAINS_LIST,
-]
-
 # =============================================================================
 # DNS SPOOFING
 # =============================================================================
