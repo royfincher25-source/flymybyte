@@ -2,6 +2,39 @@
 
 Все значимые изменения в проекте будут документироваться в этом файле.
 
+## [2.0.0] - 2026-04-05
+
+### 🔥 Полная переработка архитектуры
+
+#### Удалено
+- `env_parser.py` — мёртвый код, не импортировался
+- `core/update_service.py` — функции инлайнены в routes_updates.py
+- `core/backup_service.py` — функции инлайнены в routes_system.py
+- `core/decorators.py` — декораторы инлайнены в route-файлы
+- `core/dns_manager.py` + `dns_monitor.py` + `dns_resolver.py` → `dns_ops.py`
+- `core/ipset_manager.py` → слит в `services.py`
+- `core/list_catalog.py` → слит в `services.py`
+- `core/dns_spoofing.py` → слит в `services.py`
+- `templates/macros.html` — инлайнен в base.html
+- `routes_service.py` (1528 строк) → разбит на 5 файлов
+
+#### Новая структура маршрутов
+- `routes_core.py` — авторизация, главная страница
+- `routes_system.py` — сервисное меню, статистика, логи
+- `routes_vpn.py` — управление VPN-ключами
+- `routes_bypass.py` — списки обхода, DNS-обход AI
+- `routes_updates.py` — обновления, установка
+
+#### Упрощено
+- `utils.py` — удалено 284 строки (unused функции, docstrings)
+- `constants.py` — удалено 65 строк (unused константы)
+- `app_config.py` — удалено 76 строк (unused методы WebConfig)
+
+#### Исправлено
+- duplicate UPDATE_BACKUP_FILES в constants.py
+- update_service.py импорты сломаны (файл отсутствует)
+- binary files corrupted during update (response.text → response.content)
+
 ## [1.24.0] - 2026-04-05
 
 ### 🔥 Критическое исправление
