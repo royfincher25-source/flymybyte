@@ -10,7 +10,8 @@
       "Bash(dir *)",
       "Bash(powershell *)",
       "Bash(git *)",
-      "Bash(true)"
+      "Bash(true)",
+      "Bash(else)"
     ]
   },
   "$version": 3,
