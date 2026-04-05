@@ -29,7 +29,7 @@ from .services import (
     write_json_config,
     write_tor_config,
 )
-from .dns_monitor import (
+from .dns_ops import (
     DNSMonitor,
     check_dns_server,
     get_dns_monitor,
