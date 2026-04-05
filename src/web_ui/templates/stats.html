@@ -6,10 +6,10 @@
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-graph-up fm-lg"></i> Статистика</h2>
     <div>
-        <a href="{{ url_for('main.stats') }}" class="btn btn--primary me-2">
-            <i class="fm fm-arrow-clockwise"></i> Обновить
+        <a href="{{ url_for('main.service') }}" class="btn btn--outline btn--sm me-2">
+            <i class="fm fm-gear"></i> Сервис
         </a>
-        <a href="{{ url_for('main.index') }}" class="btn btn--outline">
+        <a href="{{ url_for('main.index') }}" class="btn btn--outline btn--sm">
             <i class="fm fm-arrow-left"></i> Назад
         </a>
     </div>
@@ -73,6 +73,8 @@
                         <td>
                             {% if service_id == 'vless' %}
                                 <i class="fm fm-circle-fill text-success"></i> VLESS
+                            {% elif service_id == 'hysteria2' %}
+                                <i class="fm fm-lightning-charge-fill text-warning"></i> Hysteria 2
                             {% elif service_id == 'shadowsocks' %}
                                 <i class="fm fm-circle-fill text-warning"></i> Shadowsocks
                             {% elif service_id == 'trojan' %}
@@ -95,13 +97,40 @@
                         </td>
                         <td>
                             <a href="{{ url_for('main.key_config', service=service_id) }}" class="btn btn--sm btn--outline">
-                                <i class="fm fm-gear"></i> Настроить
+                                <i class="fm fm-gear"></i> {% if service.config_exists %}Изменить{% else %}Настроить{% endif %}
                             </a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- DNS статус -->
+<div class="card shadow-sm mb-4">
+    <div class="card__header bg-surface">
+        <h5 class="mb-0"><i class="fm fm-globe2 fm-lg"></i> DNS</h5>
+    </div>
+    <div class="card__body">
+        <div class="row row--2col">
+            <div>
+                <h6><i class="fm fm-shield-check"></i> DNS-обход AI</h6>
+                {% if stats.dns_spoofing_enabled %}
+                    <p class="text-success"><i class="fm fm-check-circle-fill"></i> Активен ({{ stats.dns_spoofing_domains }} доменов)</p>
+                {% else %}
+                    <p class="text-danger"><i class="fm fm-x-circle-fill"></i> Выключен</p>
+                {% endif %}
+            </div>
+            <div>
+                <h6><i class="fm fm-globe"></i> DNS Override</h6>
+                {% if stats.dns_override_enabled %}
+                    <p class="text-success"><i class="fm fm-check-circle-fill"></i> ВКЛ (порт 5353)</p>
+                {% else %}
+                    <p class="text-muted"><i class="fm fm-x-circle"></i> ВЫКЛ</p>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -148,10 +177,10 @@
     <div class="card__body">
         <h5 class="card-title"><i class="fm fm-info-circle fm-lg"></i> Информация</h5>
         <p class="card__text text-muted">
-            Статистика обновляется в реальном времени при загрузке страницы.
+            Статистика обновляется при загрузке страницы.
         </p>
         <p class="card__text text-muted small">
-            <strong>Сервисы:</strong> VLESS, Shadowsocks, Trojan, Tor<br>
+            <strong>Сервисы:</strong> VLESS, Hysteria 2, Shadowsocks, Trojan, Tor<br>
             <strong>Списки обхода:</strong> Файлы .txt в директории {{ config.unblock_dir if config else '/opt/etc/unblock/' }}
         </p>
     </div>

@@ -254,6 +254,11 @@ img { max-width: 100%; height: auto; }
 .switch input:checked + .switch__track { background: var(--color-primary-medium); }
 .switch input:checked + .switch__track::after { transform: translateX(18px); }
 
+/* Service card switch colors */
+.service-card--active .switch input:checked + .switch__track {
+  background: var(--color-success);
+}
+
 /* --- Alerts --- */
 .alert {
   padding: 0.75rem 1rem;
@@ -328,6 +333,7 @@ img { max-width: 100%; height: auto; }
 .progress {
   height: 1rem;
   background: rgba(30, 42, 58, 0.9);
+  border: 1px solid rgba(79, 216, 235, 0.3);
   border-radius: var(--radius);
   overflow: hidden;
   margin-bottom: 0.5rem;
@@ -346,6 +352,20 @@ img { max-width: 100%; height: auto; }
 .progress__bar--warning { background: var(--color-warning); }
 .progress__bar--danger { background: var(--color-danger); }
 .progress__bar--info { background: var(--color-info); }
+
+/* --- Service cards (keys page) --- */
+.service-card {
+  border: 2px solid transparent;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+.service-card--active {
+  background: rgba(76, 175, 80, 0.08);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+.service-card--inactive {
+  background: rgba(244, 67, 54, 0.08);
+  border-color: rgba(244, 67, 54, 0.4);
+}
 .progress__bar--stripes {
   background-image: linear-gradient(
     45deg,
@@ -600,8 +620,18 @@ img { max-width: 100%; height: auto; }
 /* Main content padding for fixed footer */
 main { padding-bottom: 3rem; }
 
+/* Last element on page bottom spacing */
+main > *:last-child {
+  margin-bottom: 3.5rem;
+}
+
 /* --- Responsive --- */
 @media (max-width: 768px) {
   .navbar__nav { gap: 0.5rem; }
-  .footer .row { grid-template-columns: 1fr; text-align: center; }
+  .footer .row { grid-template-columns: 1fr !important; text-align: center; gap: 0.5rem; }
+  .footer .row > * { text-align: center !important; }
+  main { padding-bottom: 5rem; }
+  .flex-between { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
+  .flex-between > div,
+  .flex-between > a { align-self: stretch; }
 }

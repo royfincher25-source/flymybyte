@@ -128,6 +128,7 @@ def stats():
     config = WebConfig()
     services = {
         'vless': {'name': 'VLESS', 'init': INIT_SCRIPTS['vless'], 'config': CONFIG_PATHS['vless']},
+        'hysteria2': {'name': 'Hysteria 2', 'init': INIT_SCRIPTS['hysteria2'], 'config': CONFIG_PATHS['hysteria2']},
         'shadowsocks': {'name': 'Shadowsocks', 'init': INIT_SCRIPTS['shadowsocks'], 'config': CONFIG_PATHS['shadowsocks']},
         'trojan': {'name': 'Trojan', 'init': INIT_SCRIPTS['trojan'], 'config': CONFIG_PATHS['trojan']},
         'tor': {'name': 'Tor', 'init': INIT_SCRIPTS['tor'], 'config': CONFIG_PATHS['tor']},
@@ -151,12 +152,40 @@ def stats():
                     logger.error(f"stats Exception reading {filename}: {e}")
     active_services = sum(1 for s in services.values() if s['status'] == '✅ Активен')
     config_files = sum(1 for s in services.values() if s['config_exists'])
+
+    # DNS spoofing status
+    try:
+        from core.dns_spoofing import DNSSpoofing
+        spoofing = DNSSpoofing()
+        dns_status = spoofing.get_status()
+    except Exception:
+        dns_status = {'enabled': False, 'domain_count': 0}
+
+    # DNS Override status
+    dns_override_enabled = False
+    try:
+        result = subprocess.run(
+            ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0 and 'dpt:53' in result.stdout and 'DNAT' in result.stdout:
+            dns_override_enabled = True
+    except Exception:
+        pass
+
     stats_data = {
-        'total_services': len(services), 'active_services': active_services,
-        'config_files': config_files, 'total_bypass_lists': len(bypass_lists),
-        'total_domains': total_domains, 'services': services, 'bypass_lists': bypass_lists,
+        'total_services': len(services),
+        'active_services': active_services,
+        'config_files': config_files,
+        'total_bypass_lists': len(bypass_lists),
+        'total_domains': total_domains,
+        'services': services,
+        'bypass_lists': bypass_lists,
+        'dns_spoofing_enabled': dns_status.get('enabled', False),
+        'dns_spoofing_domains': dns_status.get('domain_count', 0),
+        'dns_override_enabled': dns_override_enabled,
     }
-    return render_template('stats.html', stats=stats_data)
+    return render_template('stats.html', stats=stats_data, config=config)
 
 
 @bp.route('/service')
@@ -969,6 +998,43 @@ def key_config(service: str):
         except Exception as e:
             flash(f'❌ Ошибка: {str(e)}', 'danger')
     return render_template('key_generic.html', service=service, service_name=svc['name'])
+
+
+@bp.route('/keys/<service>/toggle', methods=['POST'])
+@login_required
+@csrf_required
+def key_toggle(service: str):
+    services_config = {
+        'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless'], 'ipset': 'unblockvless', 'port': 10810},
+        'hysteria2': {'name': 'Hysteria 2', 'config_path': CONFIG_PATHS['hysteria2'], 'init_script': INIT_SCRIPTS['hysteria2'], 'ipset': 'unblockhysteria2', 'port': 0},
+        'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks'], 'ipset': 'unblocksh', 'port': 1082},
+        'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan'], 'ipset': 'unblocktroj', 'port': 10829},
+        'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor'], 'ipset': 'unblocktor', 'port': 9141},
+    }
+    if service not in services_config:
+        flash('Неверный сервис', 'danger')
+        return redirect(url_for('main.keys'))
+    svc = services_config[service]
+    config_exists = os.path.exists(svc['config_path'])
+
+    if config_exists:
+        # Disable: stop service, remove config, flush ipset
+        try:
+            if os.path.exists(svc['init_script']):
+                subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
+            if os.path.exists(svc['config_path']):
+                os.remove(svc['config_path'])
+            subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
+            for proto in ['tcp', 'udp']:
+                subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
+            flash(f'✅ {svc["name"]} отключён, ipset очищен', 'success')
+        except Exception as e:
+            flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
+    else:
+        # Enable: redirect to config page to enter key
+        flash(f'⚠️ Для включения {svc["name"]} необходимо настроить ключ', 'warning')
+        return redirect(url_for('main.key_config', service=service))
+    return redirect(url_for('main.keys'))
 
 
 @bp.route('/keys/<service>/disable', methods=['POST'])

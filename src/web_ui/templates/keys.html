@@ -5,7 +5,7 @@
 {% block content %}
 <div class="d-flex flex-between mb-4">
     <h2><i class="fm fm-key fm-lg"></i> Ключи и мосты</h2>
-    <a href="{{ url_for('main.index') }}" class="btn btn--outline">
+    <a href="{{ url_for('main.index') }}" class="btn btn--outline btn--sm">
         <i class="fm fm-arrow-left"></i> Назад
     </a>
 </div>
@@ -13,7 +13,7 @@
 <div class="row row--2col">
     {% for service_id, service in services.items() %}
     <div>
-        <div class="card shadow-sm {% if service.status == '✅ Активен' %}border-success{% endif %}">
+        <div class="card shadow-sm service-card {% if '✅' in service.status %}service-card--active{% else %}service-card--inactive{% endif %}">
             <div class="card__body">
                 <div class="d-flex flex-between flex-start">
                     <div>
@@ -51,12 +51,16 @@
                             <i class="fm fm-gear"></i> {% if service.config_exists %}Изменить{% else %}Настроить{% endif %}
                         </a>
                         {% if service.config_exists %}
-                        <form method="POST" action="{{ url_for('main.key_disable', service=service_id) }}" onsubmit="return confirm('Отключить {{ service.name }}? Конфиг будет удалён, ipset очищен.');">
+                        <form method="POST" action="{{ url_for('main.key_toggle', service=service_id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <button type="submit" class="btn btn--danger btn--sm btn--full">
-                                <i class="fm fm-x-lg"></i> Отключить
-                            </button>
+                            <label class="switch">
+                                <input type="checkbox" checked onchange="this.form.submit()">
+                                <span class="switch__track"></span>
+                            </label>
+                            <small class="text-success fw-bold">ВКЛ</small>
                         </form>
+                        {% else %}
+                        <small class="text-danger fw-bold">ВЫКЛ</small>
                         {% endif %}
                     </div>
                 </div>
