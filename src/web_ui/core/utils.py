@@ -2,16 +2,13 @@
 FlyMyByte Web Interface - Core Utilities
 
 Memory-optimized utilities for embedded devices (128MB RAM).
-- LRU cache with 50 entry limit (reduced from 100)
-- Efficient file operations
-- Minimal memory footprint
-- Log rotation (100KB × 3 = 300KB max)
 """
 import os
 import re
 import time
 import subprocess
 import logging
+import threading
 from collections import OrderedDict
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -56,23 +53,8 @@ def setup_logging():
             logger.error(f"Failed to setup log rotation: {e}")
 
 
-# =============================================================================
-# LRU CACHE (MEMORY-OPTIMIZED)
-# =============================================================================
-
-import threading
-
-
 class Cache:
-    """
-    LRU cache with TTL and memory limit (30 entries for embedded devices).
-    Thread-safe with threading.Lock.
-
-    Example:
-        >>> Cache.set("key", "value", ttl=60)
-        >>> Cache.get("key")
-        'value'
-    """
+    """LRU cache with TTL (30 entries max, thread-safe)."""
 
     _cache: Dict[str, Any] = {}
     _timestamps: Dict[str, float] = {}
@@ -157,92 +139,38 @@ class Cache:
 # =============================================================================
 
 def validate_bypass_entry(entry: str) -> bool:
-    """
-    Validate bypass list entry (domain, IP, or comment).
-    
-    Optimized for minimal memory usage.
-    
-    Args:
-        entry: Entry to validate (domain, IP, or comment)
-    
-    Returns:
-        True if valid, False otherwise
-    
-    Example:
-        >>> validate_bypass_entry("example.com")
-        True
-        >>> validate_bypass_entry("192.168.1.1")
-        True
-        >>> validate_bypass_entry("# comment")
-        True
-        >>> validate_bypass_entry("")
-        False
-    """
+    """Validate bypass list entry (domain, IP, or comment)."""
     entry = entry.strip()
-    
-    # Empty entries are invalid
     if not entry:
         return False
-    
-    # Comments are valid
     if entry.startswith('#'):
         return True
-    
-    # Check length (max 253 characters for domain)
     if len(entry) > 253:
         return False
-    
-    # IPv4 check
-    parts = entry.split('.')
-    if len(parts) == 4:
-        try:
-            return all(0 <= int(p) <= 255 for p in parts)
-        except ValueError:
-            pass  # Not an IP, continue to domain check
-    
-    # IPv6 check (simple check for colons)
-    if ':' in entry:
-        return True
-    
-    # Domain check (must have at least one dot)
-    if '.' in entry:
-        return True
-    
-    return False
-
-
-def is_ip_address(entry: str) -> bool:
-    """
-    Check if entry is an IP address (IPv4 or IPv6).
-
-    Args:
-        entry: Entry to check
-
-    Returns:
-        True if IP address, False otherwise
-
-    Example:
-        >>> is_ip_address("192.168.1.1")
-        True
-        >>> is_ip_address("example.com")
-        False
-        >>> is_ip_address("::1")
-        True
-    """
-    entry = entry.strip()
-
-    # IPv4 check
     parts = entry.split('.')
     if len(parts) == 4:
         try:
             return all(0 <= int(p) <= 255 for p in parts)
         except ValueError:
             pass
-
-    # IPv6 check (simple check for colons)
     if ':' in entry:
         return True
+    if '.' in entry:
+        return True
+    return False
 
+
+def is_ip_address(entry: str) -> bool:
+    """Check if entry is an IP address (IPv4 or IPv6)."""
+    entry = entry.strip()
+    parts = entry.split('.')
+    if len(parts) == 4:
+        try:
+            return all(0 <= int(p) <= 255 for p in parts)
+        except ValueError:
+            pass
+    if ':' in entry:
+        return True
     return False
 
 
@@ -251,107 +179,48 @@ def is_ip_address(entry: str) -> bool:
 # =============================================================================
 
 def load_bypass_list(filepath: str) -> List[str]:
-    """
-    Load bypass list from file with caching.
-    
-    - Caches for 1 minute or until file changes
-    - Skips comments and empty lines
-    - Memory-optimized for embedded devices
-    
-    Args:
-        filepath: Path to bypass list file
-    
-    Returns:
-        List of bypass entries (without comments/empty lines)
-    
-    Example:
-        >>> load_bypass_list("/opt/etc/unblock/unblocktor.txt")
-        ['example.com', 'test.com']
-    """
+    """Load bypass list from file with mtime-based caching (60s TTL)."""
     cache_key = f'bypass:{filepath}'
-    
-    # Check cache first
     if Cache.is_valid(cache_key):
         cached = Cache.get(cache_key)
-        # Check if file has changed
         try:
             mtime = os.path.getmtime(filepath)
             if cached and mtime == cached.get('mtime'):
-                logger.debug(f"[BYPASS] Cache hit for {filepath}: {len(cached['data'])} entries")
                 return cached['data']
         except (OSError, IOError):
             pass
-    
-    # File doesn't exist
     if not os.path.exists(filepath):
         logger.warning(f"[BYPASS] File not found: {filepath}")
         return []
-    
-    # Load from file
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
-            # Skip comments and empty lines, preserve order
-            data = [
-                line.strip() for line in f 
-                if line.strip() and not line.strip().startswith('#')
-            ]
-        
-        # Cache with mtime
+            data = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
         try:
             mtime = os.path.getmtime(filepath)
         except (OSError, IOError):
             mtime = time.time()
-        
         Cache.set(cache_key, {'data': data, 'mtime': mtime}, ttl=60)
         logger.info(f"[BYPASS] Loaded {len(data)} entries from {filepath}")
-        
         return data
-    
     except Exception as e:
         logger.error(f"[BYPASS] Error loading {filepath}: {e}")
         return []
 
 
 def save_bypass_list(filepath: str, sites: List[str]) -> None:
-    """
-    Save bypass list to file atomically.
-    
-    - Atomic write via .tmp file
-    - Preserves order (no sorting)
-    - Clears cache after save
-    - Memory-optimized
-    
-    Args:
-        filepath: Path to bypass list file
-        sites: List of bypass entries to save
-    
-    Example:
-        >>> save_bypass_list("/opt/etc/unblock/unblocktor.txt", 
-        ...                  ["example.com", "test.com"])
-    """
+    """Save bypass list to file atomically (via .tmp + os.replace)."""
     temp_path = filepath + '.tmp'
-    
     try:
-        # Atomic write via temporary file
         with open(temp_path, 'w', encoding='utf-8') as f:
-            # Preserve original order
             f.write('\n'.join(sites))
-        
-        # Atomic replace
         os.replace(temp_path, filepath)
-        
-        # Clear cache for this file
         cache_key = f'bypass:{filepath}'
         Cache._cache.pop(cache_key, None)
         Cache._timestamps.pop(cache_key, None)
-        if cache_key in Cache._access_order:
-            del Cache._access_order[cache_key]
-        
+        Cache._access_order.pop(cache_key, None)
         logger.info(f"[BYPASS] Saved {len(sites)} entries to {filepath}")
-    
     except Exception as e:
         logger.error(f"[BYPASS] Error saving {filepath}: {e}")
-        # Cleanup temp file on error
         try:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
@@ -365,30 +234,12 @@ def save_bypass_list(filepath: str, sites: List[str]) -> None:
 # =============================================================================
 
 def get_script_path(script_name: str) -> Optional[str]:
-    """
-    Get path to deployment script.
-
-    Searches in multiple locations:
-    1. /opt/bin/ (router production)
-    2. /opt/etc/unblock/ (router production)
-    3. /opt/etc/ndm/ (router production)
-    4. deploy/router/ (development)
-    5. Current directory
-
-    Args:
-        script_name: Name of script (e.g., 'unblock_update.sh')
-
-    Returns:
-        Full path to script or None if not found
-    """
-    # Router production paths
+    """Get path to deployment script (searches router + dev locations)."""
     possible_paths = [
         f"/opt/bin/{script_name}",
         f"/opt/etc/unblock/{script_name}",
         f"/opt/etc/ndm/{script_name}",
     ]
-
-    # Development paths (relative to project root)
     try:
         project_root = Path(__file__).parent.parent.parent
         dev_paths = [
@@ -398,56 +249,29 @@ def get_script_path(script_name: str) -> Optional[str]:
         possible_paths.extend(str(p) for p in dev_paths)
     except Exception:
         pass
-
-    # Current directory
     possible_paths.append(script_name)
-
-    # Find first existing path
     for path in possible_paths:
         if os.path.exists(path):
             return path
-
     return None
 
 
 def run_unblock_update() -> Tuple[bool, str]:
-    """
-    Run unblock_update.sh script to apply bypass list changes.
-    
-    Returns:
-        Tuple of (success: bool, output: str)
-    
-    Example:
-        >>> success, output = run_unblock_update()
-        >>> if success:
-        ...     print("Changes applied successfully")
-    """
+    """Run unblock_update.sh to apply bypass list changes. Returns (success, output)."""
     script_path = get_script_path('unblock_update.sh')
-    
     if not script_path:
         logger.error("[UPDATE] unblock_update.sh script not found")
         return False, "Script not found"
-    
     logger.info(f"[UPDATE] Running unblock_update.sh from {script_path}")
-    
     try:
-        result = subprocess.run(
-            ['sh', script_path],
-            capture_output=True,
-            text=True,
-            timeout=60  # 60 second timeout
-        )
-        
+        result = subprocess.run(['sh', script_path], capture_output=True, text=True, timeout=60)
         success = result.returncode == 0
         output = result.stdout.strip() or result.stderr.strip()
-        
         if success:
             logger.info(f"[UPDATE] unblock_update.sh completed: {output}")
         else:
             logger.error(f"[UPDATE] unblock_update.sh failed (code={result.returncode}): {output}")
-        
         return success, output
-    
     except subprocess.TimeoutExpired:
         logger.error("[UPDATE] unblock_update.sh timed out")
         return False, "Timeout"
@@ -457,54 +281,21 @@ def run_unblock_update() -> Tuple[bool, str]:
 
 
 # =============================================================================
-# UTILITY FUNCTIONS
-# =============================================================================
-
-def cleanup_memory() -> None:
-    """
-    Cleanup memory by clearing cache.
-    
-    Call periodically to prevent memory leaks on embedded devices.
-    
-    Example:
-        >>> cleanup_memory()  # Call every 100 operations
-    """
-    Cache.clear()
-    logger.debug("Memory cleanup completed")
-
-
-# =============================================================================
 # SYSTEM STATS
 # =============================================================================
 
-import threading
-
 
 class MemoryManager:
-    """
-    Memory manager for embedded devices with auto-optimization.
-    
-    Monitors memory usage and automatically reduces cache/workers when low.
-    Can be enabled/disabled via toggle.
-    """
-    
+    """Auto memory optimization for embedded devices."""
+
     _instance = None
     _lock = threading.Lock()
-    
-    # Thresholds
-    LOW_MEMORY_THRESHOLD_MB = 20  # Free MB to trigger optimization
-    AGGRESSIVE_THRESHOLD_MB = 10   # Free MB for aggressive optimization
-    
-    # Settings
+    LOW_MEMORY_THRESHOLD_MB = 20
+    AGGRESSIVE_THRESHOLD_MB = 10
     _enabled = False
     _aggressive_mode = False
     _original_cache_size = 30
-    
-    # Optimization levels
-    NORMAL = {'cache': 30, 'dns_interval': 60}
-    LOW = {'cache': 15, 'dns_interval': 120}
-    AGGRESSIVE = {'cache': 5, 'dns_interval': 180}
-    
+
     def __new__(cls):
         if cls._instance is None:
             with cls._lock:
@@ -512,38 +303,23 @@ class MemoryManager:
                     cls._instance = super().__new__(cls)
         return cls._instance
     
-    def __init__(self):
-        if hasattr(self, '_initialized'):
-            return
-        self._initialized = True
-        self._monitor_thread = None
-        self._running = False
-    
     @classmethod
     def enable(cls) -> bool:
-        """Enable auto memory optimization"""
         cls._enabled = True
         cls._original_cache_size = Cache.MAX_ENTRIES
         logger.info("Auto memory optimization enabled")
         return True
-    
+
     @classmethod
     def disable(cls) -> bool:
-        """Disable auto memory optimization and restore defaults"""
         cls._enabled = False
         Cache.MAX_ENTRIES = cls._original_cache_size
         cls._aggressive_mode = False
         logger.info("Auto memory optimization disabled")
         return True
-    
-    @classmethod
-    def is_enabled(cls) -> bool:
-        """Check if auto optimization is enabled"""
-        return cls._enabled
-    
+
     @classmethod
     def get_status(cls) -> dict:
-        """Get current optimization status"""
         return {
             'enabled': cls._enabled,
             'aggressive': cls._aggressive_mode,
@@ -552,92 +328,55 @@ class MemoryManager:
             'low_threshold_mb': cls.LOW_MEMORY_THRESHOLD_MB,
             'aggressive_threshold_mb': cls.AGGRESSIVE_THRESHOLD_MB,
         }
-    
+
     @classmethod
     def check_and_optimize(cls) -> tuple:
-        """
-        Check memory and optimize if needed.
-        
-        Returns:
-            Tuple of (did_optimize, level, free_mb)
-        """
         if not cls._enabled:
             return False, 'disabled', 0
-        
         stats = get_memory_stats()
         free_mb = stats.get('free_mb', 0)
-        
         if free_mb <= cls.AGGRESSIVE_THRESHOLD_MB and not cls._aggressive_mode:
-            # Aggressive optimization
-            Cache.MAX_ENTRIES = cls.AGGRESSIVE['cache']
+            Cache.MAX_ENTRIES = 5
             cls._aggressive_mode = True
             logger.warning(f"Aggressive mode: cache={Cache.MAX_ENTRIES}, free={free_mb}MB")
             return True, 'aggressive', free_mb
-        
         elif free_mb <= cls.LOW_MEMORY_THRESHOLD_MB and not cls._aggressive_mode:
-            # Low memory optimization
-            Cache.MAX_ENTRIES = cls.LOW['cache']
+            Cache.MAX_ENTRIES = 15
             logger.info(f"Low memory mode: cache={Cache.MAX_ENTRIES}, free={free_mb}MB")
             return True, 'low', free_mb
-        
         elif free_mb > cls.LOW_MEMORY_THRESHOLD_MB and cls._aggressive_mode:
-            # Restore from aggressive
-            Cache.MAX_ENTRIES = cls.NORMAL['cache']
+            Cache.MAX_ENTRIES = 30
             cls._aggressive_mode = False
             logger.info(f"Memory restored: cache={Cache.MAX_ENTRIES}, free={free_mb}MB")
             return True, 'normal', free_mb
-        
         return False, 'normal' if not cls._aggressive_mode else 'aggressive', free_mb
 
 
 def get_cpu_stats() -> dict:
-    """
-    Get CPU usage statistics for the system.
-    
-    Returns:
-        dict with cpu_percent
-    """
+    """Get CPU usage from /proc/stat. Returns {'cpu_percent': float}."""
     try:
-        # Read /proc/stat to calculate CPU usage
         with open('/proc/stat', 'r') as f:
             lines = f.readlines()
-        
-        # First line contains overall CPU stats
         for line in lines:
             if line.startswith('cpu '):
                 parts = line.split()
                 if len(parts) >= 8:
-                    # cpu  user nice system idle iowait irq softirq steal guest guest_nice
                     user = int(parts[1])
                     nice = int(parts[2])
                     system = int(parts[3])
                     idle = int(parts[4])
                     iowait = int(parts[5])
-                    
-                    # Calculate total and work time
                     total = user + nice + system + idle + iowait
                     work = user + nice + system
-                    
-                    # Get previous stats for delta calculation
                     if not hasattr(get_cpu_stats, 'prev_total'):
                         get_cpu_stats.prev_total = 0
                         get_cpu_stats.prev_work = 0
-                    
-                    # Calculate percentage
                     total_delta = total - get_cpu_stats.prev_total
                     work_delta = work - get_cpu_stats.prev_work
-                    
-                    if total_delta > 0:
-                        cpu_percent = (work_delta / total_delta) * 100
-                    else:
-                        cpu_percent = 0
-                    
-                    # Update previous stats
+                    cpu_percent = (work_delta / total_delta) * 100 if total_delta > 0 else 0
                     get_cpu_stats.prev_total = total
                     get_cpu_stats.prev_work = work
-                    
                     return {'cpu_percent': round(cpu_percent, 1)}
-        
         return {'cpu_percent': 0}
     except Exception as e:
         logger.error(f"Failed to get CPU stats: {e}")
@@ -650,52 +389,37 @@ _MEMORY_STATS_TTL = 5  # seconds
 
 
 def get_memory_stats() -> dict:
-    """
-    Get memory usage statistics for the system.
-    Cached for 5 seconds to reduce /proc/meminfo I/O.
-    
-    Returns:
-        dict with total_mb, used_mb, free_mb, percent, cache_entries
-    """
+    """Get memory usage from /proc/meminfo (cached 5s)."""
     now = time.time()
     if _memory_stats_cache['data'] is not None and (now - _memory_stats_cache['timestamp']) < _MEMORY_STATS_TTL:
         return _memory_stats_cache['data']
-    
     try:
         with open('/proc/meminfo', 'r') as f:
             lines = f.readlines()
-        
         mem = {}
         for line in lines:
             parts = line.split()
             if len(parts) >= 2:
                 key = parts[0].rstrip(':')
                 try:
-                    mem[key] = int(parts[1])  # KB
+                    mem[key] = int(parts[1])
                 except ValueError:
                     pass
-        
-        total = mem.get('MemTotal', 0) / 1024  # MB
+        total = mem.get('MemTotal', 0) / 1024
         free = mem.get('MemFree', 0) / 1024
         buffers = mem.get('Buffers', 0) / 1024
         cached = mem.get('Cached', 0) / 1024
-        available = mem.get('MemAvailable', 0) / 1024  # MB (if available in kernel)
-
+        available = mem.get('MemAvailable', 0) / 1024
         if available > 0:
             used = total - available
             real_used = used
+            display_available = available
         else:
             used = total - free - buffers - cached
             real_used = used
-
-        if available > 0:
-            display_available = available
-        else:
             display_available = free + buffers + cached
-
         percent = (real_used / total * 100) if total > 0 else 0
         raw_percent = (used / total * 100) if total > 0 else 0
-
         try:
             cache_stats = Cache.get_stats()
             cache_entries = cache_stats['entries']
@@ -703,7 +427,6 @@ def get_memory_stats() -> dict:
         except AttributeError:
             cache_entries = 0
             cache_max = 30
-
         result = {
             'total_mb': round(total, 1),
             'used_mb': round(used, 1),
@@ -727,13 +450,7 @@ def get_memory_stats() -> dict:
         except AttributeError:
             cache_max = 30
         return {
-            'total_mb': 0,
-            'used_mb': 0,
-            'free_mb': 0,
-            'available_mb': 0,
-            'cached_mb': 0,
-            'percent': 0,
-            'cache_entries': 0,
-            'cache_max': cache_max,
-            'error': str(e)
+            'total_mb': 0, 'used_mb': 0, 'free_mb': 0,
+            'available_mb': 0, 'cached_mb': 0, 'percent': 0,
+            'cache_entries': 0, 'cache_max': cache_max, 'error': str(e)
         }
