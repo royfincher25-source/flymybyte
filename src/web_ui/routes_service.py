@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, redirect, url_for, request, sessio
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import json
 import os
+import re
 import stat
 import logging
 import subprocess
@@ -15,6 +16,7 @@ import tarfile
 import threading
 import requests
 from datetime import datetime
+from typing import List, Dict, Tuple
 
 from werkzeug.utils import secure_filename
 from markupsafe import escape
@@ -32,6 +34,7 @@ from core.constants import (
     CONFIG_PATHS,
     WEB_UI_DIR,
     BACKUP_DIR,
+    BACKUP_FILES,
     TMP_RESTART_SCRIPT,
     SCRIPT_EXECUTION_TIMEOUT,
     FILE_DOWNLOAD_TIMEOUT,
@@ -62,7 +65,6 @@ from core.services import (
     parse_tor_bridges, tor_config, write_tor_config,
     restart_service, check_service_status, get_local_version, get_remote_version
 )
-from core.backup_service import create_backup, get_backup_list, delete_backup
 from core.app_config import WebConfig
 
 
@@ -192,6 +194,80 @@ def schedule_webui_restart():
             os.system(f'{INIT_SCRIPTS["web_ui"]} restart &')
         except Exception as e2:
             logger.error(f"Fallback restart failed: {e2}")
+
+
+# =============================================================================
+# INLINED FUNCTIONS (from core/backup_service.py)
+# =============================================================================
+
+def _backup_arcname(path: str) -> str:
+    """Convert absolute path to archive-relative path."""
+    if path.startswith('/opt/'):
+        return path[5:]
+    if path.startswith('/opt'):
+        return path[4:]
+    return os.path.basename(path)
+
+
+def create_backup(backup_type: str = 'full') -> Tuple[bool, str]:
+    """Create backup of all flymybyte files."""
+    try:
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_file = f'{BACKUP_DIR}/backup_{timestamp}.tar.gz'
+        existing_files = [f for f in BACKUP_FILES if os.path.exists(f)]
+        if not existing_files:
+            return False, 'Нет файлов для бэкапа'
+        with tarfile.open(backup_file, 'w:gz') as tar:
+            for f in existing_files:
+                tar.add(f, arcname=_backup_arcname(f))
+        backup_size = os.path.getsize(backup_file)
+        size_mb = backup_size / 1024 / 1024
+        return True, f'Бэкап создан: {backup_file} ({size_mb:.1f} МБ, {len(existing_files)} объектов)'
+    except Exception as e:
+        logger.error(f'Backup error: {e}')
+        return False, str(e)
+
+
+def get_backup_list() -> List[Dict]:
+    """List all backups sorted by date (newest first)."""
+    backups = []
+    if not os.path.exists(BACKUP_DIR):
+        return backups
+    for item in sorted(os.listdir(BACKUP_DIR), reverse=True):
+        if (item.startswith('backup_') or item.startswith('update_backup_')) and item.endswith('.tar.gz'):
+            item_path = os.path.join(BACKUP_DIR, item)
+            try:
+                size = os.path.getsize(item_path)
+                match = re.match(r'(backup|update_backup)_(\d{8})_(\d{6})\.tar\.gz', item)
+                if match:
+                    date_str = match.group(2)
+                    time_str = match.group(3)
+                else:
+                    date_str = item
+                    time_str = ''
+                backups.append({
+                    'name': item,
+                    'path': item_path,
+                    'size': size,
+                    'date': f"{date_str[6:8]}.{date_str[4:6]}.{date_str[0:4]}",
+                    'time': f"{time_str[0:2]}:{time_str[2:4]}" if time_str else '',
+                })
+            except Exception as e:
+                logger.error(f"Error processing backup {item}: {e}")
+    return backups
+
+
+def delete_backup(backup_name: str) -> Tuple[bool, str]:
+    """Delete a specific backup file."""
+    backup_path = os.path.join(BACKUP_DIR, backup_name)
+    if not backup_name or not os.path.exists(backup_path):
+        return False, 'Бэкап не найден'
+    try:
+        os.remove(backup_path)
+        return True, f'Бэкап {backup_name} удалён'
+    except Exception as e:
+        return False, f'Ошибка удаления: {e}'
 
 
 bp = Blueprint('main', __name__, template_folder='templates', static_folder='static')
