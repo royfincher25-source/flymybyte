@@ -1,7 +1,7 @@
 """
-Constants - Centralized configuration and paths
+Constants — centralized configuration and paths.
 
-All magic numbers, configuration values, and file paths are stored here.
+Only constants that are actually imported somewhere are kept here.
 """
 
 # =============================================================================
@@ -11,21 +11,6 @@ All magic numbers, configuration values, and file paths are stored here.
 MAX_ENTRIES_PER_REQUEST = 100
 MAX_ENTRY_LENGTH = 253
 MAX_TOTAL_INPUT_SIZE = 50 * 1024
-
-# =============================================================================
-# LOGGING
-# =============================================================================
-
-LOG_MAX_BYTES = 100 * 1024
-LOG_BACKUP_COUNT = 3
-
-# =============================================================================
-# CACHE
-# =============================================================================
-
-CACHE_MAX_ENTRIES = 30
-CACHE_DEFAULT_TTL = 60
-SERVICE_STATUS_TTL = 30
 
 # =============================================================================
 # DNS
@@ -60,46 +45,11 @@ MIN_PORT = 1
 MAX_PORT = 65535
 
 # =============================================================================
-# THREAD POOL & TIMEOUTS
+# TIMEOUTS
 # =============================================================================
 
-THREAD_POOL_WORKERS = 4
-SERVICE_RESTART_TIMEOUT = 60
-WEB_UI_RESTART_TIMEOUT = 30
 SCRIPT_EXECUTION_TIMEOUT = 120
 FILE_DOWNLOAD_TIMEOUT = 60
-DNSMASQ_RESTART_TIMEOUT = 10
-
-# =============================================================================
-# UPDATE
-# =============================================================================
-
-UPDATE_SCRIPT_STEPS = 5
-UPDATE_PROGRESS_INTERVAL = 3000
-UPDATE_RELOAD_DELAY = 3000
-
-# =============================================================================
-# IPSET
-# =============================================================================
-
-IPSET_MAX_BULK_ENTRIES = 5000
-DNS_RESOLVER_BATCH_SIZE = 100
-
-# =============================================================================
-# MEMORY MANAGEMENT
-# =============================================================================
-
-MEMORY_LOW_THRESHOLD = 20
-MEMORY_CRITICAL_THRESHOLD = 10
-MEMORY_MODE_NORMAL = 'normal'
-MEMORY_MODE_LOW = 'low'
-MEMORY_MODE_AGGRESSIVE = 'aggressive'
-
-MEMORY_MODES = {
-    MEMORY_MODE_NORMAL: {'cache': 30, 'dns_interval': 60},
-    MEMORY_MODE_LOW: {'cache': 15, 'dns_interval': 120},
-    MEMORY_MODE_AGGRESSIVE: {'cache': 5, 'dns_interval': 180},
-}
 
 # =============================================================================
 # GITHUB
@@ -116,7 +66,6 @@ GITHUB_RAW_BASE = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRAN
 WEB_UI_DIR = '/opt/etc/web_ui'
 UNBLOCK_DIR = '/opt/etc/unblock'
 BACKUP_DIR = '/opt/root/backup'
-TMP_DIR = '/tmp'
 INIT_DIR = '/opt/etc/init.d'
 NDM_DIR = '/opt/etc/ndm'
 XRAY_DIR = '/opt/etc/xray'
@@ -127,7 +76,6 @@ TOR_DIR = '/opt/etc/tor'
 # =============================================================================
 
 WEB_UI_LOG_FILE = '/opt/var/log/web_ui.log'
-WEB_UI_PIDFILE = '/var/run/web_ui.pid'
 TMP_RESTART_SCRIPT = '/tmp/restart_webui.sh'
 
 DNSMASQ_CONFIG = '/opt/etc/dnsmasq.conf'
@@ -279,48 +227,36 @@ FILES_TO_UPDATE = {
 # =============================================================================
 
 BACKUP_FILES = [
-    # Web UI
     f'{WEB_UI_DIR}',
-    # VPN configs
     f'{XRAY_DIR}',
     f'{TOR_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
     HYSTERIA2_CONFIG,
-    # Bypass lists
     f'{UNBLOCK_DIR}',
     DNSMASQ_AI_CONFIG,
     AI_DOMAINS_LIST,
-    # System configs
     DNSMASQ_CONFIG,
     CRONTAB_FILE,
-    # Scripts
     '/opt/bin',
     f'{NDM_DIR}',
     f'{INIT_DIR}',
-    # Install script
     SCRIPT_INSTALL,
-    # Logs (optional, useful for debugging)
     WEB_UI_LOG_FILE,
 ]
 
 UPDATE_BACKUP_FILES = [
-    # Web UI
     f'{WEB_UI_DIR}',
-    # VPN configs
     f'{XRAY_DIR}',
     f'{TOR_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
     HYSTERIA2_CONFIG,
-    # Bypass lists
     f'{UNBLOCK_DIR}',
     DNSMASQ_AI_CONFIG,
     AI_DOMAINS_LIST,
-    # System configs
     DNSMASQ_CONFIG,
     CRONTAB_FILE,
-    # Scripts
     '/opt/bin',
     f'{NDM_DIR}',
     f'{INIT_DIR}',
