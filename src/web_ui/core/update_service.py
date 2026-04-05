@@ -81,8 +81,13 @@ def download_file(source_path: str, dest_path: str, progress, idx: int, total: i
             return True
         response.raise_for_status()
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        with open(dest_path, 'w', encoding='utf-8') as f:
-            f.write(response.text)
+        # Binary files (fonts, images) must be written in binary mode
+        if source_path.endswith(('.woff2', '.woff', '.ttf', '.png', '.jpg', '.jpeg', '.gif', '.ico')):
+            with open(dest_path, 'wb') as f:
+                f.write(response.content)
+        else:
+            with open(dest_path, 'w', encoding='utf-8') as f:
+                f.write(response.text)
         filename = os.path.basename(dest_path)
         is_executable = filename.endswith('.sh') or filename in ['S99web_ui', 'S99unblock']
         os.chmod(dest_path, 0o755 if is_executable else 0o644)
