@@ -6,7 +6,10 @@
       "Bash(git push *)",
       "Bash(git rm *)",
       "Bash(pytest *)",
-      "Bash(findstr *)"
+      "Bash(findstr *)",
+      "Bash(dir *)",
+      "Bash(powershell *)",
+      "Bash(git *)"
     ]
   },
   "$version": 3,

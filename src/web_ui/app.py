@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 
 def create_app(config_class=None):
     """Create and configure the Flask application."""
+    import mimetypes
+    mimetypes.add_type('font/woff2', '.woff2')
+
     app = Flask(__name__)
 
     secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)

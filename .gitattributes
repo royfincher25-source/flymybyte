@@ -1,0 +1,11 @@
+*.woff2 binary
+*.woff binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.json text
