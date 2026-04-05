@@ -201,9 +201,11 @@ def schedule_webui_restart():
     except Exception as e:
         logger.warning(f"Failed to schedule restart: {e}")
         try:
-            os.system(f'{INIT_SCRIPTS["web_ui"]} restart &')
+            rc = os.system(f'{INIT_SCRIPTS["web_ui"]} restart &')
+            if rc != 0:
+                logger.error(f"Fallback restart failed with exit code: {rc}")
         except Exception as e2:
-            logger.error(f"Fallback restart failed: {e2}")
+            logger.error(f"Fallback restart exception: {e2}")
 
 
 bp = Blueprint('updates', __name__, template_folder='templates', static_folder='static')
