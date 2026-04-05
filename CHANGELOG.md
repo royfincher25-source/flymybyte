@@ -2,6 +2,15 @@
 
 Все значимые изменения в проекте будут документироваться в этом файле.
 
+## [2.0.1] - 2026-04-05
+
+### 🐛 Исправлено
+
+- **login redirect** — все route-файлы redirect-ят на `core.login` вместо несуществующих `bypass.login`, `vpn.login` и т.д.
+- **DNS spoofing disable** — использует `kill -HUP` вместо `S56dnsmasq restart`, чтобы не останавливать dnsmasq
+- **services.py** — добавлены missing импорты `Path`, `time`
+- **update_service.py** — удалён stale файл
+
 ## [2.0.0] - 2026-04-05
 
 ### 🔥 Полная переработка архитектуры
