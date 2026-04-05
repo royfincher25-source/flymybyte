@@ -897,7 +897,7 @@ def service_remove():
 @bp.route('/service/dns-monitor')
 @login_required
 def dns_monitor_status():
-    from core.dns_monitor import get_dns_monitor
+    from core.dns_ops import get_dns_monitor
     monitor = get_dns_monitor()
     status = monitor.get_status()
     return render_template('dns_monitor.html', status=status)
@@ -907,7 +907,7 @@ def dns_monitor_status():
 @login_required
 @csrf_required
 def dns_monitor_start():
-    from core.dns_monitor import get_dns_monitor
+    from core.dns_ops import get_dns_monitor
     monitor = get_dns_monitor()
     monitor.start()
     flash('✅ DNS monitor started', 'success')
@@ -918,7 +918,7 @@ def dns_monitor_start():
 @login_required
 @csrf_required
 def dns_monitor_stop():
-    from core.dns_monitor import get_dns_monitor
+    from core.dns_ops import get_dns_monitor
     monitor = get_dns_monitor()
     monitor.stop()
     flash('ℹ️ DNS monitor stopped', 'info')
@@ -929,7 +929,7 @@ def dns_monitor_stop():
 @login_required
 @csrf_required
 def dns_monitor_check():
-    from core.dns_monitor import get_dns_monitor, check_dns_server
+    from core.dns_ops import get_dns_monitor, check_dns_server
     monitor = get_dns_monitor()
     if monitor._current_server:
         result = check_dns_server(monitor._current_server['host'], monitor._current_server['port'])
@@ -947,7 +947,7 @@ def dns_monitor_check():
 @login_required
 def system_stats():
     from core.utils import get_memory_stats, get_cpu_stats, MemoryManager
-    from core.dns_monitor import get_dns_monitor
+    from core.dns_ops import get_dns_monitor
     stats = get_memory_stats()
     cpu_stats = get_cpu_stats()
     stats.update(cpu_stats)
