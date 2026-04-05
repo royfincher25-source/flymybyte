@@ -276,7 +276,7 @@ def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool,
         ...     print(f"Refreshed ipset: {msg}")
     """
     try:
-        from .dns_resolver import resolve_domains_for_ipset
+        from .dns_ops import resolve_domains_for_ipset
         
         logger.info(f"[IPSET] Refreshing from file: {filepath}")
         count = resolve_domains_for_ipset(filepath, max_workers)
