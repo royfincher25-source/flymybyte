@@ -27,7 +27,7 @@ def login_required(f):
             )
             if is_ajax or request.is_json:
                 return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect(url_for('vpn.login'))
+            return redirect(url_for('core.login'))
         return f(*args, **kwargs)
     return decorated_function
 
