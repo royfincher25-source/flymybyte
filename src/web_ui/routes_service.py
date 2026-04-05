@@ -5,11 +5,16 @@ Blueprint for service management, updates, backups, install/remove, DNS monitor,
 """
 from flask import Blueprint, render_template, redirect, url_for, request, session, flash, current_app, jsonify
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import json
 import os
 import stat
 import logging
 import subprocess
+import shutil
+import tarfile
 import threading
+import requests
+from datetime import datetime
 
 from werkzeug.utils import secure_filename
 from markupsafe import escape
@@ -39,6 +44,7 @@ from core.constants import (
     DNSMASQ_CONFIG,
     UNBLOCK_DIR,
     INIT_DIR,
+    UPDATE_BACKUP_FILES,
 )
 from core.utils import (
     load_bypass_list,
@@ -57,14 +63,135 @@ from core.services import (
     restart_service, check_service_status, get_local_version, get_remote_version
 )
 from core.backup_service import create_backup, get_backup_list, delete_backup
-from core.update_service import (
-    check_disk_space,
-    create_update_backup,
-    download_all_files,
-    run_update_scripts,
-    schedule_webui_restart,
-)
 from core.app_config import WebConfig
+
+
+# =============================================================================
+# INLINED FUNCTIONS (from core/update_service.py)
+# =============================================================================
+
+def _update_arcname(path: str) -> str:
+    """Convert absolute path to archive-relative path."""
+    if path.startswith('/opt/'):
+        return path[5:]
+    if path.startswith('/opt'):
+        return path[4:]
+    return os.path.basename(path)
+
+
+def check_disk_space(min_mb: float = 10) -> tuple:
+    """Check available disk space on /opt."""
+    try:
+        statvfs = os.statvfs('/opt')
+        free_mb = (statvfs.f_frsize * statvfs.f_bavail) / (1024 * 1024)
+        return free_mb >= min_mb, free_mb
+    except Exception as e:
+        logger.warning(f"Could not check disk space: {e}")
+        return True, 0
+
+
+def create_update_backup() -> str:
+    """Create backup before update. Returns backup file path."""
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_file = f'{BACKUP_DIR}/update_backup_{timestamp}.tar.gz'
+    existing_files = [f for f in UPDATE_BACKUP_FILES if os.path.exists(f)]
+    if existing_files:
+        with tarfile.open(backup_file, 'w:gz', compresslevel=1) as tar:
+            for f in existing_files:
+                tar.add(f, arcname=_update_arcname(f))
+    return backup_file
+
+
+def _download_file(source_path: str, dest_path: str, progress, idx: int, total: int) -> bool:
+    """Download a single file from GitHub."""
+    if source_path == 'VERSION':
+        url = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION'
+    else:
+        url = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/src/{source_path}'
+    progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
+    try:
+        response = requests.get(url, timeout=FILE_DOWNLOAD_TIMEOUT)
+        if response.status_code == 404:
+            logger.info(f"Skipping removed file: {source_path}")
+            return True
+        response.raise_for_status()
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+        if source_path.endswith(('.woff2', '.woff', '.ttf', '.png', '.jpg', '.jpeg', '.gif', '.ico')):
+            with open(dest_path, 'wb') as f:
+                f.write(response.content)
+        else:
+            with open(dest_path, 'w', encoding='utf-8') as f:
+                f.write(response.text)
+        filename = os.path.basename(dest_path)
+        is_executable = filename.endswith('.sh') or filename in ['S99web_ui', 'S99unblock']
+        os.chmod(dest_path, 0o755 if is_executable else 0o644)
+        logger.info(f"Updated {dest_path}")
+        return True
+    except (requests.exceptions.RequestException, OSError) as e:
+        logger.error(f'Error with {source_path}: {e}')
+        return False
+
+
+def download_all_files(progress) -> tuple:
+    """Download all update files in parallel. Returns (success_count, error_count)."""
+    files_to_update = FILES_TO_UPDATE
+    total_files = len(files_to_update)
+    results = {'success': 0, 'errors': 0}
+    lock = threading.Lock()
+
+    def download_and_track(source_path, dest_path, idx):
+        success = _download_file(source_path, dest_path, progress, idx, total_files)
+        with lock:
+            if success:
+                results['success'] += 1
+            else:
+                results['errors'] += 1
+
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        for i, (source_path, dest_path) in enumerate(files_to_update.items(), 1):
+            executor.submit(download_and_track, source_path, dest_path, i)
+
+    return results['success'], results['errors']
+
+
+def run_update_scripts(progress, start_step: int) -> bool:
+    """Run post-download update scripts. Returns True if all succeeded."""
+    scripts = [
+        ('Запуск unblock_update.sh', [SCRIPT_UNBLOCK_UPDATE], SCRIPT_EXECUTION_TIMEOUT),
+        ('Запуск unblock_dnsmasq.sh', [SCRIPT_UNBLOCK_DNSMASQ], SCRIPT_EXECUTION_TIMEOUT),
+        ('Генерация AI DNS config', ['sh', f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh'], SCRIPT_EXECUTION_TIMEOUT),
+        ('Перезапуск S99unblock', [INIT_SCRIPTS['unblock'], 'restart'], 60),
+        ('Перезапуск S56dnsmasq', [INIT_SCRIPTS['dnsmasq'], 'restart'], 60),
+    ]
+
+    for i, (msg, cmd, timeout) in enumerate(scripts):
+        progress.update_progress(msg, file=os.path.basename(cmd[0]) if cmd else '', progress=start_step + i, total=start_step + len(scripts))
+        if not os.path.exists(cmd[0]):
+            continue
+        try:
+            result = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"{msg} failed: {result.stderr}")
+        except (subprocess.TimeoutExpired, Exception) as e:
+            logger.warning(f"{msg} error: {e}")
+    return True
+
+
+def schedule_webui_restart():
+    """Schedule web UI restart after update."""
+    try:
+        with open(TMP_RESTART_SCRIPT, 'w') as f:
+            f.write(f'#!/bin/sh\nsleep 5\n{INIT_SCRIPTS["web_ui"]} restart\nrm -f {TMP_RESTART_SCRIPT}\n')
+        os.chmod(TMP_RESTART_SCRIPT, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        os.system(f'{TMP_RESTART_SCRIPT} &')
+        logger.info("S99web_ui restart scheduled")
+    except Exception as e:
+        logger.warning(f"Failed to schedule restart: {e}")
+        try:
+            os.system(f'{INIT_SCRIPTS["web_ui"]} restart &')
+        except Exception as e2:
+            logger.error(f"Fallback restart failed: {e2}")
 
 
 bp = Blueprint('main', __name__, template_folder='templates', static_folder='static')
@@ -272,7 +399,6 @@ def service_restart_all():
 def service_restart_webui():
     logger.info("[ROUTES] /service/restart-webui")
     try:
-        from core.update_service import schedule_webui_restart
         schedule_webui_restart()
         flash('✅ Веб-интерфейс будет перезапущен через 5 секунд', 'success')
     except Exception as e:
