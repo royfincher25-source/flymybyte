@@ -60,5 +60,5 @@ Client → dnsmasq:5353 (via DNAT) → stubby:40500 (DNS-over-TLS) → ss-redir:
 
 ## Current Version
 
-- Version: 1.17.0
+- Version: 2.0.1
 - Branch: origin/master

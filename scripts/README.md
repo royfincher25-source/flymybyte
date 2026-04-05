@@ -257,5 +257,4 @@ ssh root@192.168.1.1 -p 222 "sh /opt/root/apply_routing.sh"
 
 ## 🔗 См. также
 
-- [`docs/FIX_ROUTING.md`](../docs/FIX_ROUTING.md) — Исправление маршрутизации
 - [`docs/CHECK_BYPASS_INSTRUCTION.md`](../docs/CHECK_BYPASS_INSTRUCTION.md) — Инструкция по проверке обхода

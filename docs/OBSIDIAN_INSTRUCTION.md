@@ -2,8 +2,8 @@
 type: documentation
 project: flymybyte
 platform: Keenetic Router + Python Flask
-version: 1.2.0
-date: 23.03.2026
+version: 2.0.1
+date: 05.04.2026
 tags:
   - FlyMyByte
   - keenetic

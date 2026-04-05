@@ -11,7 +11,8 @@
       "Bash(powershell *)",
       "Bash(git *)",
       "Bash(true)",
-      "Bash(else)"
+      "Bash(else)",
+      "Bash(rm *)"
     ]
   },
   "$version": 3,
