@@ -60,7 +60,14 @@
                             <small class="text-success fw-bold">ВКЛ</small>
                         </form>
                         {% else %}
-                        <small class="text-danger fw-bold">ВЫКЛ</small>
+                        <form method="POST" action="{{ url_for('main.key_toggle', service=service_id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <label class="switch">
+                                <input type="checkbox" onchange="this.form.submit()">
+                                <span class="switch__track"></span>
+                            </label>
+                            <small class="text-danger fw-bold">ВЫКЛ</small>
+                        </form>
                         {% endif %}
                     </div>
                 </div>
