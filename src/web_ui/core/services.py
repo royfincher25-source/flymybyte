@@ -934,7 +934,7 @@ def write_json_config(config: Dict[str, Any], filepath: str) -> None:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except Exception:
-            pass
+            logger.warning(f"write_json_config: failed to remove temp file {temp_path}")
         raise
 
 
@@ -969,7 +969,7 @@ def write_tor_config(config: Dict[str, Any], filepath: str) -> None:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
         except Exception:
-            pass
+            logger.warning(f"write_tor_config: failed to remove temp file {temp_path}")
         raise
 
 
@@ -1848,8 +1848,8 @@ class DNSSpoofing:
                     logger.info("AI domains DNS spoofing disabled (dnsmasq reloaded via SIGHUP)")
                 else:
                     logger.warning("dnsmasq not running, config removed — restart manually if needed")
-            except Exception:
-                pass  # Config removed, don't fail hard
+            except Exception as e:
+                logger.warning(f"Error during dnsmasq reload after config removal: {e}")
 
             self._enabled = False
             self._domains = []
@@ -1942,8 +1942,7 @@ class DNSSpoofing:
                         return result
 
             except Exception as e:
-                logger.debug(f"nslookup error: {e}")
-                pass
+                logger.debug(f"test_domain nslookup error for {domain}: {e}")
 
             try:
                 proc_result = subprocess.run(
@@ -1965,8 +1964,8 @@ class DNSSpoofing:
                         result['ips'] = ips
                         return result
 
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"test_domain fallback nslookup error for {domain}: {e}")
 
             result['error'] = 'No IPs found'
 
