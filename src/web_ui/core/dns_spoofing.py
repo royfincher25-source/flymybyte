@@ -392,7 +392,10 @@ class DNSSpoofing:
     
     def disable(self) -> Tuple[bool, str]:
         """
-        Disable DNS spoofing (remove config and restart dnsmasq).
+        Disable DNS spoofing (remove config and FULL restart dnsmasq).
+
+        Uses full restart (not SIGHUP) because dnsmasq doesn't reload
+        conf-file directives on SIGHUP — old rules stay in memory.
 
         Returns:
             Tuple of (success: bool, message: str)
@@ -404,21 +407,52 @@ class DNSSpoofing:
                 config_path.unlink()
                 logger.info(f"Removed AI domains config: {self._config_path}")
 
-            # Restart dnsmasq
-            success, msg = self._restart_dnsmasq()
+            # Full restart (not SIGHUP) — dnsmasq must forget old conf-file rules
+            dnsmasq_init = INIT_SCRIPTS['dnsmasq']
+            if not Path(dnsmasq_init).exists():
+                logger.warning("dnsmasq init script not found")
+                self._enabled = False
+                self._domains = []
+                return True, "Config removed (dnsmasq not installed)"
 
-            if success:
+            try:
+                result = subprocess.run(
+                    [dnsmasq_init, 'restart'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.stdout.strip():
+                    logger.debug(f"dnsmasq restart stdout: {result.stdout.strip()}")
+                if result.stderr.strip():
+                    logger.debug(f"dnsmasq restart stderr: {result.stderr.strip()}")
+
+                time.sleep(1)
+                dnsmasq_running = self._check_dnsmasq_status()
+
+                if dnsmasq_running:
+                    self._enabled = False
+                    self._domains = []
+                    logger.info("AI domains DNS spoofing disabled (dnsmasq restarted)")
+                    return True, "Disabled"
+                else:
+                    self._enabled = False
+                    self._domains = []
+                    error_msg = result.stderr.strip() or result.stdout.strip() or "Unknown error"
+                    logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq may not be running: {error_msg}")
+                    return True, f"Config removed (dnsmasq: {error_msg})"
+
+            except subprocess.TimeoutExpired:
                 self._enabled = False
                 self._domains = []
-                logger.info("AI domains DNS spoofing disabled")
-                return True, "Disabled"
-            else:
-                # Config was removed but dnsmasq restart failed
-                # This is a partial success - config is gone but service may not be in desired state
+                logger.warning("DNS spoofing disabled, but dnsmasq restart timed out")
+                return True, "Config removed (restart timeout)"
+
+            except Exception as e:
                 self._enabled = False
                 self._domains = []
-                logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq restart issue: {msg}")
-                return True, f"Config removed (dnsmasq: {msg})"
+                logger.warning(f"DNS spoofing disabled, config removed, but dnsmasq restart error: {e}")
+                return True, f"Config removed (restart error: {e})"
 
         except Exception as e:
             error_msg = f"Error disabling DNS spoofing: {e}"
