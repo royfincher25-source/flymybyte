@@ -1018,20 +1018,36 @@ def key_toggle(service: str):
     config_exists = os.path.exists(svc['config_path'])
 
     if config_exists:
-        # Disable: stop service, remove config, flush ipset
-        try:
-            if os.path.exists(svc['init_script']):
-                subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
-            if os.path.exists(svc['config_path']):
-                os.remove(svc['config_path'])
-            subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
-            for proto in ['tcp', 'udp']:
-                subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
-            flash(f'✅ {svc["name"]} отключён, ipset очищен', 'success')
-        except Exception as e:
-            flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
+        # Check if service is currently running
+        is_running = check_service_status(svc['init_script']) == '✅ Активен'
+
+        if is_running:
+            # Disable: stop service, flush ipset, remove iptables — keep config
+            try:
+                if os.path.exists(svc['init_script']):
+                    subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
+                subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
+                for proto in ['tcp', 'udp']:
+                    subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
+                flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
+            except Exception as e:
+                flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
+        else:
+            # Enable: start service (config already exists)
+            try:
+                if os.path.exists(svc['init_script']):
+                    subprocess.run(['sh', svc['init_script'], 'start'], capture_output=True, timeout=15)
+                # Rebuild ipset and iptables rules
+                from core.services import restart_service
+                success, output = restart_service(svc['name'], svc['init_script'])
+                if success:
+                    flash(f'✅ {svc["name"]} включён', 'success')
+                else:
+                    flash(f'⚠️ {svc["name"]} запущен, но ошибка: {output}', 'warning')
+            except Exception as e:
+                flash(f'❌ Ошибка при включении: {str(e)}', 'danger')
     else:
-        # Enable: redirect to config page to enter key
+        # No config: redirect to config page to enter key
         flash(f'⚠️ Для включения {svc["name"]} необходимо настроить ключ', 'warning')
         return redirect(url_for('main.key_config', service=service))
     return redirect(url_for('main.keys'))
@@ -1056,15 +1072,12 @@ def key_disable(service: str):
         # Stop the service
         if os.path.exists(svc['init_script']):
             subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
-        # Remove config file
-        if os.path.exists(svc['config_path']):
-            os.remove(svc['config_path'])
         # Flush ipset
         subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
         # Remove iptables redirect rules for this ipset
         for proto in ['tcp', 'udp']:
             subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
-        flash(f'✅ {svc["name"]} отключён, ipset очищен', 'success')
+        flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
     except Exception as e:
         flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
     return redirect(url_for('main.keys'))

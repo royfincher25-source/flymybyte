@@ -54,20 +54,17 @@
                         <form method="POST" action="{{ url_for('main.key_toggle', service=service_id) }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <label class="switch">
-                                <input type="checkbox" checked onchange="this.form.submit()">
+                                <input type="checkbox" {% if '✅' in service.status %}checked{% endif %} onchange="this.form.submit()">
                                 <span class="switch__track"></span>
                             </label>
+                            {% if '✅' in service.status %}
                             <small class="text-success fw-bold">ВКЛ</small>
+                            {% else %}
+                            <small class="text-danger fw-bold">ВЫКЛ</small>
+                            {% endif %}
                         </form>
                         {% else %}
-                        <form method="POST" action="{{ url_for('main.key_toggle', service=service_id) }}">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <label class="switch">
-                                <input type="checkbox" onchange="this.form.submit()">
-                                <span class="switch__track"></span>
-                            </label>
-                            <small class="text-danger fw-bold">ВЫКЛ</small>
-                        </form>
+                        <small class="text-muted fst-italic">Нет ключа</small>
                         {% endif %}
                     </div>
                 </div>
