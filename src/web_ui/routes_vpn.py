@@ -186,13 +186,28 @@ def key_toggle(service: str):
         if is_running:
             try:
                 if os.path.exists(svc['init_script']):
-                    subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
+                    result = subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, text=True, timeout=15)
+                    logger.info(f"[TOGGLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:100]}, stderr={result.stderr[:100]}")
                 subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
                 for proto in ['tcp', 'udp']:
                     subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
-                flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
+                
+                # FIX: Очищаем кэш статуса после остановки
+                from core.utils import Cache
+                Cache.delete(f'status:{svc["init_script"]}')
+                
+                # Проверяем что сервис действительно остановился
+                import time
+                time.sleep(1)
+                still_running = check_service_status(svc['init_script']) == '✅ Активен'
+                if still_running:
+                    flash(f'⚠️ {svc["name"]} не остановился (ключ сохранён)', 'warning')
+                    logger.warning(f"[TOGGLE] {service} still running after stop!")
+                else:
+                    flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
             except Exception as e:
                 flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
+                logger.error(f"[TOGGLE] {service} stop error: {e}")
         else:
             try:
                 if os.path.exists(svc['init_script']):
@@ -228,13 +243,28 @@ def key_disable(service: str):
     svc = services_config[service]
     try:
         if os.path.exists(svc['init_script']):
-            subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, timeout=15)
+            result = subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, text=True, timeout=15)
+            logger.info(f"[DISABLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:100]}, stderr={result.stderr[:100]}")
         subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
         for proto in ['tcp', 'udp']:
             subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
-        flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
+        
+        # FIX: Очищаем кэш статуса после остановки
+        from core.utils import Cache
+        Cache.delete(f'status:{svc["init_script"]}')
+        
+        # Проверяем что сервис действительно остановился
+        import time
+        time.sleep(1)
+        still_running = check_service_status(svc['init_script']) == '✅ Активен'
+        if still_running:
+            flash(f'⚠️ {svc["name"]} не остановился (ключ сохранён)', 'warning')
+            logger.warning(f"[DISABLE] {service} still running after stop!")
+        else:
+            flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
     except Exception as e:
         flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
+        logger.error(f"[DISABLE] {service} stop error: {e}")
     return redirect(url_for('vpn.keys'))
 
 

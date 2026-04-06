@@ -118,6 +118,12 @@ class Cache:
         cls._access_order.clear()
 
     @classmethod
+    def delete(cls, key: str) -> None:
+        """Delete a specific key from cache."""
+        with cls._lock:
+            cls._remove(key)
+
+    @classmethod
     def get_stats(cls) -> dict:
         return {
             'entries': len(cls._cache),
