@@ -98,7 +98,11 @@ def keys():
                 service['status'] = '❌ Не настроен'
             else:
                 # FIX: Проверяем реальный статус сервиса через /proc
+                # Перед проверкой очищаем кэш чтобы получить актуальный статус
+                from core.utils import Cache
+                Cache.delete(f'status:{service["init"]}')
                 service['status'] = check_service_status(service['init'])
+                logger.info(f"[KEYS] {svc_name} status: {service['status']}")
     return render_template('keys.html', services=services)
 
 
