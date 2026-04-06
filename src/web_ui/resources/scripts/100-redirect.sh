@@ -60,21 +60,39 @@ IPSETS=$(ipset list -n 2>/dev/null)
 log "Captured iptables rules ($(echo "$RULES" | wc -l) lines) and ipsets ($(echo "$IPSETS" | wc -l) sets)"
 
 # DNS redirect to dnsmasq:5353 (only if dnsmasq is listening on 5353)
-log "Checking if dnsmasq is listening on port 5353..."
+# OPTIMIZATION: Check /proc for dnsmasq instead of netstat
+log "Checking if dnsmasq is running..."
 DNS_REDIRECT_OK=false
-if netstat -tlnp 2>/dev/null | grep -q ":5353 " || ss -tlnp 2>/dev/null | grep -q ":5353 "; then
-    log "  dnsmasq:5353 is listening, enabling DNS redirect"
+dnsmasq_running=false
+
+for pid_dir in /proc/[0-9]*; do
+    if [ -r "$pid_dir/cmdline" ] && grep -q "dnsmasq" "$pid_dir/cmdline" 2>/dev/null; then
+        dnsmasq_running=true
+        break
+    fi
+done
+
+if [ "$dnsmasq_running" = "true" ]; then
+    log "  dnsmasq process found, enabling DNS redirect"
     DNS_REDIRECT_OK=true
 else
     # Try starting dnsmasq and wait briefly
-    log "  dnsmasq:5353 NOT listening, attempting to start..."
+    log "  dnsmasq NOT running, attempting to start..."
     /opt/etc/init.d/S56dnsmasq restart >> "$LOGFILE" 2>&1
-    sleep 3
-    if netstat -tlnp 2>/dev/null | grep -q ":5353 " || ss -tlnp 2>/dev/null | grep -q ":5353 "; then
-        log "  dnsmasq:5353 started successfully, enabling DNS redirect"
+    sleep 2
+    
+    for pid_dir in /proc/[0-9]*; do
+        if [ -r "$pid_dir/cmdline" ] && grep -q "dnsmasq" "$pid_dir/cmdline" 2>/dev/null; then
+            dnsmasq_running=true
+            break
+        fi
+    done
+    
+    if [ "$dnsmasq_running" = "true" ]; then
+        log "  dnsmasq started successfully, enabling DNS redirect"
         DNS_REDIRECT_OK=true
     else
-        log_error "  dnsmasq:5353 still not listening, SKIPPING DNS redirect to prevent internet loss"
+        log_error "  dnsmasq still not running, SKIPPING DNS redirect to prevent internet loss"
     fi
 fi
 
@@ -96,29 +114,29 @@ else
 fi
 
 # Check if a service is running for a given ipset
+# OPTIMIZATION: Check /proc directly instead of netstat/ps to reduce CPU usage
 service_running() {
     local name="$1"
     local port="$2"
+    local pattern=""
+    
     case "$name" in
-        unblocksh)
-            netstat -lnp 2>/dev/null | grep -q ":1082 "
-            ;;
-        unblockhysteria2)
-            ps 2>/dev/null | grep -q "[h]ysteria"
-            ;;
-        unblocktor)
-            netstat -lnp 2>/dev/null | grep -q ":9141 "
-            ;;
-        unblockvless)
-            netstat -lnp 2>/dev/null | grep -q ":10810 "
-            ;;
-        unblocktroj)
-            netstat -lnp 2>/dev/null | grep -q ":10829 "
-            ;;
-        *)
-            return 1
-            ;;
+        unblocksh)        pattern="ss-redir" ;;
+        unblockhysteria2) pattern="hysteria" ;;
+        unblocktor)       pattern="tor" ;;
+        unblockvless)     pattern="xray" ;;
+        unblocktroj)      pattern="trojan" ;;
+        *)                return 1 ;;
     esac
+    
+    # Check /proc for process cmdline
+    for pid_dir in /proc/[0-9]*; do
+        pid="${pid_dir##*/}"
+        if [ -r "$pid_dir/cmdline" ] && grep -q "$pattern" "$pid_dir/cmdline" 2>/dev/null; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 add_redirect() {

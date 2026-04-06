@@ -163,33 +163,27 @@ log "Processing predefined files..."
 
 # Map ipset names to service check commands
 # Only populate ipset if the corresponding service is running
+# OPTIMIZATION: Check /proc instead of netstat/ps to reduce CPU usage
 check_service() {
     local setname="$1"
+    local pattern=""
+    
     case "$setname" in
-        unblocksh)
-            # ss-redir on port 1082
-            netstat -lnp 2>/dev/null | grep -q ":1082 "
-            ;;
-        unblockhysteria2)
-            # hysteria2 service
-            ps | grep -q "[h]ysteria"
-            ;;
-        unblocktor)
-            # tor on port 9141
-            netstat -lnp 2>/dev/null | grep -q ":9141 "
-            ;;
-        unblockvless)
-            # vless on port 10810
-            netstat -lnp 2>/dev/null | grep -q ":10810 "
-            ;;
-        unblocktroj)
-            # trojan on port 10829
-            netstat -lnp 2>/dev/null | grep -q ":10829 "
-            ;;
-        *)
-            return 0
-            ;;
+        unblocksh)        pattern="ss-redir" ;;
+        unblockhysteria2) pattern="hysteria" ;;
+        unblocktor)       pattern="tor" ;;
+        unblockvless)     pattern="xray" ;;
+        unblocktroj)      pattern="trojan" ;;
+        *)                return 0 ;;
     esac
+    
+    # Check /proc for process cmdline
+    for pid_dir in /proc/[0-9]*; do
+        if [ -r "$pid_dir/cmdline" ] && grep -q "$pattern" "$pid_dir/cmdline" 2>/dev/null; then
+            return 0  # Service is running
+        fi
+    done
+    return 1  # Service not running
 }
 
 # Process predefined files

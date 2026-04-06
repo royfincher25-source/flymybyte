@@ -50,6 +50,7 @@ MAX_PORT = 65535
 
 SCRIPT_EXECUTION_TIMEOUT = 120
 FILE_DOWNLOAD_TIMEOUT = 60
+BACKGROUND_RESTART_TIMEOUT = 600  # 10 минут для фонового перезапуска
 
 # =============================================================================
 # GITHUB

@@ -182,8 +182,132 @@ function showToast(message, type) {
 
 document.getElementById('auto-optimize-toggle').addEventListener('change', toggleAutoOptimize);
 updateStats();
-// Update stats every 10 seconds (reduced from 5 for KN-1212 performance)
-setInterval(updateStats, 10000);
+// Update stats every 30 seconds (reduced from 10s for KN-1212 CPU optimization)
+setInterval(updateStats, 30000);
+
+// =============================================================================
+// UNBLOCK RESTART (AJAX)
+// =============================================================================
+
+let unblockRestartRunning = false;
+let unblockCheckInterval = null;
+
+async function restartUnblock() {
+    if (unblockRestartRunning) {
+        showToast('Перезапуск уже запущен', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('restartUnblockBtn');
+    const progress = document.getElementById('unblockProgress');
+    const status = document.getElementById('unblockStatus');
+    const logs = document.getElementById('unblockLogs');
+    
+    try {
+        // Отключаем кнопку
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fm fm-spinner fm-spin"></i> Запуск...';
+        
+        // Запускаем фоновый перезапуск (FormData для совместимости с CSRF)
+        const formData = new FormData();
+        formData.append('csrf_token', '{{ csrf_token() }}');
+        
+        const resp = await fetch('/service/restart-unblock-async', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await resp.json();
+        
+        if (!resp.ok) {
+            throw new Error(data.error || 'Ошибка запуска');
+        }
+        
+        // Показываем прогресс
+        unblockRestartRunning = true;
+        progress.style.display = 'block';
+        status.textContent = data.message;
+        logs.style.display = 'none';
+        logs.textContent = '';
+        
+        // Запускаем периодическую проверку статуса
+        unblockCheckInterval = setInterval(checkUnblockStatus, 2000);
+        
+    } catch (e) {
+        console.error('Failed to start restart:', e);
+        showToast(e.message || 'Ошибка запуска перезапуска', 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fm fm-arrow-clockwise"></i> Перезапустить';
+    }
+}
+
+async function checkUnblockStatus() {
+    try {
+        const resp = await fetch('/service/restart-unblock-status');
+        const data = await resp.json();
+        
+        const status = document.getElementById('unblockStatus');
+        const logs = document.getElementById('unblockLogs');
+        const btn = document.getElementById('restartUnblockBtn');
+        const progress = document.getElementById('unblockProgress');
+        const progressBar = document.getElementById('unblockProgressBar');
+        
+        // Обновляем логи
+        if (data.logs && data.logs.length > 0) {
+            logs.style.display = 'block';
+            logs.innerHTML = data.logs.map(line => `<div>${escapeHtml(line)}</div>`).join('');
+            logs.scrollTop = logs.scrollHeight;
+        }
+        
+        if (data.running) {
+            // Ещё выполняется
+            status.innerHTML = '<i class="fm fm-arrow-clockwise fm-spin"></i> Перезапуск выполняется...';
+            progressBar.innerHTML = '<i class="fm fm-arrow-clockwise fm-spin"></i> Выполняется...';
+        } else {
+            // Завершено
+            unblockRestartRunning = false;
+            clearInterval(unblockCheckInterval);
+            
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fm fm-arrow-clockwise"></i> Перезапустить';
+            
+            // Проверяем успешность по последнему логу
+            const lastLog = data.logs[data.logs.length - 1] || '';
+            if (lastLog.includes('exit code: 0')) {
+                status.innerHTML = '<i class="fm fm-check-circle text-success"></i> Перезапуск завершён успешно!';
+                progressBar.className = 'progress__bar progress__bar--success';
+                progressBar.innerHTML = '<i class="fm fm-check-circle"></i> Успешно';
+                showToast('✅ Unblock-сервис успешно перезапущен', 'success');
+            } else if (lastLog.includes('exit code:')) {
+                const exitCode = lastLog.match(/exit code: (\d+)/);
+                status.innerHTML = `<i class="fm fm-x-circle text-danger"></i> Ошибка перезапуска (код: ${exitCode ? exitCode[1] : '?'})`;
+                progressBar.className = 'progress__bar progress__bar--danger';
+                progressBar.innerHTML = '<i class="fm fm-x-circle"></i> Ошибка';
+                showToast('⚠️ Ошибка перезапуска unblock', 'danger');
+            } else {
+                status.innerHTML = '<i class="fm fm-info-circle"></i> Статус неизвестен';
+            }
+            
+            // Скрываем прогресс через 5 секунд
+            setTimeout(() => {
+                progress.style.display = 'none';
+                logs.style.display = 'none';
+            }, 5000);
+            
+            // Обновляем общую статистику
+            updateStats();
+        }
+        
+    } catch (e) {
+        console.error('Failed to check status:', e);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 </script>
 
 <div class="row row--2col">
@@ -193,12 +317,18 @@ setInterval(updateStats, 10000);
             <div class="card__body">
                 <h5 class="card__title"><i class="fm fm-shield-check"></i> Перезапуск Unblock</h5>
                 <p class="text-muted small">Перезапуск сервиса обхода блокировок</p>
-                <form method="POST" action="{{ url_for('system.service_restart_unblock') }}">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <button type="submit" class="btn btn--primary btn--sm">
-                        <i class="fm fm-arrow-clockwise"></i> Перезапустить
-                    </button>
-                </form>
+                <button type="button" class="btn btn--primary btn--sm" id="restartUnblockBtn" onclick="restartUnblock()">
+                    <i class="fm fm-arrow-clockwise"></i> Перезапустить
+                </button>
+                <div id="unblockProgress" class="mt-2" style="display: none;">
+                    <div class="progress mb-2" style="height: 20px;">
+                        <div class="progress__bar progress__bar--info" id="unblockProgressBar" style="width: 100%">
+                            <i class="fm fm-arrow-clockwise fm-spin"></i> Перезапуск...
+                        </div>
+                    </div>
+                    <small id="unblockStatus" class="text-muted">Запуск...</small>
+                    <div id="unblockLogs" class="mt-2 p-2 bg-dark rounded" style="max-height: 150px; overflow-y: auto; font-size: 0.75rem; font-family: monospace; display: none;"></div>
+                </div>
             </div>
         </div>
     </div>

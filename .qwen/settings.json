@@ -12,7 +12,10 @@
       "Bash(git *)",
       "Bash(true)",
       "Bash(else)",
-      "Bash(rm *)"
+      "Bash(rm *)",
+      "Bash(python *)",
+      "Bash(select-object *)",
+      "Bash(type *)"
     ]
   },
   "$version": 3,

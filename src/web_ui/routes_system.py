@@ -226,16 +226,20 @@ def stats():
         dns_status = {'enabled': False, 'domain_count': 0}
 
     # DNS Override status
-    dns_override_enabled = False
-    try:
-        result = subprocess.run(
-            ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v'],
-            capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0 and 'dpt:53' in result.stdout and 'DNAT' in result.stdout:
-            dns_override_enabled = True
-    except Exception:
-        pass
+    # FIX #4: Проверяем маркерный файл для точного статуса
+    dns_override_enabled = os.path.exists('/tmp/dns_override_enabled')
+    
+    # Fallback: если маркера нет, проверяем iptables
+    if not dns_override_enabled:
+        try:
+            result = subprocess.run(
+                ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0 and 'dpt:53' in result.stdout and 'DNAT' in result.stdout:
+                dns_override_enabled = True
+        except Exception:
+            pass
 
     stats_data = {
         'total_services': len(services),
@@ -255,17 +259,22 @@ def stats():
 @bp.route('/service')
 @login_required
 def service():
-    dns_override_enabled = False
-    try:
-        result = subprocess.run(
-            ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v'],
-            capture_output=True, text=True, timeout=5
-        )
-        if result.returncode == 0:
-            if 'dpt:53' in result.stdout and 'DNAT' in result.stdout:
-                dns_override_enabled = True
-    except Exception as e:
-        logger.error(f"Error checking DNS Override status: {e}")
+    # FIX #4: Проверяем маркерный файл для точного статуса
+    dns_override_enabled = os.path.exists('/tmp/dns_override_enabled')
+    
+    # Fallback: если маркера нет, проверяем iptables
+    if not dns_override_enabled:
+        try:
+            result = subprocess.run(
+                ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v'],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                if 'dpt:53' in result.stdout and 'DNAT' in result.stdout:
+                    dns_override_enabled = True
+        except Exception as e:
+            logger.error(f"Error checking DNS Override status: {e}")
+    
     return render_template('service.html', dns_override_enabled=dns_override_enabled)
 
 
@@ -281,6 +290,147 @@ def service_restart_unblock():
     else:
         flash(f'⚠️ Ошибка перезапуска: {output}', 'danger')
     return redirect(url_for('system.service'))
+
+
+@bp.route('/service/restart-unblock-async', methods=['POST'])
+@login_required
+@csrf_required
+def service_restart_unblock_async():
+    """Запуск перезапуска unblock в фоновом режиме"""
+    logger.info("[ROUTES] /service/restart-unblock-async")
+    
+    import stat
+    import tempfile
+    import time
+    
+    # Путь к скрипту фонового перезапуска
+    restart_script = '/tmp/unblock_restart.sh'
+    log_file = '/opt/var/log/unblock_restart.log'
+    pid_file = '/tmp/unblock_restart.pid'
+    
+    # Проверяем, не запущен ли уже перезапуск
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, 'r') as f:
+                old_pid = int(f.read().strip())
+            # Проверяем, жив ли процесс
+            result = subprocess.run(['kill', '-0', str(old_pid)], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Перезапуск уже запущен',
+                    'pid': old_pid
+                }), 409
+        except Exception:
+            pass  # Старый процесс мёртв, удаляем pid файл
+        os.remove(pid_file)
+    
+    # SAFETY: Проверяем что скрипт не завис более 10 минут
+    if os.path.exists(log_file):
+        try:
+            log_mtime = os.path.getmtime(log_file)
+            if time.time() - log_mtime > 600:  # 10 минут
+                logger.warning("[ROUTES] Old restart log found, cleaning up")
+                os.remove(log_file)
+                os.remove(pid_file) if os.path.exists(pid_file) else None
+        except Exception:
+            pass
+    
+    # Создаём скрипт фонового перезапуска
+    try:
+        with open(restart_script, 'w') as f:
+            f.write(f'''#!/bin/sh
+# Фоновый перезапуск unblock (с таймаутом безопасности)
+echo $$ > {pid_file}
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting unblock restart..." > {log_file}
+
+# Запускаем перезапуск с таймаутом 5 минут
+TIMEOUT=300
+START_TIME=$(date +%s)
+
+sh {INIT_SCRIPTS['unblock']} restart >> {log_file} 2>&1 &
+RESTART_PID=$!
+
+# Ждём завершения с проверкой таймаута
+while kill -0 $RESTART_PID 2>/dev/null; do
+    CURRENT_TIME=$(date +%s)
+    ELAPSED=$((CURRENT_TIME - START_TIME))
+    
+    if [ $ELAPSED -ge $TIMEOUT ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TIMEOUT: restart exceeded ${TIMEOUT}s, killing..." >> {log_file}
+        kill -9 $RESTART_PID 2>/dev/null
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restart killed after timeout" >> {log_file}
+        rm -f {pid_file}
+        exit 1
+    fi
+    
+    sleep 2
+done
+
+# Ждём завершения процесса
+wait $RESTART_PID 2>/dev/null
+EXIT_CODE=$?
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restart finished with exit code: $EXIT_CODE" >> {log_file}
+rm -f {pid_file}
+exit $EXIT_CODE
+''')
+        os.chmod(restart_script, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+        
+        # Запускаем в фоне
+        subprocess.Popen(['sh', restart_script], start_new_session=True)
+        
+        logger.info("[ROUTES] Background unblock restart started")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Перезапуск запущен (выполняется 1-5 минут)',
+            'log_file': log_file
+        })
+        
+    except Exception as e:
+        logger.error(f"[ROUTES] Failed to start background restart: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Ошибка запуска: {str(e)}'
+        }), 500
+
+
+@bp.route('/service/restart-unblock-status')
+@login_required
+def service_restart_unblock_status():
+    """Проверка статуса фонового перезапуска"""
+    pid_file = '/tmp/unblock_restart.pid'
+    log_file = '/opt/var/log/unblock_restart.log'
+    
+    # Проверяем, запущен ли ещё процесс
+    is_running = False
+    pid = None
+    
+    if os.path.exists(pid_file):
+        try:
+            with open(pid_file, 'r') as f:
+                pid = int(f.read().strip())
+            result = subprocess.run(['kill', '-0', str(pid)], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                is_running = True
+        except Exception:
+            pass
+    
+    # Читаем логи
+    logs = []
+    if os.path.exists(log_file):
+        try:
+            with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                logs = f.readlines()[-20:]  # Последние 20 строк
+        except Exception:
+            pass
+    
+    return jsonify({
+        'running': is_running,
+        'pid': pid,
+        'logs': logs
+    })
 
 
 @bp.route('/service/restart-router', methods=['POST'])
@@ -426,16 +576,38 @@ def service_dns_override(action):
 
         if enable:
             logger.info("[ROUTES] DNS Override: enabling...")
-            subprocess.run(['iptables', '-t', 'nat', '-F', 'PREROUTING'], capture_output=True, text=True, timeout=5)
+            
+            # FIX #3: НЕ очищать весь PREROUTING — удалять только старые DNAT правила DNS Override
+            # Это сохраняет правила VPN redirect от 100-redirect.sh
+            logger.info("[ROUTES] Removing old DNS Override DNAT rules only...")
+            for proto in ['udp', 'tcp']:
+                subprocess.run(
+                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
+                     '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
+                    capture_output=True, text=True, timeout=5
+                )
+                subprocess.run(
+                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
+                     '-j', 'DNAT', '--to-destination', local_ip],
+                    capture_output=True, text=True, timeout=5
+                )
+            
+            # Перезапускаем dnsmasq (не убиваем!)
             subprocess.run(['/opt/etc/init.d/S56dnsmasq', 'restart'], capture_output=True, text=True, timeout=15)
             time.sleep(1)
+            
+            # Генерируем конфиги для bypass-доменов
             subprocess.run(['/opt/bin/unblock_dnsmasq.sh'], capture_output=True, text=True, timeout=30)
+            
+            # Применяем правила VPN redirect
             redirect_script = '/opt/etc/ndm/netfilter.d/100-redirect.sh'
             if os.path.exists(redirect_script):
                 logger.debug(f"[ROUTES] Running {redirect_script}")
                 subprocess.run(['sh', redirect_script], capture_output=True, text=True, timeout=15)
             else:
                 logger.warning(f"[ROUTES] Redirect script not found: {redirect_script}")
+            
+            # Добавляем DNAT правила DNS Override
             for proto in ['udp', 'tcp']:
                 logger.debug(f"[ROUTES] Adding DNAT rule for {proto}")
                 subprocess.run(
@@ -443,10 +615,17 @@ def service_dns_override(action):
                      '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
                     capture_output=True, text=True, timeout=5
                 )
+            
+            # FIX #4: Создаём маркерный файл для точного статуса
+            with open('/tmp/dns_override_enabled', 'w') as f:
+                f.write(local_ip)
+            
             flash('✅ DNS Override включен', 'success')
             logger.info("[ROUTES] DNS Override enabled successfully")
         else:
             logger.info("[ROUTES] DNS Override: disabling...")
+            
+            # Удаляем только DNAT правила DNS Override (не трогаем VPN redirect)
             for proto in ['udp', 'tcp']:
                 logger.debug(f"[ROUTES] Removing DNAT rules for {proto}")
                 subprocess.run(
@@ -459,7 +638,13 @@ def service_dns_override(action):
                      '-j', 'DNAT', '--to-destination', local_ip],
                     capture_output=True, text=True, timeout=5
                 )
-            subprocess.run(['/opt/etc/init.d/S56dnsmasq', 'stop'], capture_output=True, text=True, timeout=10)
+            
+            # FIX #1: НЕ останавливать dnsmasq! Он нужен для DNS-обхода AI и обычного DNS
+            # Удаляем маркерный файл включения — watchdog увидит это и не будет восстанавливать DNAT
+            if os.path.exists('/tmp/dns_override_enabled'):
+                os.remove('/tmp/dns_override_enabled')
+                logger.info("[ROUTES] Removed /tmp/dns_override_enabled marker")
+            
             flash('✅ DNS Override выключен', 'success')
             logger.info("[ROUTES] DNS Override disabled successfully")
     except Exception as e:
