@@ -187,7 +187,15 @@ def key_toggle(service: str):
             try:
                 if os.path.exists(svc['init_script']):
                     result = subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, text=True, timeout=15)
-                    logger.info(f"[TOGGLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:100]}, stderr={result.stderr[:100]}")
+                    logger.info(f"[TOGGLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:200]}, stderr={result.stderr[:200]}")
+                    
+                    # FIX: Проверяем вывод скрипта — некоторые скрипты возвращают rc=0 но не останавливают
+                    output_lower = (result.stdout + result.stderr).lower()
+                    if 'alive' in output_lower or 'not stopped' in output_lower or 'failed' in output_lower:
+                        logger.warning(f"[TOGGLE] {service} stop script reported: still alive or failed")
+                        flash(f'⚠️ {svc["name"]} не остановился (скрипт сообщил об ошибке)', 'warning')
+                        return redirect(url_for('vpn.keys'))
+                    
                 subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
                 for proto in ['tcp', 'udp']:
                     subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
@@ -201,7 +209,7 @@ def key_toggle(service: str):
                 time.sleep(1)
                 still_running = check_service_status(svc['init_script']) == '✅ Активен'
                 if still_running:
-                    flash(f'⚠️ {svc["name"]} не остановился (ключ сохранён)', 'warning')
+                    flash(f'⚠️ {svc["name"]} не остановился (процесс всё ещё активен)', 'warning')
                     logger.warning(f"[TOGGLE] {service} still running after stop!")
                 else:
                     flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
@@ -244,7 +252,15 @@ def key_disable(service: str):
     try:
         if os.path.exists(svc['init_script']):
             result = subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, text=True, timeout=15)
-            logger.info(f"[DISABLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:100]}, stderr={result.stderr[:100]}")
+            logger.info(f"[DISABLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:200]}, stderr={result.stderr[:200]}")
+            
+            # FIX: Проверяем вывод скрипта
+            output_lower = (result.stdout + result.stderr).lower()
+            if 'alive' in output_lower or 'not stopped' in output_lower or 'failed' in output_lower:
+                logger.warning(f"[DISABLE] {service} stop script reported: still alive or failed")
+                flash(f'⚠️ {svc["name"]} не остановился (скрипт сообщил об ошибке)', 'warning')
+                return redirect(url_for('vpn.keys'))
+            
         subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
         for proto in ['tcp', 'udp']:
             subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
@@ -258,7 +274,7 @@ def key_disable(service: str):
         time.sleep(1)
         still_running = check_service_status(svc['init_script']) == '✅ Активен'
         if still_running:
-            flash(f'⚠️ {svc["name"]} не остановился (ключ сохранён)', 'warning')
+            flash(f'⚠️ {svc["name"]} не остановился (процесс всё ещё активен)', 'warning')
             logger.warning(f"[DISABLE] {service} still running after stop!")
         else:
             flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
