@@ -261,6 +261,7 @@ def key_toggle(service: str):
                 logger.error(f"[TOGGLE] {service} stop error: {e}")
         else:
             # Сервис не запущен — включаем
+            import time
             logger.info(f"[TOGGLE] {service} is not running, starting...")
             try:
                 if os.path.exists(svc['init_script']):
