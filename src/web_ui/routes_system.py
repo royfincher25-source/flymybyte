@@ -355,15 +355,15 @@ RESTART_PID=$!
 while kill -0 $RESTART_PID 2>/dev/null; do
     CURRENT_TIME=$(date +%s)
     ELAPSED=$((CURRENT_TIME - START_TIME))
-    
+
     if [ $ELAPSED -ge $TIMEOUT ]; then
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TIMEOUT: restart exceeded ${TIMEOUT}s, killing..." >> {log_file}
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] TIMEOUT: restart exceeded ${{TIMEOUT}}s, killing..." >> {log_file}
         kill -9 $RESTART_PID 2>/dev/null
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] Restart killed after timeout" >> {log_file}
         rm -f {pid_file}
         exit 1
     fi
-    
+
     sleep 2
 done
 
