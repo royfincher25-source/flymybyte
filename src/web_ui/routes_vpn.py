@@ -182,98 +182,76 @@ def key_toggle(service: str):
 
     if config_exists:
         is_running = check_service_status(svc['init_script']) == '✅ Активен'
+        logger.info(f"[TOGGLE] {service} initial status: is_running={is_running}")
 
         if is_running:
             try:
-                # FIX: Сначала пробуем остановить через init скрипт
+                import time
+                import re
+                from core.utils import Cache
+                
+                # Шаг 1: Останавливаем через init скрипт
                 stop_output = ""
-                stopped_via_script = False
                 if os.path.exists(svc['init_script']):
                     result = subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, text=True, timeout=15)
                     stop_output = result.stdout + result.stderr
-                    logger.info(f"[TOGGLE] {service} stop: rc={result.returncode}, output={stop_output[:300]}")
-                    
-                    # Проверяем что скрипт сообщил об успешной остановке
-                    if 'stopped gracefully' in stop_output.lower() or 'stopped' in stop_output.lower():
-                        stopped_via_script = True
-                        logger.info(f"[TOGGLE] {service} script reports: stopped")
+                    logger.info(f"[TOGGLE] {service} stop script: rc={result.returncode}, output={stop_output[:300]}")
                 
-                # Ждём пока процесс умрёт (до 5 секунд)
-                import time
-                killed = False
-                for attempt in range(5):
-                    time.sleep(1)
-                    # Очищаем кэш перед проверкой
-                    from core.utils import Cache
-                    Cache.delete(f'status:{svc["init_script"]}')
-                    
-                    still_running = check_service_status(svc['init_script']) == '✅ Активен'
-                    if not still_running:
-                        killed = True
-                        logger.info(f"[TOGGLE] {service} stopped after {attempt+1}s")
-                        break
+                # Шаг 2: Извлекаем PID из вывода скрипта
+                pid = None
+                pid_match = re.search(r'PID:\s*(\d+)', stop_output)
+                if pid_match:
+                    pid = pid_match.group(1)
+                    logger.info(f"[TOGGLE] {service} PID from script: {pid}")
                 
-                # FIX: Если процесс всё ещё жив — убиваем напрямую через kill -9
-                if not killed:
-                    logger.warning(f"[TOGGLE] {service} still alive after stop script, force killing...")
+                # Шаг 3: Если PID не найден — ищем через pgrep
+                if not pid:
+                    proc_name_map = {
+                        'shadowsocks': 'ss-redir',
+                        'vless': 'xray',
+                        'hysteria2': 'hysteria',
+                        'trojan': 'trojan',
+                        'tor': 'tor',
+                    }
+                    proc_name = proc_name_map.get(service, service)
+                    pgrep_result = subprocess.run(['pgrep', '-f', proc_name], capture_output=True, text=True, timeout=3)
+                    if pgrep_result.returncode == 0 and pgrep_result.stdout.strip():
+                        pid = pgrep_result.stdout.strip().split('\n')[0]
+                        logger.info(f"[TOGGLE] {service} PID from pgrep: {pid}")
+                
+                # Шаг 4: Ждём 2 секунды и проверяем остановился ли процесс
+                time.sleep(2)
+                Cache.delete(f'status:{svc["init_script"]}')
+                
+                # Шаг 5: Если процесс всё ещё жив — убиваем через kill -9
+                still_alive = False
+                if pid:
                     try:
-                        # Извлекаем PID из вывода скрипта или через pgrep
-                        pid = None
-                        if stopped_via_script:
-                            # Ищем PID в выводе скрипта
-                            import re
-                            pid_match = re.search(r'PID:\s*(\d+)', stop_output)
-                            if pid_match:
-                                pid = pid_match.group(1)
-                                logger.info(f"[TOGGLE] {service} extracted PID from script: {pid}")
-                        
-                        if not pid:
-                            # Пробуем найти через pgrep
-                            proc_name_map = {
-                                'shadowsocks': 'ss-redir',
-                                'vless': 'xray',
-                                'hysteria2': 'hysteria',
-                                'trojan': 'trojan',
-                                'tor': 'tor',
-                            }
-                            proc_name = proc_name_map.get(service, service)
-                            pgrep_result = subprocess.run(['pgrep', '-f', proc_name], capture_output=True, text=True, timeout=3)
-                            if pgrep_result.returncode == 0 and pgrep_result.stdout.strip():
-                                pid = pgrep_result.stdout.strip().split('\n')[0]
-                                logger.info(f"[TOGGLE] {service} found PID via pgrep: {pid}")
-                        
-                        if pid:
-                            logger.info(f"[TOGGLE] {service} sending kill -9 to PID {pid}")
-                            kill_result = subprocess.run(['kill', '-9', pid], capture_output=True, text=True, timeout=5)
-                            logger.info(f"[TOGGLE] {service} kill -9 {pid}: rc={kill_result.returncode}")
+                        kill_check = subprocess.run(['kill', '-0', pid], capture_output=True, text=True, timeout=3)
+                        if kill_check.returncode == 0:
+                            still_alive = True
+                            logger.warning(f"[TOGGLE] {service} PID {pid} still alive, sending kill -9")
+                            subprocess.run(['kill', '-9', pid], capture_output=True, text=True, timeout=5)
                             time.sleep(2)
-                            
-                            # Очищаем кэш и проверяем ещё раз
-                            Cache.delete(f'status:{svc["init_script"]}')
-                            still_running = check_service_status(svc['init_script']) == '✅ Активен'
-                            if not still_running:
-                                killed = True
-                                logger.info(f"[TOGGLE] {service} killed via kill -9")
-                        else:
-                            logger.error(f"[TOGGLE] {service} could not find PID to kill")
                     except Exception as e:
-                        logger.error(f"[TOGGLE] {service} kill error: {e}")
+                        logger.error(f"[TOGGLE] {service} kill check error: {e}")
                 
-                # Очищаем iptables и ipset независимо от результата
+                # Шаг 6: Очищаем iptables и ipset
                 subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
                 for proto in ['tcp', 'udp']:
                     subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
                 
-                # Очищаем кэш статуса
-                from core.utils import Cache
+                # Шаг 7: Финальная проверка статуса
                 Cache.delete(f'status:{svc["init_script"]}')
+                final_status = check_service_status(svc['init_script'])
+                logger.info(f"[TOGGLE] {service} final status after stop: {final_status}")
                 
-                # Финальная проверка
-                if killed:
+                if final_status != '✅ Активен':
                     flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
                 else:
-                    flash(f'⚠️ {svc["name"]} не удалось остановить (процесс всё ещё активен)', 'warning')
-                    logger.error(f"[TOGGLE] {service} FAILED to stop after all attempts!")
+                    flash(f'⚠️ {svc["name"]} всё ещё активен после остановки', 'warning')
+                    logger.warning(f"[TOGGLE] {service} still active after stop attempt!")
+                    
             except Exception as e:
                 flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
                 logger.error(f"[TOGGLE] {service} stop error: {e}")
