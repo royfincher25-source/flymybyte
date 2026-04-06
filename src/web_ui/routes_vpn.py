@@ -88,13 +88,17 @@ def keys():
         'trojan': {'name': 'Trojan', 'config': CONFIG_PATHS['trojan'], 'init': INIT_SCRIPTS['trojan']},
         'tor': {'name': 'Tor', 'config': CONFIG_PATHS['tor'], 'init': INIT_SCRIPTS['tor']},
     }
-    for service in services.values():
+    for svc_name, service in services.items():
         if not os.path.exists(service['init']):
             service['status'] = '❌ Скрипт не найден'
             service['config_exists'] = False
         else:
             service['config_exists'] = os.path.exists(service['config'])
-            service['status'] = '✅ Активен' if service['config_exists'] else '❌ Не настроен'
+            if not service['config_exists']:
+                service['status'] = '❌ Не настроен'
+            else:
+                # FIX: Проверяем реальный статус сервиса через /proc
+                service['status'] = check_service_status(service['init'])
     return render_template('keys.html', services=services)
 
 
