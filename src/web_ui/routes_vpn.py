@@ -185,34 +185,64 @@ def key_toggle(service: str):
 
         if is_running:
             try:
+                # FIX: Сначала пробуем остановить через init скрипт
+                stop_output = ""
                 if os.path.exists(svc['init_script']):
                     result = subprocess.run(['sh', svc['init_script'], 'stop'], capture_output=True, text=True, timeout=15)
-                    logger.info(f"[TOGGLE] {service} stop: rc={result.returncode}, stdout={result.stdout[:200]}, stderr={result.stderr[:200]}")
-                    
-                    # FIX: Проверяем вывод скрипта — некоторые скрипты возвращают rc=0 но не останавливают
-                    output_lower = (result.stdout + result.stderr).lower()
-                    if 'alive' in output_lower or 'not stopped' in output_lower or 'failed' in output_lower:
-                        logger.warning(f"[TOGGLE] {service} stop script reported: still alive or failed")
-                        flash(f'⚠️ {svc["name"]} не остановился (скрипт сообщил об ошибке)', 'warning')
-                        return redirect(url_for('vpn.keys'))
-                    
+                    stop_output = result.stdout + result.stderr
+                    logger.info(f"[TOGGLE] {service} stop: rc={result.returncode}, output={stop_output[:300]}")
+                
+                # Ждём пока процесс умрёт (до 5 секунд)
+                import time
+                killed = False
+                for attempt in range(5):
+                    time.sleep(1)
+                    still_running = check_service_status(svc['init_script']) == '✅ Активен'
+                    if not still_running:
+                        killed = True
+                        logger.info(f"[TOGGLE] {service} stopped after {attempt+1}s")
+                        break
+                
+                # FIX: Если процесс всё ещё жив — убиваем напрямую через pkill
+                if not killed:
+                    logger.warning(f"[TOGGLE] {service} still alive after stop script, force killing...")
+                    try:
+                        # Извлекаем имя процесса из конфига
+                        process_names = {
+                            'shadowsocks': 'ss-redir',
+                            'vless': 'xray',
+                            'hysteria2': 'hysteria',
+                            'trojan': 'trojan',
+                            'tor': 'tor',
+                        }
+                        proc_name = process_names.get(service, service)
+                        pkill_result = subprocess.run(['pkill', '-9', '-f', proc_name], capture_output=True, text=True, timeout=5)
+                        logger.info(f"[TOGGLE] {service} pkill -9 -f {proc_name}: rc={pkill_result.returncode}")
+                        time.sleep(2)
+                        
+                        # Проверяем ещё раз
+                        still_running = check_service_status(svc['init_script']) == '✅ Активен'
+                        if not still_running:
+                            killed = True
+                            logger.info(f"[TOGGLE] {service} killed via pkill")
+                    except Exception as e:
+                        logger.error(f"[TOGGLE] {service} pkill error: {e}")
+                
+                # Очищаем iptables и ipset независимо от результата
                 subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
                 for proto in ['tcp', 'udp']:
                     subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
                 
-                # FIX: Очищаем кэш статуса после остановки
+                # Очищаем кэш статуса
                 from core.utils import Cache
                 Cache.delete(f'status:{svc["init_script"]}')
                 
-                # Проверяем что сервис действительно остановился
-                import time
-                time.sleep(1)
-                still_running = check_service_status(svc['init_script']) == '✅ Активен'
-                if still_running:
-                    flash(f'⚠️ {svc["name"]} не остановился (процесс всё ещё активен)', 'warning')
-                    logger.warning(f"[TOGGLE] {service} still running after stop!")
-                else:
+                # Финальная проверка
+                if killed:
                     flash(f'✅ {svc["name"]} отключён (ключ сохранён)', 'success')
+                else:
+                    flash(f'⚠️ {svc["name"]} не удалось остановить (процесс всё ещё активен, попробуйте перезагрузить роутер)', 'danger')
+                    logger.error(f"[TOGGLE] {service} FAILED to stop after all attempts!")
             except Exception as e:
                 flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
                 logger.error(f"[TOGGLE] {service} stop error: {e}")
