@@ -260,17 +260,34 @@ def key_toggle(service: str):
                 flash(f'❌ Ошибка при отключении: {str(e)}', 'danger')
                 logger.error(f"[TOGGLE] {service} stop error: {e}")
         else:
+            # Сервис не запущен — включаем
+            logger.info(f"[TOGGLE] {service} is not running, starting...")
             try:
                 if os.path.exists(svc['init_script']):
-                    subprocess.run(['sh', svc['init_script'], 'start'], capture_output=True, timeout=15)
+                    result = subprocess.run(['sh', svc['init_script'], 'start'], capture_output=True, text=True, timeout=15)
+                    logger.info(f"[TOGGLE] {service} start script: rc={result.returncode}, output={result.stdout[:200]}")
+                    
+                    time.sleep(2)
+                
                 from core.services import restart_service
                 success, output = restart_service(svc['name'], svc['init_script'])
+                
+                # Очищаем кэш статуса после перезапуска
+                from core.utils import Cache
+                Cache.delete(f'status:{svc["init_script"]}')
+                
                 if success:
                     flash(f'✅ {svc["name"]} включён', 'success')
+                    logger.info(f"[TOGGLE] {service} started successfully")
                 else:
                     flash(f'⚠️ {svc["name"]} запущен, но ошибка: {output}', 'warning')
+                    logger.warning(f"[TOGGLE] {service} restart_service returned: {output}")
+                
+                # Ждём чтобы процесс успел стартовать перед проверкой статуса
+                time.sleep(1)
             except Exception as e:
                 flash(f'❌ Ошибка при включении: {str(e)}', 'danger')
+                logger.error(f"[TOGGLE] {service} start error: {e}")
     else:
         flash(f'⚠️ Для включения {svc["name"]} необходимо настроить ключ', 'warning')
         return redirect(url_for('vpn.key_config', service=service))
