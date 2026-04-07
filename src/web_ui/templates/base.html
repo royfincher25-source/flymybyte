@@ -9,6 +9,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+<div class="wrapper">
     <nav class="navbar">
         <div class="container">
             <a class="navbar__brand" href="{{ url_for('core.index') }}">
@@ -67,6 +68,7 @@
             </div>
         </div>
     </footer>
+</div>
 
     <!-- Toast container -->
     <div id="toast-container"></div>

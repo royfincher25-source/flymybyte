@@ -49,7 +49,11 @@ a:hover { color: var(--color-primary-medium); }
 img { max-width: 100%; height: auto; }
 
 /* --- Container & Grid --- */
-.container { max-width: 1200px; margin: 0 auto; padding: 0 1rem 6.5rem; }
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 calc(15px + (20 - 15) * ((100vw - 320px) / (1200 - 320)));
+}
 
 .row { display: grid; gap: 1rem; }
 .row--2col { grid-template-columns: repeat(2, 1fr); }
@@ -96,20 +100,22 @@ img { max-width: 100%; height: auto; }
 
 /* --- Cards --- */
 .card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-primary-dark);
-  border-radius: var(--radius);
-  margin-bottom: 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-primary-dark);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
 }
 .card__header {
-  padding: 0.75rem 1rem;
-  background: var(--color-primary-dark);
-  color: var(--color-primary) !important;
-  border-bottom: 1px solid var(--color-primary-dark);
-  border-radius: var(--radius) var(--radius) 0 0;
-  font-weight: 600;
+    padding: 0.75rem 1rem;
+    background: var(--color-primary-dark);
+    color: var(--color-primary) !important;
+    border-bottom: 1px solid var(--color-primary-dark);
+    border-radius: var(--radius) var(--radius) 0 0;
+    font-weight: 600;
 }
-.card__body { padding: 1rem; }
+.card__body {
+    padding: calc(0.75rem + (1 - 0.75) * ((100vw - 320px) / (1200 - 320)));
+}
 
 /* Menu cards (index.html) */
 .menu-card {
@@ -603,34 +609,32 @@ img { max-width: 100%; height: auto; }
 .border-info { border-color: var(--color-info); }
 .border-warning { border-color: var(--color-warning); }
 
+/* --- Wrapper (flexbox sticky footer) --- */
+.wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+main {
+    flex: 1 1 auto;
+}
+
 /* --- Footer --- */
 .footer {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  background: rgba(30, 42, 58, 0.95);
-  border-top: 1px solid var(--color-primary-dark);
-  padding: 1rem 0;
-  z-index: 100;
+    background: rgba(30, 42, 58, 0.95);
+    border-top: 1px solid var(--color-primary-dark);
+    padding: 1rem 0;
+    margin-top: auto;
 }
 .footer a { transition: color var(--transition); }
 .footer a:hover { color: var(--color-primary) !important; }
 
-/* Main content padding for fixed footer */
-main { padding-bottom: 3rem; }
-
-/* Last element on page bottom spacing */
-main > *:last-child {
-  margin-bottom: 3.5rem;
-}
-
 /* --- Responsive --- */
 @media (max-width: 768px) {
-  .navbar__nav { gap: 0.5rem; }
-  .footer .row { grid-template-columns: 1fr !important; text-align: center; gap: 0.5rem; }
-  .footer .row > * { text-align: center !important; }
-  main { padding-bottom: 5rem; }
-  .flex-between { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
-  .flex-between > div,
-  .flex-between > a { align-self: stretch; }
+    .navbar__nav { gap: 0.5rem; }
+    .footer .row { grid-template-columns: 1fr !important; text-align: center; gap: 0.5rem; }
+    .footer .row > * { text-align: center !important; }
+    .flex-between { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }
+    .flex-between > div,
+    .flex-between > a { align-self: stretch; }
 }
