@@ -168,21 +168,20 @@ def _download_file(source_path: str, dest_path: str, progress, idx: int, total: 
 
 
 def download_all_files(progress) -> tuple:
+    """Download files sequentially (max_workers=1) to avoid DNS overload on router."""
     from concurrent.futures import ThreadPoolExecutor
     files_to_update = FILES_TO_UPDATE
     total_files = len(files_to_update)
     results = {'success': 0, 'errors': 0}
-    lock = threading.Lock()
 
     def download_and_track(source_path, dest_path, idx):
         success = _download_file(source_path, dest_path, progress, idx, total_files)
-        with lock:
-            if success:
-                results['success'] += 1
-            else:
-                results['errors'] += 1
+        if success:
+            results['success'] += 1
+        else:
+            results['errors'] += 1
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         for i, (source_path, dest_path) in enumerate(files_to_update.items(), 1):
             executor.submit(download_and_track, source_path, dest_path, i)
 
@@ -190,10 +189,29 @@ def download_all_files(progress) -> tuple:
 
 
 def run_update_scripts(progress, start_step: int) -> bool:
+    """Phase 1: Apply configs without restarting services (to avoid DNS disruption)."""
     scripts = [
         ('Запуск unblock_update.sh', [SCRIPT_UNBLOCK_UPDATE], SCRIPT_EXECUTION_TIMEOUT),
         ('Запуск unblock_dnsmasq.sh', [SCRIPT_UNBLOCK_DNSMASQ], SCRIPT_EXECUTION_TIMEOUT),
         ('Генерация AI DNS config', ['sh', f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh'], SCRIPT_EXECUTION_TIMEOUT),
+    ]
+
+    for i, (msg, cmd, timeout) in enumerate(scripts):
+        progress.update_progress(msg, file=os.path.basename(cmd[0]) if cmd else '', progress=start_step + i, total=start_step + len(scripts))
+        if not os.path.exists(cmd[0]):
+            continue
+        try:
+            result = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.warning(f"{msg} failed: {result.stderr}")
+        except (subprocess.TimeoutExpired, Exception) as e:
+            logger.warning(f"{msg} error: {e}")
+    return True
+
+
+def restart_services(progress, start_step: int) -> bool:
+    """Phase 2: Restart services AFTER all downloads complete."""
+    scripts = [
         ('Перезапуск S99unblock', [INIT_SCRIPTS['unblock'], 'restart'], 60),
         ('Перезапуск S56dnsmasq', [INIT_SCRIPTS['dnsmasq'], 'restart'], 60),
     ]
@@ -277,21 +295,31 @@ def service_updates_run():
 
         updated_count, error_count = download_all_files(progress)
 
+        if error_count > 0:
+            progress.set_error(f'Обновлено: {updated_count}, ошибок: {error_count}')
+            flash(f'⚠️ Обновлено: {updated_count}, ошибок: {error_count}', 'warning')
+            return jsonify({'success': False, 'error': f'Обновлено: {updated_count}, ошибок: {error_count}', 'reload': False})
+
+        # Phase 1: Apply configs (no restart)
         try:
             run_update_scripts(progress, total_files)
         except Exception as e:
             logger.warning(f"Failed to run update scripts: {e}")
             progress.set_error(f'Failed to run scripts: {e}')
+            flash(f'❌ Ошибка применения настроек: {str(e)}', 'danger')
+            return jsonify({'success': False, 'error': str(e)})
 
-        if error_count == 0:
-            progress.complete()
-            flash(f'✅ Обновление завершено! Обновлено файлов: {updated_count}', 'success')
-            schedule_webui_restart()
-            return jsonify({'success': True, 'message': f'✅ Обновление завершено! Обновлено файлов: {updated_count}', 'reload': True, 'reload_delay': 3000})
-        else:
-            progress.set_error(f'Обновлено: {updated_count}, ошибок: {error_count}')
-            flash(f'⚠️ Обновлено: {updated_count}, ошибок: {error_count}', 'warning')
-            return jsonify({'success': False, 'error': f'Обновлено: {updated_count}, ошибок: {error_count}', 'reload': False})
+        # Phase 2: Restart services (after all downloads complete)
+        restart_step = total_files + 3
+        try:
+            restart_services(progress, restart_step)
+        except Exception as e:
+            logger.warning(f"Failed to restart services: {e}")
+
+        progress.complete()
+        flash(f'✅ Обновление завершено! Обновлено файлов: {updated_count}', 'success')
+        schedule_webui_restart()
+        return jsonify({'success': True, 'message': f'✅ Обновление завершено! Обновлено файлов: {updated_count}', 'reload': True, 'reload_delay': 3000})
     except Exception as e:
         progress.set_error(str(e))
         flash(f'❌ Ошибка обновления: {str(e)}', 'danger')

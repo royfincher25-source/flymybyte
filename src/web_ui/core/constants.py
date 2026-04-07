@@ -49,7 +49,7 @@ MAX_PORT = 65535
 # =============================================================================
 
 SCRIPT_EXECUTION_TIMEOUT = 120
-FILE_DOWNLOAD_TIMEOUT = 60
+FILE_DOWNLOAD_TIMEOUT = 15
 BACKGROUND_RESTART_TIMEOUT = 600  # 10 минут для фонового перезапуска
 
 # =============================================================================
@@ -163,9 +163,7 @@ FILES_TO_UPDATE = {
     'VERSION': f'{WEB_UI_DIR}/VERSION',
     'web_ui/.env.example': f'{WEB_UI_DIR}/.env.example',
     'web_ui/__init__.py': f'{WEB_UI_DIR}/__init__.py',
-    'web_ui/routes_service.py': f'{WEB_UI_DIR}/routes_service.py',
     'web_ui/app.py': f'{WEB_UI_DIR}/app.py',
-    'web_ui/env_parser.py': f'{WEB_UI_DIR}/env_parser.py',
     'web_ui/core/__init__.py': f'{WEB_UI_DIR}/core/__init__.py',
     'web_ui/core/constants.py': f'{WEB_UI_DIR}/core/constants.py',
     'web_ui/core/utils.py': f'{WEB_UI_DIR}/core/utils.py',
@@ -178,7 +176,6 @@ FILES_TO_UPDATE = {
     'web_ui/routes_vpn.py': f'{WEB_UI_DIR}/routes_vpn.py',
     'web_ui/routes_bypass.py': f'{WEB_UI_DIR}/routes_bypass.py',
     'web_ui/routes_updates.py': f'{WEB_UI_DIR}/routes_updates.py',
-    'web_ui/app.py': f'{WEB_UI_DIR}/app.py',
     'web_ui/resources/scripts/S99unblock': f'{INIT_DIR}/S99unblock',
     'web_ui/resources/scripts/S99web_ui': f'{INIT_DIR}/S99web_ui',
     'web_ui/resources/scripts/100-redirect.sh': f'{NDM_DIR}/netfilter.d/100-redirect.sh',
