@@ -79,7 +79,7 @@
 			{
 				"type":"field",
 				"port":"0-65535",
-				"outboundTag":"vless-outbound",
+				"outboundTag":"direct",
 				"enabled":true
 			}
 		]
