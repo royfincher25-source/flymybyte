@@ -49,7 +49,7 @@ a:hover { color: var(--color-primary-medium); }
 img { max-width: 100%; height: auto; }
 
 /* --- Container & Grid --- */
-.container { max-width: 1200px; margin: 0 auto; padding: 0 1rem; }
+.container { max-width: 1200px; margin: 0 auto; padding: 0 1rem 6.5rem; }
 
 .row { display: grid; gap: 1rem; }
 .row--2col { grid-template-columns: repeat(2, 1fr); }
