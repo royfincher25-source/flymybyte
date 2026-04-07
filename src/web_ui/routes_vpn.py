@@ -197,6 +197,9 @@ def key_toggle(service: str):
                 import time
                 import re
                 from core.utils import Cache
+                from core.iptables_manager import get_iptables_manager
+                
+                ipt = get_iptables_manager()
                 
                 # Шаг 1: Останавливаем через init скрипт
                 stop_output = ""
@@ -244,10 +247,9 @@ def key_toggle(service: str):
                     except Exception as e:
                         logger.error(f"[TOGGLE] {service} kill check error: {e}")
                 
-                # Шаг 6: Очищаем iptables и ipset
+                # Шаг 6: Очищаем iptables и ipset через IptablesManager
                 subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
-                for proto in ['tcp', 'udp']:
-                    subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
+                ipt.remove_vpn_redirect(svc['ipset'], svc['port'])
                 
                 # Шаг 7: Финальная проверка статуса
                 Cache.delete(f'status:{svc["init_script"]}')
@@ -315,6 +317,11 @@ def key_disable(service: str):
         return redirect(url_for('vpn.keys'))
     svc = services_config[service]
     try:
+        import time
+        import re
+        from core.iptables_manager import get_iptables_manager
+        
+        ipt = get_iptables_manager()
         stop_output = ""
         stopped_via_script = False
         if os.path.exists(svc['init_script']):
@@ -327,7 +334,6 @@ def key_disable(service: str):
                 logger.info(f"[DISABLE] {service} script reports: stopped")
         
         # Ждём пока процесс умрёт
-        import time
         killed = False
         for attempt in range(5):
             time.sleep(1)
@@ -346,7 +352,6 @@ def key_disable(service: str):
             try:
                 pid = None
                 if stopped_via_script:
-                    import re
                     pid_match = re.search(r'PID:\s*(\d+)', stop_output)
                     if pid_match:
                         pid = pid_match.group(1)
@@ -376,9 +381,9 @@ def key_disable(service: str):
             except Exception as e:
                 logger.error(f"[DISABLE] {service} kill error: {e}")
         
+        # Очищаем через IptablesManager
         subprocess.run(['ipset', 'flush', svc['ipset']], capture_output=True)
-        for proto in ['tcp', 'udp']:
-            subprocess.run(['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '-m', 'set', '--match-set', svc['ipset'], 'dst', '-j', 'REDIRECT', '--to-port', str(svc['port'])], capture_output=True)
+        ipt.remove_vpn_redirect(svc['ipset'], svc['port'])
         
         from core.utils import Cache
         Cache.delete(f'status:{svc["init_script"]}')

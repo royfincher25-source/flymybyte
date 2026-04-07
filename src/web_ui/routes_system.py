@@ -563,8 +563,16 @@ def service_restore_dns():
 @login_required
 @csrf_required
 def service_dns_override(action):
+    """Включить/выключить DNS Override через IptablesManager."""
     enable = (action == 'on')
     logger.info(f"[ROUTES] /service/dns-override/{action} - {'enabling' if enable else 'disabling'}")
+    
+    from core.iptables_manager import get_iptables_manager
+    from core.dnsmasq_manager import get_dnsmasq_manager
+    
+    ipt = get_iptables_manager()
+    dns_mgr = get_dnsmasq_manager()
+    
     try:
         local_ip = subprocess.run(
             ['sh', '-c', "ip -4 addr show br0 | awk '/inet /{print $2}' | cut -d/ -f1 | grep -E '^(192\\.168\\.|10\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.)' | head -n1"],
@@ -577,46 +585,20 @@ def service_dns_override(action):
         if enable:
             logger.info("[ROUTES] DNS Override: enabling...")
             
-            # FIX #3: НЕ очищать весь PREROUTING — удалять только старые DNAT правила DNS Override
-            # Это сохраняет правила VPN redirect от 100-redirect.sh
-            logger.info("[ROUTES] Removing old DNS Override DNAT rules only...")
-            for proto in ['udp', 'tcp']:
-                subprocess.run(
-                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
-                     '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
-                    capture_output=True, text=True, timeout=5
-                )
-                subprocess.run(
-                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
-                     '-j', 'DNAT', '--to-destination', local_ip],
-                    capture_output=True, text=True, timeout=5
-                )
-            
-            # Перезапускаем dnsmasq (не убиваем!)
-            subprocess.run(['/opt/etc/init.d/S56dnsmasq', 'restart'], capture_output=True, text=True, timeout=15)
+            # 1. Перезапускаем dnsmasq и генерируем конфиги
+            dns_mgr.restart_dnsmasq()
             time.sleep(1)
+            dns_mgr.generate_all()
             
-            # Генерируем конфиги для bypass-доменов
-            subprocess.run(['/opt/bin/unblock_dnsmasq.sh'], capture_output=True, text=True, timeout=30)
-            
-            # Применяем правила VPN redirect
+            # 2. Применяем правила VPN redirect
             redirect_script = '/opt/etc/ndm/netfilter.d/100-redirect.sh'
             if os.path.exists(redirect_script):
-                logger.debug(f"[ROUTES] Running {redirect_script}")
                 subprocess.run(['sh', redirect_script], capture_output=True, text=True, timeout=15)
-            else:
-                logger.warning(f"[ROUTES] Redirect script not found: {redirect_script}")
             
-            # Добавляем DNAT правила DNS Override
-            for proto in ['udp', 'tcp']:
-                logger.debug(f"[ROUTES] Adding DNAT rule for {proto}")
-                subprocess.run(
-                    ['iptables', '-t', 'nat', '-A', 'PREROUTING', '-p', proto, '--dport', '53',
-                     '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
-                    capture_output=True, text=True, timeout=5
-                )
+            # 3. Добавляем DNAT правила DNS Override
+            ipt.add_dns_redirect(local_ip, 5353)
             
-            # FIX #4: Создаём маркерный файл для точного статуса
+            # 4. Создаём маркер
             with open('/tmp/dns_override_enabled', 'w') as f:
                 f.write(local_ip)
             
@@ -625,25 +607,12 @@ def service_dns_override(action):
         else:
             logger.info("[ROUTES] DNS Override: disabling...")
             
-            # Удаляем только DNAT правила DNS Override (не трогаем VPN redirect)
-            for proto in ['udp', 'tcp']:
-                logger.debug(f"[ROUTES] Removing DNAT rules for {proto}")
-                subprocess.run(
-                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
-                     '-j', 'DNAT', '--to-destination', f'{local_ip}:5353'],
-                    capture_output=True, text=True, timeout=5
-                )
-                subprocess.run(
-                    ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53',
-                     '-j', 'DNAT', '--to-destination', local_ip],
-                    capture_output=True, text=True, timeout=5
-                )
+            # 1. Удаляем DNAT правила DNS Override
+            ipt.remove_dns_redirect(local_ip, 5353)
             
-            # FIX #1: НЕ останавливать dnsmasq! Он нужен для DNS-обхода AI и обычного DNS
-            # Удаляем маркерный файл включения — watchdog увидит это и не будет восстанавливать DNAT
+            # 2. Удаляем маркер
             if os.path.exists('/tmp/dns_override_enabled'):
                 os.remove('/tmp/dns_override_enabled')
-                logger.info("[ROUTES] Removed /tmp/dns_override_enabled marker")
             
             flash('✅ DNS Override выключен', 'success')
             logger.info("[ROUTES] DNS Override disabled successfully")

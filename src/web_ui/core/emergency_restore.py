@@ -2,11 +2,7 @@
 FlyMyByte — Emergency Restore Module
 
 Полный сброс к рабочему состоянию при критических ошибках.
-Вызывается через кнопку "Всё сломалось — почини!" в веб-интерфейсе.
-
-Использование:
-    from core.emergency_restore import emergency_restore
-    success, log = emergency_restore()
+Использует IptablesManager и DnsmasqManager для централизованного управления.
 """
 import os
 import subprocess
@@ -49,8 +45,7 @@ MARKER_FILES = [
 ]
 
 
-def _run_cmd(cmd: List[str], timeout: int = 10) -> Tuple[bool, str]:
-    """Выполнить команду и вернуть результат."""
+def _run_cmd(cmd: list, timeout: int = 10) -> Tuple[bool, str]:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         return result.returncode == 0, result.stdout + result.stderr
@@ -61,9 +56,7 @@ def _run_cmd(cmd: List[str], timeout: int = 10) -> Tuple[bool, str]:
 def emergency_restore() -> Tuple[bool, List[str]]:
     """
     Полный сброс к рабочему состоянию.
-
-    Returns:
-        Tuple[bool, List[str]]: (success, log_messages)
+    Использует IptablesManager и DnsmasqManager.
     """
     log = []
     success = True
@@ -79,13 +72,19 @@ def emergency_restore() -> Tuple[bool, List[str]]:
             ok, out = _run_cmd(['sh', script_path, 'stop'], timeout=10)
             status = "✅" if ok else "⚠️"
             log.append(f"  {status} {name}: {'stopped' if ok else 'not found'}")
-            logger.info(f"[EMERGENCY] Stopped {name}: {ok}")
 
-    # 2. Очистить iptables PREROUTING
+    # 2. Очистить iptables PREROUTING через IptablesManager
     log.append("🧹 Очистка iptables правил...")
-    ok, out = _run_cmd(['iptables', '-t', 'nat', '-F', 'PREROUTING'], timeout=5)
-    log.append(f"  {'✅' if ok else '⚠️'} PREROUTING flushed")
-    logger.info(f"[EMERGENCY] Flush PREROUTING: {ok}")
+    try:
+        from core.iptables_manager import get_iptables_manager
+        ipt = get_iptables_manager()
+        ok, msg = ipt.flush_all_flymybyte_rules()
+        log.append(f"  {'✅' if ok else '⚠️'} {msg}")
+    except Exception as e:
+        log.append(f"  ⚠️ IptablesManager error: {e}")
+        # Fallback на прямой вызов
+        ok, out = _run_cmd(['iptables', '-t', 'nat', '-F', 'PREROUTING'], timeout=5)
+        log.append(f"  {'✅' if ok else '⚠️'} Fallback flush: {'OK' if ok else 'failed'}")
 
     # 3. Очистить все ipset
     log.append("🧹 Очистка ipset списков...")
@@ -93,7 +92,6 @@ def emergency_restore() -> Tuple[bool, List[str]]:
         ok, out = _run_cmd(['ipset', 'flush', ipset_name], timeout=5)
         status = "✅" if ok else "ℹ️"
         log.append(f"  {status} {ipset_name}")
-        logger.info(f"[EMERGENCY] Flush {ipset_name}: {ok}")
 
     # 4. Удалить маркерные файлы
     log.append("🗑️  Удаление временных файлов...")
@@ -105,44 +103,40 @@ def emergency_restore() -> Tuple[bool, List[str]]:
             except Exception as e:
                 log.append(f"  ⚠️ Failed to remove {marker}: {e}")
 
-    # 5. Восстановить dnsmasq.conf из шаблона
-    log.append("📄 Восстановление dnsmasq.conf...")
-    if os.path.exists(DNSMASQ_TEMPLATE):
-        try:
+    # 5. Восстановить dnsmasq.conf и очистить конфиги bypass
+    log.append("📄 Восстановление dnsmasq конфигурации...")
+    try:
+        from core.dnsmasq_manager import get_dnsmasq_manager
+        dns_mgr = get_dnsmasq_manager()
+        
+        # Восстанавливаем шаблон
+        if os.path.exists(DNSMASQ_TEMPLATE):
             shutil.copy2(DNSMASQ_TEMPLATE, DNSMASQ_CONF)
             log.append("  ✅ dnsmasq.conf restored from template")
-            logger.info("[EMERGENCY] dnsmasq.conf restored")
-        except Exception as e:
-            log.append(f"  ⚠️ Failed to restore dnsmasq.conf: {e}")
-            logger.error(f"[EMERGENCY] dnsmasq.conf restore error: {e}")
-            success = False
-    else:
-        log.append("  ⚠️ Template not found, skipping")
-
-    # 6. Очистить конфиги bypass
-    log.append("🧹 Очистка конфигов bypass...")
-    for conf_file in ['/opt/etc/unblock.dnsmasq', '/opt/etc/unblock-ai.dnsmasq']:
-        if os.path.exists(conf_file):
-            try:
+        
+        # Очищаем конфиги bypass
+        for conf_file in [DNSMASQ_CONF.replace('dnsmasq.conf', 'unblock.dnsmasq'),
+                          DNSMASQ_CONF.replace('dnsmasq.conf', 'unblock-ai.dnsmasq')]:
+            if os.path.exists(conf_file):
                 with open(conf_file, 'w') as f:
                     f.write('')
                 log.append(f"  ✅ Cleared {os.path.basename(conf_file)}")
-            except Exception as e:
-                log.append(f"  ⚠️ Failed to clear {conf_file}: {e}")
+    except Exception as e:
+        log.append(f"  ⚠️ DnsmasqManager error: {e}")
+        success = False
 
-    # 7. Перезапустить dnsmasq
+    # 6. Перезапустить dnsmasq
     log.append("🔄 Перезапуск dnsmasq...")
     dnsmasq_script = f'{INIT_DIR}/S56dnsmasq'
     if os.path.exists(dnsmasq_script):
         ok, out = _run_cmd(['sh', dnsmasq_script, 'restart'], timeout=15)
         log.append(f"  {'✅' if ok else '❌'} dnsmasq {'restarted' if ok else 'failed'}")
-        logger.info(f"[EMERGENCY] dnsmasq restart: {ok}")
         if not ok:
             success = False
     else:
         log.append("  ⚠️ dnsmasq script not found")
 
-    # 8. Проверка DNS
+    # 7. Проверка DNS
     log.append("🔍 Проверка DNS...")
     try:
         ok, out = _run_cmd(['nslookup', 'google.com', '8.8.8.8'], timeout=10)
@@ -153,7 +147,7 @@ def emergency_restore() -> Tuple[bool, List[str]]:
     except Exception as e:
         log.append(f"  ⚠️ DNS check error: {e}")
 
-    # 9. Финальный статус
+    # 8. Финальный статус
     log.append("")
     if success:
         log.append("✅ Аварийное восстановление завершено успешно!")
