@@ -31,7 +31,7 @@
         <ul class="menu__list">
             {% if session.get('authenticated') %}
             <li class="menu__item"><a class="menu__link" href="{{ url_for('core.index') }}"><i class="fm fm-house"></i> Главная</a></li>
-            <li class="menu__item"><a class="menu__link" href="{{ url_for('keys.keys') }}"><i class="fm fm-key"></i> Ключи</a></li>
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('vpn.keys') }}"><i class="fm fm-key"></i> Ключи</a></li>
             <li class="menu__item"><a class="menu__link" href="{{ url_for('bypass.bypass') }}"><i class="fm fm-globe"></i> Обход</a></li>
             <li class="menu__item"><a class="menu__link" href="{{ url_for('system.service') }}"><i class="fm fm-gear"></i> Сервис</a></li>
             <li class="menu__item"><a class="menu__link" href="{{ url_for('updates.service_updates') }}"><i class="fm fm-arrow-repeat"></i> Обновления</a></li>
