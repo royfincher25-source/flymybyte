@@ -495,6 +495,67 @@ function escapeHtml(text) {
             </div>
         </div>
     </div>
+
+    <!-- Аварийное восстановление -->
+    <div>
+        <div class="card shadow-sm border-danger">
+            <div class="card__body">
+                <h5 class="card__title text-danger"><i class="fm fm-exclamation-triangle"></i> Аварийное восстановление</h5>
+                <p class="text-muted small">Если интернет не работает после настройки VPN</p>
+                <ul class="text-muted small mb-2">
+                    <li>Остановит все VPN-сервисы</li>
+                    <li>Очистит iptables и ipset правила</li>
+                    <li>Восстановит dnsmasq</li>
+                </ul>
+                <button type="button" class="btn btn--danger btn--sm" onclick="openModal('emergencyModal')">
+                    <i class="fm fm-shield-check"></i> Всё сломалось — почини!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно аварийного восстановления -->
+<div class="modal fade" id="emergencyModal" tabindex="-1" aria-labelledby="emergencyModalLabel" aria-hidden="true">
+    <div class="modal__dialog">
+        <div class="modal__header">
+            <h5 class="modal__title" id="emergencyModalLabel">
+                <i class="fm fm-exclamation-triangle text-danger"></i> Аварийное восстановление
+            </h5>
+            <button type="button" class="btn-close" onclick="closeModal('emergencyModal')" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal__body">
+            <p>Это действие выполнит полный сброс к рабочему состоянию:</p>
+            <ul>
+                <li>⏹️ Остановит все VPN-сервисы (VLESS, Shadowsocks, Trojan, Tor, Hysteria2)</li>
+                <li>🧹 Очистит все iptables и ipset правила</li>
+                <li>📄 Восстановит конфигурацию dnsmasq</li>
+                <li>🔄 Перезапустит DNS</li>
+            </ul>
+            <div class="alert alert--warning mb-0">
+                <i class="fm fm-info-circle"></i>
+                После восстановления вам потребуется заново настроить VPN-сервисы.
+            </div>
+            {% if session.get('emergency_log') %}
+            <details class="mt-3">
+                <summary>Последний лог восстановления</summary>
+                <pre class="mt-2 p-2 bg-dark rounded" style="max-height: 200px; overflow-y: auto; font-size: 0.75rem;">
+{%- for line in session.pop('emergency_log') %}{{ line }}
+{% endfor -%}
+                </pre>
+            </details>
+            {% endif %}
+        </div>
+        <div class="modal__footer">
+            <button type="button" class="btn btn--secondary" onclick="closeModal('emergencyModal')">Отмена</button>
+            <form method="POST" action="{{ url_for('system.emergency_restore') }}" class="d-inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button type="submit" class="btn btn--danger">
+                    <i class="fm fm-shield-check"></i> Восстановить
+                </button>
+            </form>
+        </div>
+    </div>
 </div>
 
 <!-- Модальное окно подтверждения перезагрузки роутера -->

@@ -230,7 +230,21 @@ def vless_config(key: str) -> Dict[str, Any]:
         ],
         'routing': {
             'domainStrategy': 'AsIs',
-            'rules': [],
+            'rules': [
+                # FIX: Локальные IP идут напрямую
+                {
+                    'type': 'field',
+                    'ip': ['geoip:private'],
+                    'outboundTag': 'direct',
+                },
+                # FIX: Весь остальной трафик идёт напрямую по умолчанию
+                # iptables сам перенаправит только домены из списка обхода
+                {
+                    'type': 'field',
+                    'port': '0-65535',
+                    'outboundTag': 'direct',
+                },
+            ],
         },
     }
 

@@ -690,6 +690,26 @@ def dns_monitor_status():
     return render_template('dns_monitor.html', status=status)
 
 
+@bp.route('/service/emergency-restore', methods=['POST'])
+@login_required
+@csrf_required
+def emergency_restore():
+    """Аварийное восстановление — полный сброс к рабочему состоянию."""
+    logger.info("[ROUTES] /service/emergency-restore - Starting emergency restore")
+    from core.emergency_restore import emergency_restore as do_restore
+    success, log = do_restore()
+    
+    if success:
+        flash('✅ Аварийное восстановление завершено! Интернет должен работать.', 'success')
+    else:
+        flash('⚠️ Восстановление завершено с предупреждениями. Проверьте логи.', 'warning')
+    
+    # Сохраняем детальный лог в сессию для отображения
+    session['emergency_log'] = log
+    logger.info(f"[ROUTES] Emergency restore completed: success={success}")
+    return redirect(url_for('system.service'))
+
+
 @bp.route('/service/dns-monitor/start', methods=['POST'])
 @login_required
 @csrf_required
