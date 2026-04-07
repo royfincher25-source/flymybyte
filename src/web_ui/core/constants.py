@@ -171,6 +171,8 @@ FILES_TO_UPDATE = {
     'web_ui/core/dns_ops.py': f'{WEB_UI_DIR}/core/dns_ops.py',
     'web_ui/core/app_config.py': f'{WEB_UI_DIR}/core/app_config.py',
     'web_ui/core/update_progress.py': f'{WEB_UI_DIR}/core/update_progress.py',
+    'web_ui/core/dnsmasq_manager.py': f'{WEB_UI_DIR}/core/dnsmasq_manager.py',
+    'web_ui/core/iptables_manager.py': f'{WEB_UI_DIR}/core/iptables_manager.py',
     'web_ui/routes_core.py': f'{WEB_UI_DIR}/routes_core.py',
     'web_ui/routes_system.py': f'{WEB_UI_DIR}/routes_system.py',
     'web_ui/routes_vpn.py': f'{WEB_UI_DIR}/routes_vpn.py',
