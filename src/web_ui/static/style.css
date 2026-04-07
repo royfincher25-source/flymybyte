@@ -84,9 +84,6 @@ img { max-width: 100%; height: auto; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 .navbar__brand {
   font-size: 1.25rem;
