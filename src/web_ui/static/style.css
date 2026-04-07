@@ -52,7 +52,7 @@ img { max-width: 100%; height: auto; }
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 calc(15px + (20 - 15) * ((100vw - 320px) / (1200 - 320)));
 }
 
 .row { display: grid; gap: 1rem; }
