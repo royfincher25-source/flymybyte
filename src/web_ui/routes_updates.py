@@ -116,34 +116,55 @@ def create_update_backup() -> str:
     return backup_file
 
 
-def _download_file(source_path: str, dest_path: str, progress, idx: int, total: int) -> bool:
+def _download_file(source_path: str, dest_path: str, progress, idx: int, total: int, max_retries: int = 3) -> bool:
     import requests
+    import time
     if source_path == 'VERSION':
         url = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION'
     else:
         url = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/src/{source_path}'
     progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
-    try:
-        response = requests.get(url, timeout=FILE_DOWNLOAD_TIMEOUT)
-        if response.status_code == 404:
-            logger.info(f"Skipping removed file: {source_path}")
+    
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, timeout=FILE_DOWNLOAD_TIMEOUT)
+            if response.status_code == 404:
+                logger.info(f"Skipping removed file: {source_path}")
+                return True
+            response.raise_for_status()
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+            if source_path.endswith(('.woff2', '.woff', '.ttf', '.png', '.jpg', '.jpeg', '.gif', '.ico')):
+                with open(dest_path, 'wb') as f:
+                    f.write(response.content)
+            else:
+                with open(dest_path, 'w', encoding='utf-8') as f:
+                    f.write(response.text)
+            filename = os.path.basename(dest_path)
+            is_executable = filename.endswith('.sh') or filename in ['S99web_ui', 'S99unblock']
+            os.chmod(dest_path, 0o755 if is_executable else 0o644)
+            logger.info(f"Updated {dest_path}")
             return True
-        response.raise_for_status()
-        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-        if source_path.endswith(('.woff2', '.woff', '.ttf', '.png', '.jpg', '.jpeg', '.gif', '.ico')):
-            with open(dest_path, 'wb') as f:
-                f.write(response.content)
-        else:
-            with open(dest_path, 'w', encoding='utf-8') as f:
-                f.write(response.text)
-        filename = os.path.basename(dest_path)
-        is_executable = filename.endswith('.sh') or filename in ['S99web_ui', 'S99unblock']
-        os.chmod(dest_path, 0o755 if is_executable else 0o644)
-        logger.info(f"Updated {dest_path}")
-        return True
-    except (requests.exceptions.RequestException, OSError) as e:
-        logger.error(f'Error with {source_path}: {e}')
-        return False
+        except requests.exceptions.ConnectionError as e:
+            last_error = e
+            if 'Failed to resolve' in str(e) or 'NameResolutionError' in str(e):
+                delay = 5 * attempt
+                logger.warning(f"DNS error for {source_path} (attempt {attempt}/{max_retries}), retrying in {delay}s: {e}")
+                time.sleep(delay)
+            else:
+                logger.error(f'Connection error with {source_path}: {e}')
+                return False
+        except (requests.exceptions.RequestException, OSError) as e:
+            last_error = e
+            if attempt < max_retries:
+                delay = 3 * attempt
+                logger.warning(f"Error with {source_path} (attempt {attempt}/{max_retries}), retrying in {delay}s: {e}")
+                time.sleep(delay)
+            else:
+                logger.error(f'Error with {source_path}: {e}')
+    
+    logger.error(f'Failed to download {source_path} after {max_retries} attempts: {last_error}')
+    return False
 
 
 def download_all_files(progress) -> tuple:
