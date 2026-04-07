@@ -74,6 +74,7 @@ from core.utils import (
     is_ip_address,
 )
 from core.app_config import WebConfig
+from core.dnsmasq_manager import get_dnsmasq_manager
 from core.services import (
     DNSSpoofing, apply_dns_spoofing, disable_dns_spoofing,
     get_dns_spoofing_status, get_catalog, download_list,
@@ -99,6 +100,14 @@ def dns_spoofing():
 def dns_spoofing_status():
     try:
         status = get_dns_spoofing_status()
+        # Use DnsmasqManager for accurate dnsmasq status
+        try:
+            dns_mgr = get_dnsmasq_manager()
+            dns_status = dns_mgr.get_status()
+            status['dnsmasq_running'] = dns_status['dnsmasq_running']
+            status['config_valid'] = dns_status['config_valid']
+        except Exception:
+            pass
         return jsonify(status)
     except Exception as e:
         logger.error(f"dns_spoofing_status error: {e}")
@@ -108,12 +117,15 @@ def dns_spoofing_status():
 @bp.route('/dns-spoofing/apply', methods=['POST'])
 @login_required
 def dns_spoofing_apply():
+    """Применить DNS-обход AI-доменов через DnsmasqManager."""
     try:
-        success, message = apply_dns_spoofing()
-        if success:
-            return jsonify({'success': True, 'message': message})
+        dns_mgr = get_dnsmasq_manager()
+        ok, msg = dns_mgr.generate_ai_config()
+        if ok:
+            dns_mgr.restart_dnsmasq_with_retry()
+            return jsonify({'success': True, 'message': msg})
         else:
-            return jsonify({'success': False, 'error': message})
+            return jsonify({'success': False, 'error': msg})
     except Exception as e:
         logger.error(f"dns_spoofing_apply error: {e}")
         return jsonify({'success': False, 'error': str(e)})
@@ -122,12 +134,17 @@ def dns_spoofing_apply():
 @bp.route('/dns-spoofing/disable', methods=['POST'])
 @login_required
 def dns_spoofing_disable():
+    """Отключить DNS-обход AI-доменов через DnsmasqManager."""
     try:
-        success, message = disable_dns_spoofing()
-        if success:
-            return jsonify({'success': True, 'message': message})
-        else:
-            return jsonify({'success': False, 'error': message})
+        dns_mgr = get_dnsmasq_manager()
+        # Очищаем AI конфиг
+        ai_conf = '/opt/etc/unblock-ai.dnsmasq'
+        if os.path.exists(ai_conf):
+            with open(ai_conf, 'w') as f:
+                f.write('')
+        # Перезапускаем dnsmasq
+        dns_mgr.restart_dnsmasq_with_retry()
+        return jsonify({'success': True, 'message': 'DNS-обход AI выключен'})
     except Exception as e:
         logger.error(f"dns_spoofing_disable error: {e}")
         return jsonify({'success': False, 'error': str(e)})
@@ -288,20 +305,18 @@ def add_to_bypass(filename: str):
         save_bypass_list(filepath, current_list)
         logger.info(f"[ROUTES] Saved {added_count} new entries (IPs: {len(ip_entries)}, domains: {len(domain_entries)}, invalid: {len(invalid_entries)})")
         if added_count > 0:
-            if ip_entries and not domain_entries:
-                logger.info(f"[ROUTES] Adding {len(ip_entries)} IPs directly to ipset")
-                success, msg = bulk_add_to_ipset('unblock', ip_entries)
-                if success:
-                    flash(f'✅ Успешно добавлено: {added_count} шт. (IP в ipset: {len(ip_entries)})', 'success')
+            # Use DnsmasqManager for atomic config regeneration and dnsmasq restart
+            try:
+                dns_mgr = get_dnsmasq_manager()
+                ok, msg = dns_mgr.generate_all()
+                if ok:
+                    dns_mgr.restart_dnsmasq_with_retry()
+                    flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
                 else:
-                    logger.warning(f"[ROUTES] ipset add failed, falling back to unblock_update: {msg}")
-                    success, output = run_unblock_update()
-                    if success:
-                        flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
-                    else:
-                        flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {output}', 'warning')
-            else:
-                logger.info(f"[ROUTES] Running unblock_update for {added_count} mixed entries")
+                    flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {msg}', 'warning')
+            except Exception as e:
+                logger.error(f"[ROUTES] DnsmasqManager error: {e}")
+                # Fallback to old method
                 success, output = run_unblock_update()
                 if success:
                     flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
