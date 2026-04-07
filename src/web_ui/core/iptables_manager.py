@@ -1,0 +1,376 @@
+"""
+FlyMyByte — Unified iptables Manager
+
+Централизованное управление iptables правилами.
+Заменяет разрозненные вызовы iptables в 5+ файлах.
+
+Использование:
+    from core.iptables_manager import IptablesManager
+
+    mgr = IptablesManager()
+    mgr.add_vpn_redirect('unblockvless', 10810)
+    mgr.remove_vpn_redirect('unblockvless', 10810)
+    mgr.add_dns_redirect('192.168.1.1', 5353)
+    mgr.snapshot()   # сохранить текущее состояние
+    mgr.restore()    # восстановить
+"""
+import subprocess
+import logging
+import json
+import os
+from typing import List, Dict, Tuple, Optional
+
+logger = logging.getLogger(__name__)
+
+SNAPSHOT_FILE = '/tmp/iptables_snapshot.json'
+
+
+class IptablesManager:
+    """Менеджер iptables правил для FlyMyByte."""
+
+    def __init__(self):
+        self._table = 'nat'
+        self._chain = 'PREROUTING'
+
+    # =========================================================================
+    # VPN REDIRECT RULES
+    # =========================================================================
+
+    def add_vpn_redirect(self, ipset_name: str, port: int) -> Tuple[bool, str]:
+        """
+        Добавить правила перенаправления трафика для ipset на VPN-порт.
+
+        Args:
+            ipset_name: Имя ipset (напр. 'unblockvless')
+            port: Порт VPN-прокси (напр. 10810)
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        rules_added = []
+        errors = []
+
+        for proto in ['tcp', 'udp']:
+            rule = ['-t', self._table, '-C', self._chain, '-p', proto,
+                    '-m', 'set', '--match-set', ipset_name, 'dst',
+                    '-j', 'REDIRECT', '--to-port', str(port)]
+
+            # Проверяем не существует ли уже
+            result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                logger.debug(f"Rule already exists: {ipset_name} {proto} -> {port}")
+                rules_added.append(f"{proto} (exists)")
+                continue
+
+            # Добавляем правило
+            rule[3] = '-A'  # Меняем -C на -A
+            result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                rules_added.append(proto)
+                logger.info(f"Added iptables rule: {ipset_name} {proto} -> {port}")
+            else:
+                errors.append(f"{proto}: {result.stderr.strip()}")
+                logger.error(f"Failed to add rule {ipset_name} {proto} -> {port}: {result.stderr.strip()}")
+
+        if errors:
+            return False, f"Errors: {'; '.join(errors)}"
+        return True, f"Added: {', '.join(rules_added)}"
+
+    def remove_vpn_redirect(self, ipset_name: str, port: int) -> Tuple[bool, str]:
+        """
+        Удалить правила перенаправления для ipset.
+
+        Args:
+            ipset_name: Имя ipset
+            port: Порт VPN-прокси
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        rules_removed = []
+
+        for proto in ['tcp', 'udp']:
+            # Удаляем все копии правила (может быть несколько)
+            while True:
+                rule = ['-t', self._table, '-D', self._chain, '-p', proto,
+                        '-m', 'set', '--match-set', ipset_name, 'dst',
+                        '-j', 'REDIRECT', '--to-port', str(port)]
+                result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+                if result.returncode != 0:
+                    break
+                rules_removed.append(proto)
+
+        if rules_removed:
+            logger.info(f"Removed iptables rules: {ipset_name} -> {port}")
+            return True, f"Removed: {', '.join(set(rules_removed))}"
+        return True, "No rules to remove"
+
+    # =========================================================================
+    # DNS REDIRECT RULES (DNS Override)
+    # =========================================================================
+
+    def add_dns_redirect(self, local_ip: str, target_port: int) -> Tuple[bool, str]:
+        """
+        Добавить правила DNAT для перенаправления DNS-запросов.
+
+        Args:
+            local_ip: IP роутера (напр. '192.168.1.1')
+            target_port: Порт dnsmasq (напр. 5353)
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        rules_added = []
+        errors = []
+
+        for proto in ['udp', 'tcp']:
+            rule = ['-t', self._table, '-C', self._chain, '-p', proto,
+                    '--dport', '53', '-j', 'DNAT',
+                    '--to-destination', f'{local_ip}:{target_port}']
+
+            result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                rules_added.append(f"{proto} (exists)")
+                continue
+
+            rule[3] = '-A'
+            result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                rules_added.append(proto)
+                logger.info(f"Added DNS redirect: {proto} dport 53 -> {local_ip}:{target_port}")
+            else:
+                errors.append(f"{proto}: {result.stderr.strip()}")
+
+        if errors:
+            return False, f"Errors: {'; '.join(errors)}"
+        return True, f"Added: {', '.join(rules_added)}"
+
+    def remove_dns_redirect(self, local_ip: str, target_port: int) -> Tuple[bool, str]:
+        """
+        Удалить правила DNAT для DNS-запросов.
+
+        Args:
+            local_ip: IP роутера
+            target_port: Порт dnsmasq
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        rules_removed = []
+
+        for proto in ['udp', 'tcp']:
+            while True:
+                rule = ['-t', self._table, '-D', self._chain, '-p', proto,
+                        '--dport', '53', '-j', 'DNAT',
+                        '--to-destination', f'{local_ip}:{target_port}']
+                result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+                if result.returncode != 0:
+                    break
+                rules_removed.append(proto)
+
+            # Также удаляем вариант без порта (на всякий случай)
+            while True:
+                rule = ['-t', self._table, '-D', self._chain, '-p', proto,
+                        '--dport', '53', '-j', 'DNAT',
+                        '--to-destination', local_ip]
+                result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
+                if result.returncode != 0:
+                    break
+                rules_removed.append(proto)
+
+        if rules_removed:
+            logger.info(f"Removed DNS redirect rules for {local_ip}:{target_port}")
+            return True, f"Removed: {', '.join(set(rules_removed))}"
+        return True, "No DNS redirect rules to remove"
+
+    # =========================================================================
+    # FLUSH / RESET
+    # =========================================================================
+
+    def flush_chain(self, table: str = 'nat', chain: str = 'PREROUTING') -> Tuple[bool, str]:
+        """
+        Очистить всю цепочку iptables.
+
+        Args:
+            table: Таблица (nat, mangle, filter)
+            chain: Цепочка
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        result = subprocess.run(
+            ['iptables', '-t', table, '-F', chain],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            logger.warning(f"Flushed {table}:{chain}")
+            return True, f"Flushed {table}:{chain}"
+        return False, result.stderr.strip()
+
+    def flush_all_flymybyte_rules(self) -> Tuple[bool, str]:
+        """
+        Очистить ВСЕ правила FlyMyByte из PREROUTING.
+        Удаляет только правила, относящиеся к FlyMyByte (REDIRECT, DNAT).
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        removed = []
+
+        # Получаем список всех правил
+        result = subprocess.run(
+            ['iptables', '-t', 'nat', '-L', 'PREROUTING', '-n', '-v', '--line-numbers'],
+            capture_output=True, text=True, timeout=5
+        )
+
+        if result.returncode != 0:
+            return False, "Failed to list rules"
+
+        # Парсим и удаляем правила FlyMyByte (REDIRECT и DNAT на 53)
+        lines = result.stdout.strip().split('\n')
+        for line in reversed(lines):  # С конца, чтобы номера не сбивались
+            if 'REDIRECT' in line or ('DNAT' in line and 'dpt:53' in line):
+                # Извлекаем номер правила
+                parts = line.strip().split()
+                if parts and parts[0].isdigit():
+                    rule_num = parts[0]
+                    del_result = subprocess.run(
+                        ['iptables', '-t', 'nat', '-D', 'PREROUTING', rule_num],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if del_result.returncode == 0:
+                        removed.append(rule_num)
+
+        if removed:
+            logger.warning(f"Removed {len(removed)} FlyMyByte rules from PREROUTING")
+            return True, f"Removed {len(removed)} rules"
+        return True, "No FlyMyByte rules found"
+
+    # =========================================================================
+    # SNAPSHOT / RESTORE
+    # =========================================================================
+
+    def snapshot(self) -> Tuple[bool, str]:
+        """
+        Сохранить текущее состояние iptables в файл.
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        result = subprocess.run(
+            ['iptables-save', '-t', 'nat'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            return False, "Failed to save iptables state"
+
+        try:
+            with open(SNAPSHOT_FILE, 'w') as f:
+                f.write(result.stdout)
+            logger.info(f"iptables snapshot saved to {SNAPSHOT_FILE}")
+            return True, f"Snapshot saved ({len(result.stdout)} bytes)"
+        except Exception as e:
+            return False, str(e)
+
+    def restore(self) -> Tuple[bool, str]:
+        """
+        Восстановить iptables из сохранённого снапшота.
+
+        Returns:
+            Tuple[bool, str]: (success, message)
+        """
+        if not os.path.exists(SNAPSHOT_FILE):
+            return False, "No snapshot file found"
+
+        try:
+            with open(SNAPSHOT_FILE, 'r') as f:
+                rules = f.read()
+
+            result = subprocess.run(
+                ['iptables-restore'],
+                input=rules, capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                logger.info("iptables restored from snapshot")
+                return True, "Restored from snapshot"
+            return False, result.stderr.strip()
+        except Exception as e:
+            return False, str(e)
+
+    def delete_snapshot(self) -> None:
+        """Удалить файл снапшота."""
+        if os.path.exists(SNAPSHOT_FILE):
+            os.remove(SNAPSHOT_FILE)
+
+    # =========================================================================
+    # STATUS / INFO
+    # =========================================================================
+
+    def get_rules(self, table: str = 'nat', chain: str = 'PREROUTING') -> str:
+        """
+        Получить список правил в читаемом формате.
+
+        Returns:
+            str: Список правил
+        """
+        result = subprocess.run(
+            ['iptables', '-t', table, '-L', chain, '-n', '-v'],
+            capture_output=True, text=True, timeout=5
+        )
+        return result.stdout if result.returncode == 0 else ''
+
+    def get_rules_count(self, table: str = 'nat', chain: str = 'PREROUTING') -> int:
+        """
+        Получить количество правил в цепочке.
+
+        Returns:
+            int: Количество правил
+        """
+        result = subprocess.run(
+            ['iptables', '-t', table, '-L', chain, '-n'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            return 0
+        lines = result.stdout.strip().split('\n')
+        return max(0, len(lines) - 2)  # Минус заголовок и итоговая строка
+
+
+# =============================================================================
+# MODULE-LEVEL CONVENIENCE FUNCTIONS
+# =============================================================================
+
+def get_iptables_manager() -> IptablesManager:
+    """Получить экземпляр менеджера (singleton pattern)."""
+    if not hasattr(get_iptables_manager, '_instance'):
+        get_iptables_manager._instance = IptablesManager()
+    return get_iptables_manager._instance
+
+
+# Convenience wrappers for backward compatibility with shell scripts
+def add_vpn_redirect(ipset_name: str, port: int) -> Tuple[bool, str]:
+    return get_iptables_manager().add_vpn_redirect(ipset_name, port)
+
+
+def remove_vpn_redirect(ipset_name: str, port: int) -> Tuple[bool, str]:
+    return get_iptables_manager().remove_vpn_redirect(ipset_name, port)
+
+
+def add_dns_redirect(local_ip: str, target_port: int) -> Tuple[bool, str]:
+    return get_iptables_manager().add_dns_redirect(local_ip, target_port)
+
+
+def remove_dns_redirect(local_ip: str, target_port: int) -> Tuple[bool, str]:
+    return get_iptables_manager().remove_dns_redirect(local_ip, target_port)
+
+
+def flush_all_flymybyte_rules() -> Tuple[bool, str]:
+    return get_iptables_manager().flush_all_flymybyte_rules()
+
+
+def snapshot() -> Tuple[bool, str]:
+    return get_iptables_manager().snapshot()
+
+
+def restore() -> Tuple[bool, str]:
+    return get_iptables_manager().restore()
