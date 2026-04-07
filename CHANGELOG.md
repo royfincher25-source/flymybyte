@@ -2,6 +2,25 @@
 
 Все значимые изменения в проекте будут документироваться в этом файле.
 
+## [2.1.0] - 2026-04-07
+
+### ✨ Новое
+
+- **Бургер-меню** — адаптивная навигация для мобильных (<768px), чистый JS без jQuery
+- **Табы** — переключение контента (`data-tabs`, `data-tabs-title`, `data-tabs-body-item`)
+- **Спойлеры/аккордеон** — раскрывающиеся блоки (`data-spoilers`, `data-spoiler-title`, `data-spoiler-body`)
+- **Показать ещё** — обрезка длинного контента (`data-showmore`, `data-showmore-content`)
+- **Smooth scroll** — плавная прокрутка к якорям (`data-goto`, `data-goto-header`, `data-goto-top`)
+- **Показать пароль** — toggle видимости (`.viewpass` кнопка рядом с password input)
+- **Popup улучшен** — закрытие по ESC, клик вне окна, блокировка скролла (`body._lock`)
+
+### 🔧 Изменено
+
+- **base.html** — структура бургер-меню с `icon-menu` и `menu__body`, подключён `main.js`
+- **style.css** — адаптивный контейнер через `calc()`, flexbox sticky footer, 150+ строк новых стилей
+- **main.js** — новый файл, ~250 строк чистого JS, 0 зависимостей, <5KB gzipped
+- **service.html** — модалки переведены на `data-popup` / `data-close` вместо inline onclick
+
 ## [2.0.6] - 2026-04-07
 
 ### 🐛 Исправлено

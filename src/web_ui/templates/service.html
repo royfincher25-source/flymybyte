@@ -339,7 +339,7 @@ function escapeHtml(text) {
             <div class="card__body">
                 <h5 class="card__title"><i class="fm fm-router"></i> Перезапуск роутера</h5>
                 <p class="text-muted small">Перезагрузка всего роутера (~2 минуты)</p>
-                <button type="button" class="btn btn--warning btn--sm" onclick="openModal('rebootModal')">
+                <button type="button" class="btn btn--warning btn--sm" data-popup="rebootModal">
                     <i class="fm fm-arrow-clockwise"></i> Перезапустить
                 </button>
             </div>
@@ -507,7 +507,7 @@ function escapeHtml(text) {
                     <li>Очистит iptables и ipset правила</li>
                     <li>Восстановит dnsmasq</li>
                 </ul>
-                <button type="button" class="btn btn--danger btn--sm" onclick="openModal('emergencyModal')">
+                <button type="button" class="btn btn--danger btn--sm" data-popup="emergencyModal">
                     <i class="fm fm-shield-check"></i> Всё сломалось — почини!
                 </button>
             </div>
@@ -522,7 +522,7 @@ function escapeHtml(text) {
             <h5 class="modal__title" id="emergencyModalLabel">
                 <i class="fm fm-exclamation-triangle text-danger"></i> Аварийное восстановление
             </h5>
-            <button type="button" class="btn-close" onclick="closeModal('emergencyModal')" aria-label="Закрыть"></button>
+            <button type="button" class="btn-close" data-close aria-label="Закрыть"></button>
         </div>
         <div class="modal__body">
             <p>Это действие выполнит полный сброс к рабочему состоянию:</p>
@@ -547,7 +547,7 @@ function escapeHtml(text) {
             {% endif %}
         </div>
         <div class="modal__footer">
-            <button type="button" class="btn btn--secondary" onclick="closeModal('emergencyModal')">Отмена</button>
+            <button type="button" class="btn btn--secondary" data-close>Отмена</button>
             <form method="POST" action="{{ url_for('system.emergency_restore') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn--danger">
@@ -565,7 +565,7 @@ function escapeHtml(text) {
             <h5 class="modal__title" id="rebootModalLabel">
                 <i class="fm fm-exclamation-triangle text-warning"></i> Подтверждение
             </h5>
-            <button type="button" class="btn-close" onclick="closeModal('rebootModal')" aria-label="Закрыть"></button>
+            <button type="button" class="btn-close" data-close aria-label="Закрыть"></button>
         </div>
         <div class="modal__body">
             <p>Вы уверены, что хотите перезагрузить роутер?</p>
@@ -575,7 +575,7 @@ function escapeHtml(text) {
             </div>
         </div>
         <div class="modal__footer">
-            <button type="button" class="btn btn--secondary" onclick="closeModal('rebootModal')">Отмена</button>
+            <button type="button" class="btn btn--secondary" data-close>Отмена</button>
             <form method="POST" action="{{ url_for('system.service_restart_router') }}" class="d-inline">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn--warning">

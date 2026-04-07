@@ -178,6 +178,7 @@ FILES_TO_UPDATE = {
     'web_ui/routes_vpn.py': f'{WEB_UI_DIR}/routes_vpn.py',
     'web_ui/routes_bypass.py': f'{WEB_UI_DIR}/routes_bypass.py',
     'web_ui/routes_updates.py': f'{WEB_UI_DIR}/routes_updates.py',
+    'web_ui/static/main.js': f'{WEB_UI_DIR}/static/main.js',
     'web_ui/resources/scripts/S99unblock': f'{INIT_DIR}/S99unblock',
     'web_ui/resources/scripts/S99web_ui': f'{INIT_DIR}/S99web_ui',
     'web_ui/resources/scripts/100-redirect.sh': f'{NDM_DIR}/netfilter.d/100-redirect.sh',

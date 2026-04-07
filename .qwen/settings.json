@@ -15,7 +15,10 @@
       "Bash(rm *)",
       "Bash(python *)",
       "Bash(select-object *)",
-      "Bash(type *)"
+      "Bash(type *)",
+      "Bash(ls *)",
+      "Bash(del *)",
+      "Bash(timeout *)"
     ]
   },
   "$version": 3,

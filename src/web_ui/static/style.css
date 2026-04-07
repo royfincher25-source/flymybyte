@@ -629,9 +629,159 @@ main {
 .footer a { transition: color var(--transition); }
 .footer a:hover { color: var(--color-primary) !important; }
 
+/* --- Body lock (for popup/mobile menu) --- */
+body._lock { overflow: hidden; }
+
+/* --- Burger Menu --- */
+.icon-menu {
+    display: none;
+    width: 30px;
+    height: 18px;
+    position: relative;
+    cursor: pointer;
+    z-index: 5;
+    background: none;
+    border: none;
+    padding: 0;
+}
+.icon-menu span {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    top: 8px;
+    background-color: var(--color-primary);
+    transition: all 0.3s ease;
+}
+.icon-menu::before,
+.icon-menu::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: var(--color-primary);
+    transition: all 0.3s ease;
+}
+.icon-menu::before { top: 0; }
+.icon-menu::after { bottom: 0; }
+
+.icon-menu._active span { transform: scale(0); }
+.icon-menu._active::before { transform: rotate(45deg); top: 8px; }
+.icon-menu._active::after { transform: rotate(-45deg); bottom: 8px; }
+
+.menu__body {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: var(--color-surface-solid);
+    padding: 70px 20px 20px;
+    transition: left 0.3s ease;
+    overflow-y: auto;
+    z-index: 4;
+}
+.menu__body._active { left: 0; }
+.menu__list { list-style: none; padding: 0; margin: 0; }
+.menu__item { margin-bottom: 0.5rem; }
+.menu__link {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--color-primary);
+    font-size: 1.125rem;
+    border-radius: var(--radius);
+    transition: background var(--transition);
+}
+.menu__link:hover { background: rgba(77, 216, 235, 0.1); }
+
+/* --- Tabs --- */
+.tabs__nav { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.tabs__title {
+    padding: 0.5rem 1rem;
+    background: rgba(30, 42, 58, 0.9);
+    border: 1px solid var(--color-primary-dark);
+    border-radius: var(--radius);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all var(--transition);
+}
+.tabs__title:hover { border-color: var(--color-primary-medium); color: var(--color-text); }
+.tabs__title._tab-active {
+    background: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+    color: #fff;
+}
+.tabs__body { display: none; }
+.tabs__body._tab-active { display: block; }
+
+/* --- Spoilers (Accordion) --- */
+.spoilers__item { margin-bottom: 0.5rem; }
+.spoilers__title {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(30, 42, 58, 0.9);
+    border: 1px solid var(--color-primary-dark);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transition);
+}
+.spoilers__title:hover { border-color: var(--color-primary-medium); }
+.spoilers__title._spoller-active {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-color: var(--color-primary);
+}
+.spoilers__title::after {
+    content: '▾';
+    font-size: 1rem;
+    transition: transform var(--transition);
+}
+.spoilers__title._spoller-active::after { transform: rotate(180deg); }
+.spoilers__body {
+    padding: 0.75rem 1rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-primary-dark);
+    border-top: none;
+    border-bottom-left-radius: var(--radius);
+    border-bottom-right-radius: var(--radius);
+    transition: max-height 0.3s ease;
+    overflow: hidden;
+}
+
+/* --- Show More --- */
+[data-showmore-content] {
+    transition: max-height 0.3s ease;
+}
+[data-showmore-button] {
+    display: none;
+    margin-top: 0.5rem;
+}
+
+/* --- View Password --- */
+.viewpass {
+    background: none;
+    border: none;
+    color: var(--color-primary-medium);
+    cursor: pointer;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    transition: color var(--transition);
+}
+.viewpass:hover { color: var(--color-primary); }
+.viewpass._active { color: var(--color-success); }
+
 /* --- Responsive --- */
 @media (max-width: 768px) {
-    .navbar__nav { gap: 0.5rem; }
+    .icon-menu { display: block; }
+    .navbar__nav { display: none; }
     .footer .row { grid-template-columns: 1fr !important; text-align: center; gap: 0.5rem; }
     .footer .row > * { text-align: center !important; }
     .flex-between { flex-direction: column; align-items: flex-start !important; gap: 0.75rem; }

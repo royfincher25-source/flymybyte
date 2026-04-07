@@ -24,8 +24,21 @@
                 </a>
             </div>
             {% endif %}
+            <button type="button" class="icon-menu"><span></span><span></span><span></span></button>
         </div>
     </nav>
+    <div class="menu__body">
+        <ul class="menu__list">
+            {% if session.get('authenticated') %}
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('core.index') }}"><i class="fm fm-house"></i> Главная</a></li>
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('keys.keys') }}"><i class="fm fm-key"></i> Ключи</a></li>
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('bypass.bypass') }}"><i class="fm fm-globe"></i> Обход</a></li>
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('system.service') }}"><i class="fm fm-gear"></i> Сервис</a></li>
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('updates.service_updates') }}"><i class="fm fm-arrow-repeat"></i> Обновления</a></li>
+            <li class="menu__item"><a class="menu__link" href="{{ url_for('core.logout') }}"><i class="fm fm-box-arrow-right"></i> Выход</a></li>
+            {% endif %}
+        </ul>
+    </div>
 
     <main class="container mt-4">
         {% with messages = get_flashed_messages(with_categories=true) %}
@@ -81,6 +94,7 @@
         </div>
     </div>
 
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
     <script>
     const loadingOverlay = document.getElementById('loadingOverlay');
     const loadingText = document.getElementById('loadingText');
@@ -123,16 +137,6 @@
             toast.classList.remove('toast--show');
             setTimeout(function() { toast.remove(); }, 300);
         }, 3000);
-    }
-
-    // Modal helpers
-    function openModal(id) {
-        var modal = document.getElementById(id);
-        if (modal) modal.classList.add('modal--open');
-    }
-    function closeModal(id) {
-        var modal = document.getElementById(id);
-        if (modal) modal.classList.remove('modal--open');
     }
     </script>
     {% block extra_js %}{% endblock %}
