@@ -75,12 +75,6 @@
 				"type":"field",
 				"ip":["geoip:private"],
 				"outboundTag":"direct"
-			},
-			{
-				"type":"field",
-				"port":"0-65535",
-				"outboundTag":"direct",
-				"enabled":true
 			}
 		]
 	}

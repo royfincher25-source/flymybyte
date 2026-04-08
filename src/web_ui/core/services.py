@@ -169,13 +169,13 @@ def vless_config(key: str) -> Dict[str, Any]:
         },
         'inbounds': [
             {
-                'tag': 'socks',
-                'listen': '127.0.0.1',
+                'tag': 'transparent',
+                'listen': '::',
                 'port': 10810,
-                'protocol': 'socks',
+                'protocol': 'dokodemo-door',
                 'settings': {
-                    'auth': 'noauth',
-                    'udp': True,
+                    'network': 'tcp',
+                    'followRedirect': True,
                 },
                 'sniffing': {
                     'enabled': True,

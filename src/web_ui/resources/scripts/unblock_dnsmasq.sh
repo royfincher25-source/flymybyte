@@ -59,7 +59,11 @@ generate_config() {
 
         # Handle wildcard domains (keep as is, dnsmasq ignores leading dots)
         echo "ipset=/$line/$setname" >> "$temp_config"
-        echo "server=/$line/127.0.0.1#$DNS_PORT" >> "$temp_config"
+        # NOTE: Do NOT add server= for bypass domains.
+        # dnsmasq resolves via upstream DNS (8.8.8.8), and ipset= automatically
+        # adds the resolved IP to ipset. Server=127.0.0.1#40500 (stubby via proxy)
+        # causes SERVFAIL when proxy is down, killing DNS for bypass domains.
+        # VPN DNS traffic is routed via iptables REDIRECT to proxy port.
         domain_count=$((domain_count + 1))
     done < "$file"
 
