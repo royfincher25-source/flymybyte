@@ -1918,7 +1918,14 @@ class DNSSpoofing:
         config_path = Path(self._config_path)
         domains_path = Path(self._domains_path)
 
-        config_exists = config_path.exists()
+        # FIX: check if config file has content, not just exists
+        config_has_content = False
+        if config_path.exists():
+            try:
+                content = config_path.read_text(encoding='utf-8')
+                config_has_content = bool(content.strip())
+            except Exception:
+                pass
 
         if not self._domains and domains_path.exists():
             self.load_domains()
@@ -1926,9 +1933,9 @@ class DNSSpoofing:
         dnsmasq_running = self._check_dnsmasq_status()
 
         return {
-            'enabled': self._enabled or config_exists,
+            'enabled': self._enabled or config_has_content,
             'domain_count': len(self._domains),
-            'config_exists': config_exists,
+            'config_exists': config_has_content,
             'dnsmasq_running': dnsmasq_running,
             'config_path': self._config_path,
             'domains_path': self._domains_path,
