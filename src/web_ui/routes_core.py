@@ -30,9 +30,8 @@ def login():
         get_csrf_token()
     if request.method == 'POST':
         if not validate_csrf_token():
-            from flask import flash
-            flash('Ошибка безопасности: неверный токен', 'danger')
-            logger.warning("CSRF token validation failed on login")
+            # Silently redirect — don't flash scary security message on login
+            logger.debug("CSRF token validation failed on login (redirecting)")
             return redirect(url_for('core.login'))
         password = request.form.get('password', '')
         web_password = current_app.config.get('WEB_PASSWORD', 'changeme')
