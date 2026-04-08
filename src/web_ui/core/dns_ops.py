@@ -340,7 +340,7 @@ DNS_SERVER = "8.8.8.8"  # External DNS server for reliable resolution
 
 def resolve_single(domain: str, timeout: float = DEFAULT_TIMEOUT) -> List[str]:
     """
-    Resolve a single domain to IP addresses using nslookup.
+    Resolve a single domain to IP addresses using socket.getaddrinfo.
 
     Args:
         domain: Domain name to resolve
@@ -350,24 +350,18 @@ def resolve_single(domain: str, timeout: float = DEFAULT_TIMEOUT) -> List[str]:
         List of IP addresses
     """
     try:
-        result = subprocess.run(
-            ["nslookup", domain, DNS_SERVER],
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-
-        ips = re.findall(r'Address:\s*([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})', result.stdout)
-        ips = [ip for ip in ips if ip != DNS_SERVER]
-        ips = list(set(ips))
-
+        # FIX: Use socket.getaddrinfo instead of nslookup subprocess
+        # nslookup on BusyBox often fails or has different output format
+        socket.setdefaulttimeout(timeout)
+        results = socket.getaddrinfo(domain, None, socket.AF_INET, socket.SOCK_STREAM)
+        ips = list(set(r[4][0] for r in results))
         logger.debug(f"Resolved {domain} -> {ips}")
         return ips
-    except subprocess.TimeoutExpired:
-        logger.warning(f"Timeout resolving {domain}")
-        return []
-    except subprocess.SubprocessError as e:
+    except socket.gaierror as e:
         logger.warning(f"Failed to resolve {domain}: {e}")
+        return []
+    except socket.timeout:
+        logger.warning(f"Timeout resolving {domain}")
         return []
     except Exception as e:
         logger.error(f"Unexpected error resolving {domain}: {e}")

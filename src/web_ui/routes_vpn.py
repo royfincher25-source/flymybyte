@@ -305,10 +305,19 @@ def key_toggle(service: str):
                                     logger.info(f"[TOGGLE] ipset refreshed: {msg}")
                                 else:
                                     logger.warning(f"[TOGGLE] ipset refresh failed: {msg}")
+                            else:
+                                logger.warning(f"[TOGGLE] bypass file not found: {bypass_file}")
+                                # Создаём ipset вручную, даже если файл пустой
+                                try:
+                                    subprocess.run(['ipset', 'create', ipset_name, 'hash:net'], capture_output=True)
+                                except Exception:
+                                    pass
 
                             # 2. Добавляем iptables правила
                             if port > 0:
                                 logger.info(f"[TOGGLE] Adding iptables rules for {ipset_name}:{port}")
+                                # Убедимся что ipset существует
+                                subprocess.run(['ipset', 'create', ipset_name, 'hash:net'], capture_output=True)
                                 from core.iptables_manager import get_iptables_manager
                                 ipt = get_iptables_manager()
                                 ipt.add_vpn_redirect(ipset_name, port)
