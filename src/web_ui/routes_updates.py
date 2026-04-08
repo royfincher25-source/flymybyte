@@ -73,9 +73,9 @@ def _download_file(source_path: str, dest_path: str, progress, idx: int, total: 
     import requests
     import time
     if source_path == 'VERSION':
-        url = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/VERSION'
+        url = f'https://raw.githubusercontent.com/{GITHUB_REPO["owner"]}/{GITHUB_REPO["repo"]}/{GITHUB_REPO["branch"]}/VERSION'
     else:
-        url = f'https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/src/{source_path}'
+        url = f'https://raw.githubusercontent.com/{GITHUB_REPO["owner"]}/{GITHUB_REPO["repo"]}/{GITHUB_REPO["branch"]}/src/{source_path}'
     progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
     
     last_error = None
@@ -133,12 +133,22 @@ def _load_local_manifest() -> dict:
 def _download_remote_manifest() -> dict:
     """Download MANIFEST.json from GitHub."""
     url = f"https://raw.githubusercontent.com/{GITHUB_REPO['owner']}/{GITHUB_REPO['repo']}/{GITHUB_REPO['branch']}/MANIFEST.json"
+    logger.info(f"[UPDATE] Fetching: {url}")
     try:
         resp = requests.get(url, timeout=15)
+        logger.info(f"[UPDATE] HTTP {resp.status_code} from GitHub ({len(resp.content)} bytes)")
         if resp.status_code == 200:
-            return resp.json()
-    except Exception:
-        pass
+            try:
+                data = resp.json()
+                logger.info(f"[UPDATE] Parsed manifest: {len(data.get('files', {}))} files")
+                return data
+            except Exception as e:
+                logger.warning(f"[UPDATE] resp.json() failed: {e}")
+                return {}
+        else:
+            logger.warning(f"[UPDATE] HTTP {resp.status_code} from GitHub")
+    except Exception as e:
+        logger.warning(f"[UPDATE] Failed to fetch MANIFEST.json: {e}")
     return {}
 
 
@@ -269,8 +279,10 @@ def download_all_files(progress) -> tuple:
 
 def _download_all_files_fallback(progress) -> tuple:
     """Fallback: download ALL files (old behavior when manifest unavailable)."""
+    logger.info("[UPDATE] FALLBACK: downloading ALL files via FILES_TO_UPDATE")
     files_to_update = FILES_TO_UPDATE
     total_files = len(files_to_update)
+    logger.info(f"[UPDATE] Total files to download: {total_files}")
     results = {'success': 0, 'errors': 0}
 
     def download_and_track(source_path, dest_path, idx):
