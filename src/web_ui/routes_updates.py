@@ -163,22 +163,32 @@ def download_all_files(progress) -> tuple:
 
     # 1. Try to get remote manifest
     remote = _download_remote_manifest()
-    if not remote:
-        # Fallback: download ALL files (old behavior)
-        logger.warning("MANIFEST.json not available, falling back to full update")
+    if not remote or not isinstance(remote, dict):
+        logger.warning("MANIFEST.json not available or invalid, falling back to full update")
         return _download_all_files_fallback(progress)
 
     # 2. Load local manifest
     local = _load_local_manifest()
+    if not isinstance(local, dict):
+        local = {}
     local_files = local.get('files', {})
+    if not isinstance(local_files, dict):
+        local_files = {}
     remote_files = remote.get('files', {})
+    if not isinstance(remote_files, dict):
+        logger.warning("Remote MANIFEST has invalid format, falling back to full update")
+        return _download_all_files_fallback(progress)
 
     # 3. Determine what needs updating
     files_to_download = {}
     files_to_delete = []
 
     for source_path, info in remote_files.items():
+        if not isinstance(info, dict):
+            continue
         local_info = local_files.get(source_path, {})
+        if not isinstance(local_info, dict):
+            local_info = {}
         local_md5 = local_info.get('md5', '')
 
         # Check if file exists locally and matches
@@ -192,7 +202,8 @@ def download_all_files(progress) -> tuple:
     for source_path in local_files:
         if source_path not in remote_files:
             info = local_files[source_path]
-            files_to_delete.append(info.get('dest', ''))
+            if isinstance(info, dict):
+                files_to_delete.append(info.get('dest', ''))
 
     total = len(files_to_download) + len(files_to_delete)
     if total == 0:
