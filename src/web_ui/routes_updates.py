@@ -8,6 +8,9 @@ import logging
 import os
 import shutil
 import subprocess
+import json
+import requests
+from concurrent.futures import ThreadPoolExecutor
 from flask import Blueprint, render_template, redirect, url_for, request, session, flash, jsonify
 from core.decorators import login_required, validate_csrf_token, csrf_required
 
@@ -69,13 +72,27 @@ def create_update_backup() -> str:
     return backup_file
 
 
+# Helper to build GitHub raw file URL (handles both old string and new dict format)
+def _github_url(path: str) -> str:
+    """Build GitHub raw URL from repo path."""
+    if isinstance(GITHUB_REPO, dict):
+        owner = GITHUB_REPO.get('owner', GITHUB_REPO.get('user', 'royfincher25-source'))
+        repo = GITHUB_REPO.get('repo', 'flymybyte')
+        branch = GITHUB_REPO.get('branch', 'master')
+    else:
+        # Fallback: GITHUB_REPO is a string like "owner/repo"
+        parts = str(GITHUB_REPO).split('/')
+        owner, repo = parts[0], parts[1] if len(parts) > 1 else 'flymybyte'
+        branch = GITHUB_BRANCH if 'GITHUB_BRANCH' in globals() else 'master'
+    return f'https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}'
+
+
 def _download_file(source_path: str, dest_path: str, progress, idx: int, total: int, max_retries: int = 3) -> bool:
-    import requests
     import time
     if source_path == 'VERSION':
-        url = f'https://raw.githubusercontent.com/{GITHUB_REPO["owner"]}/{GITHUB_REPO["repo"]}/{GITHUB_REPO["branch"]}/VERSION'
+        url = _github_url('VERSION')
     else:
-        url = f'https://raw.githubusercontent.com/{GITHUB_REPO["owner"]}/{GITHUB_REPO["repo"]}/{GITHUB_REPO["branch"]}/src/{source_path}'
+        url = _github_url(f'src/{source_path}')
     progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
     
     last_error = None
@@ -132,7 +149,7 @@ def _load_local_manifest() -> dict:
 
 def _download_remote_manifest() -> dict:
     """Download MANIFEST.json from GitHub."""
-    url = f"https://raw.githubusercontent.com/{GITHUB_REPO['owner']}/{GITHUB_REPO['repo']}/{GITHUB_REPO['branch']}/MANIFEST.json"
+    url = _github_url('MANIFEST.json')
     logger.info(f"[UPDATE] Fetching: {url}")
     try:
         resp = requests.get(url, timeout=15)
