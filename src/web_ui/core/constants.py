@@ -187,6 +187,7 @@ FILES_TO_UPDATE = {
     'web_ui/resources/scripts/unblock_ipset.sh': SCRIPT_UNBLOCK_IPSET,
     'web_ui/resources/scripts/unblock_dnsmasq.sh': SCRIPT_UNBLOCK_DNSMASQ,
     'web_ui/resources/scripts/unblock_update.sh': SCRIPT_UNBLOCK_UPDATE,
+    'web_ui/resources/scripts/refresh_ipset.sh': '/opt/bin/refresh_ipset.sh',
     'web_ui/resources/config/dnsmasq.conf': DNSMASQ_CONFIG,
     'web_ui/resources/config/crontab': CRONTAB_FILE,
     'web_ui/scripts/script.sh': SCRIPT_INSTALL,

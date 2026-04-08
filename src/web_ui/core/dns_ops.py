@@ -418,13 +418,14 @@ def parallel_resolve(domains: List[str], max_workers: int = MAX_WORKERS) -> Dict
     return results
 
 
-def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS) -> int:
+def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ipset_name: str = None) -> int:
     """
     Resolve domains from bypass list file and add to ipset.
 
     Args:
         filepath: Path to bypass list file
         max_workers: Parallel workers (default: 10)
+        ipset_name: Target ipset name (auto-detect from filepath if None)
 
     Returns:
         Number of IPs added to ipset
@@ -439,6 +440,22 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS) -> 
         logger.info(f"No domains to resolve in {filepath}")
         return 0
 
+    # Auto-detect ipset name from filepath
+    if ipset_name is None:
+        filename = Path(filepath).stem  # e.g. "vless" from "vless.txt"
+        if filename == 'vless':
+            ipset_name = 'unblockvless'
+        elif filename in ('shadowsocks', 'ss'):
+            ipset_name = 'unblocksh'
+        elif filename == 'tor':
+            ipset_name = 'unblocktor'
+        elif filename == 'trojan':
+            ipset_name = 'unblocktroj'
+        elif filename == 'hysteria2':
+            ipset_name = 'unblockhysteria2'
+        else:
+            ipset_name = f'unblock{filename}'
+
     BATCH_SIZE = 500
     total_ips_added = 0
 
@@ -451,13 +468,13 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS) -> 
             batch_ips.update(ips)
 
         if batch_ips:
-            ensure_ipset_exists('unblock_domains')
-            success, msg = bulk_add_to_ipset('unblock_domains', list(batch_ips))
+            ensure_ipset_exists(ipset_name)
+            success, msg = bulk_add_to_ipset(ipset_name, list(batch_ips))
             if success:
                 total_ips_added += len(batch_ips)
-                logger.info(f"Batch {i // BATCH_SIZE + 1}: added {len(batch_ips)} IPs")
+                logger.info(f"Batch {i // BATCH_SIZE + 1}: added {len(batch_ips)} IPs to {ipset_name}")
             else:
                 logger.error(f"Failed to add batch IPs: {msg}")
 
-    logger.info(f"Total: added {total_ips_added} resolved IPs to ipset")
+    logger.info(f"Total: added {total_ips_added} resolved IPs to ipset {ipset_name}")
     return total_ips_added

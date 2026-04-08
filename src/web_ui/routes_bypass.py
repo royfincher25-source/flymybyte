@@ -305,6 +305,17 @@ def add_to_bypass(filename: str):
         save_bypass_list(filepath, current_list)
         logger.info(f"[ROUTES] Saved {added_count} new entries (IPs: {len(ip_entries)}, domains: {len(domain_entries)}, invalid: {len(invalid_entries)})")
         if added_count > 0:
+            # FIX: Refresh ipset immediately after adding domains
+            try:
+                from core.services import refresh_ipset_from_file
+                ok, msg = refresh_ipset_from_file(filepath)
+                if ok:
+                    logger.info(f"[ROUTES] ipset refreshed: {msg}")
+                else:
+                    logger.warning(f"[ROUTES] ipset refresh failed: {msg}")
+            except Exception as e:
+                logger.error(f"[ROUTES] ipset refresh error: {e}")
+
             # Use DnsmasqManager for atomic config regeneration and dnsmasq restart
             try:
                 dns_mgr = get_dnsmasq_manager()
@@ -389,6 +400,26 @@ def refresh_bypass_ipset(filename: str):
         logger.error(f"[ROUTES] Refresh failed: {msg}")
         flash(f'❌ Ошибка: {msg}', 'danger')
     return redirect(url_for('bypass.view_bypass', filename=filename))
+
+
+@bp.route('/bypass/<filename>/refresh-ipset', methods=['POST'])
+@login_required
+@csrf_required
+def refresh_ipset(filename: str):
+    """Refresh ipset from bypass list file."""
+    config = WebConfig()
+    filename = secure_filename(filename)
+    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    try:
+        from core.services import refresh_ipset_from_file
+        ok, msg = refresh_ipset_from_file(filepath)
+        if ok:
+            return jsonify({'success': True, 'message': msg})
+        else:
+            return jsonify({'success': False, 'error': msg})
+    except Exception as e:
+        logger.error(f"[ROUTES] ipset refresh error: {e}")
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @bp.route('/bypass/catalog')
