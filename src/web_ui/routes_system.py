@@ -112,15 +112,14 @@ def restore_backup(backup_name: str) -> Tuple[bool, str]:
     try:
         import tarfile
 
-        # Extract to root (backup contains /opt/etc/... paths)
         with tarfile.open(backup_path, 'r:gz') as tar:
-            # Safety: ensure no absolute path escapes
             members = []
             for member in tar.getmembers():
-                # Strip leading path separators to extract relative to /
+                # Бэкап сохраняет пути БЕЗ /opt/ (arcname=_backup_arcname)
+                # Восстанавливаем префикс /opt/ при извлечении
                 safe_name = member.name.lstrip('/')
                 if safe_name:
-                    member.name = safe_name
+                    member.name = 'opt/' + safe_name
                     members.append(member)
 
             tar.extractall('/', members=members)
