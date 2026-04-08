@@ -117,6 +117,24 @@ def parse_vless_key(key: str) -> Dict[str, Any]:
         'name': parsed.fragment or 'VLESS',
     }
 
+    # XHTTP transport parameters
+    if result['type'] == 'xhttp':
+        result['xhttp_mode'] = params.get('mode', ['packet-stream'])[0]
+        result['xhttp_max_upload_upload'] = params.get('maxUploadUpload', [''])[0]
+        result['xhttp_max_concurrent_upload'] = params.get('maxConcurrentUpload', [''])[0]
+
+        # Validate XHTTP mode
+        valid_modes = ['packet-stream', 'stream-one', 'stream-multi']
+        if result['xhttp_mode'] not in valid_modes:
+            logger.warning(f"XHTTP mode '{result['xhttp_mode']}' not in {valid_modes}, using default 'packet-stream'")
+            result['xhttp_mode'] = 'packet-stream'
+
+        # XHTTP requires host and path
+        if not result['host'] or result['host'] == server:
+            raise ValueError("Для XHTTP необходимо указать host (SNI)")
+        if not result['path']:
+            result['path'] = '/'
+
     # Handle different security types
     if result['security'] == 'reality':
         result['pbk'] = params.get('pbk', [''])[0]
@@ -217,6 +235,13 @@ def vless_config(key: str) -> Dict[str, Any]:
                             'Host': parsed['host'],
                         }
                     } if parsed['type'] == 'ws' else {},
+                    'xhttpSettings': {
+                        'mode': parsed.get('xhttp_mode', 'packet-stream'),
+                        'host': parsed.get('host', ''),
+                        'path': parsed.get('path', '/'),
+                        'maxUploadUpload': parsed.get('xhttp_max_upload_upload', ''),
+                        'maxConcurrentUpload': parsed.get('xhttp_max_concurrent_upload', ''),
+                    } if parsed['type'] == 'xhttp' else {},
                 },
                 'mux': {
                     'enabled': False,
