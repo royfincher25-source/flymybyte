@@ -3,6 +3,7 @@ FlyMyByte Web Interface - Core Routes
 
 Blueprint for authentication and basic pages: /, /login, /logout, /status
 """
+import secrets
 import logging
 from flask import Blueprint, render_template, redirect, url_for, request, session, current_app, jsonify
 from core.decorators import login_required, get_csrf_token, validate_csrf_token, csrf_required
