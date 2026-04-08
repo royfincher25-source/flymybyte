@@ -23,6 +23,7 @@ from .constants import (
     DNS_CHECK_INTERVAL,
     DNS_TIMEOUT,
     DNS_FAILURE_THRESHOLD,
+    IPSET_MAP,
 )
 from .utils import is_ip_address
 
@@ -418,7 +419,7 @@ def parallel_resolve(domains: List[str], max_workers: int = MAX_WORKERS) -> Dict
     return results
 
 
-def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ipset_name: str = None) -> int:
+def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ipset_name: Optional[str] = None) -> int:
     """
     Resolve domains from bypass list file and add to ipset.
 
@@ -443,18 +444,7 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ips
     # Auto-detect ipset name from filepath
     if ipset_name is None:
         filename = Path(filepath).stem  # e.g. "vless" from "vless.txt"
-        if filename == 'vless':
-            ipset_name = 'unblockvless'
-        elif filename in ('shadowsocks', 'ss'):
-            ipset_name = 'unblocksh'
-        elif filename == 'tor':
-            ipset_name = 'unblocktor'
-        elif filename == 'trojan':
-            ipset_name = 'unblocktroj'
-        elif filename == 'hysteria2':
-            ipset_name = 'unblockhysteria2'
-        else:
-            ipset_name = f'unblock{filename}'
+        ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
 
     BATCH_SIZE = 500
     total_ips_added = 0

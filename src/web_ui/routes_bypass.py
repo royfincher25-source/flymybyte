@@ -307,7 +307,6 @@ def add_to_bypass(filename: str):
         if added_count > 0:
             # FIX: Refresh ipset immediately after adding domains
             try:
-                from core.services import refresh_ipset_from_file
                 ok, msg = refresh_ipset_from_file(filepath)
                 if ok:
                     logger.info(f"[ROUTES] ipset refreshed: {msg}")
@@ -409,6 +408,8 @@ def refresh_ipset(filename: str):
     """Refresh ipset from bypass list file."""
     config = WebConfig()
     filename = secure_filename(filename)
+    if not filename:
+        return jsonify({'success': False, 'error': 'Invalid filename'}), 400
     filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
     try:
         from core.services import refresh_ipset_from_file

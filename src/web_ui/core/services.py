@@ -1410,6 +1410,20 @@ def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool,
     Returns:
         Tuple of (success: bool, message: str)
     """
+    from .app_config import WebConfig
+
+    # Validate file path (prevent directory traversal)
+    config = WebConfig()
+    real_path = os.path.realpath(filepath)
+    real_dir = os.path.realpath(config.unblock_dir)
+    if not real_path.startswith(real_dir + os.sep):
+        return False, "Invalid file path"
+
+    # Check file exists
+    if not os.path.exists(filepath):
+        logger.warning(f"File not found: {filepath}")
+        return False, f"File not found: {filepath}"
+
     try:
         from .dns_ops import resolve_domains_for_ipset
 

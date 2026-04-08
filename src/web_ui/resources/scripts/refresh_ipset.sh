@@ -13,13 +13,20 @@ log() {
 log "=== Starting ipset refresh ==="
 
 # Определяем файл и ipset из аргументов или по умолчанию
-IPSET_NAME="${1:-unblockvless}"
+# Validate ipset name (alphanumeric + underscore only)
+case "${1:-}" in
+    ''|*[!a-zA-Z0-9_]*)
+        [ -n "$1" ] && log "WARNING: Invalid ipset name: $1, using default"
+        IPSET_NAME="unblockvless"
+        ;;
+    *) IPSET_NAME="$1" ;;
+esac
 BYPASS_FILE="${2:-/opt/etc/unblock/vless.txt}"
 
 # Если передан только ipset (без файла)
-if [ -n "$1" ] && [ -z "$2" ]; then
+if [ -n "$IPSET_NAME" ] && [ -z "$2" ]; then
     # Определяем файл по имени ipset
-    case "$1" in
+    case "$IPSET_NAME" in
         unblockvless) BYPASS_FILE="/opt/etc/unblock/vless.txt" ;;
         unblocksh) BYPASS_FILE="/opt/etc/unblock/shadowsocks.txt" ;;
         unblocktor) BYPASS_FILE="/opt/etc/unblock/tor.txt" ;;
@@ -83,4 +90,5 @@ done < "$BYPASS_FILE"
 
 log "Done: $RESOLVED IPs added, $FAILED domains failed"
 ENTRIES=$(ipset list $IPSET_NAME 2>/dev/null | grep -c '^[0-9]')
+ENTRIES=${ENTRIES:-0}
 log "ipset $IPSET_NAME now has $ENTRIES entries"
