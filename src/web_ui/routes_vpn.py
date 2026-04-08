@@ -286,6 +286,35 @@ def key_toggle(service: str):
                 if success:
                     flash(f'✅ {svc["name"]} включён', 'success')
                     logger.info(f"[TOGGLE] {service} started successfully")
+
+                    # FIX: Заполняем ipset и добавляем iptables правила
+                    try:
+                        ipset_name = svc.get('ipset', '')
+                        port = svc.get('port', 0)
+
+                        # 1. Заполняем ipset из файла доменов
+                        if ipset_name:
+                            logger.info(f"[TOGGLE] Refreshing ipset {ipset_name}")
+                            from core.app_config import WebConfig
+                            cfg = WebConfig()
+                            bypass_file = os.path.join(cfg.unblock_dir, f"{service}.txt")
+                            if os.path.exists(bypass_file):
+                                from core.services import refresh_ipset_from_file
+                                ok, msg = refresh_ipset_from_file(bypass_file)
+                                if ok:
+                                    logger.info(f"[TOGGLE] ipset refreshed: {msg}")
+                                else:
+                                    logger.warning(f"[TOGGLE] ipset refresh failed: {msg}")
+
+                            # 2. Добавляем iptables правила
+                            if port > 0:
+                                logger.info(f"[TOGGLE] Adding iptables rules for {ipset_name}:{port}")
+                                from core.iptables_manager import get_iptables_manager
+                                ipt = get_iptables_manager()
+                                ipt.add_vpn_redirect(ipset_name, port)
+                    except Exception as e:
+                        logger.error(f"[TOGGLE] Failed to setup ipset/iptables: {e}")
+                        # Не фатально — продолжаем
                 else:
                     flash(f'⚠️ {svc["name"]} запущен, но ошибка: {output}', 'warning')
                     logger.warning(f"[TOGGLE] {service} restart_service returned: {output}")
