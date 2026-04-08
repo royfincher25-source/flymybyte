@@ -351,8 +351,8 @@ def service_updates():
 @login_required
 @csrf_required
 def service_updates_run():
-    from core.update_progress import UpdateProgress
-    progress = UpdateProgress()
+    from core.update_progress import get_progress_instance
+    progress = get_progress_instance()
     try:
         if progress.is_running:
             return jsonify({'success': False, 'error': 'Update already in progress'})
@@ -407,8 +407,8 @@ def service_updates_run():
 @bp.route('/api/update/progress', methods=['GET'])
 @login_required
 def get_update_progress():
-    from core.update_progress import UpdateProgress
-    progress = UpdateProgress()
+    from core.update_progress import get_progress_instance
+    progress = get_progress_instance()
     return jsonify(progress.get_status())
 
 

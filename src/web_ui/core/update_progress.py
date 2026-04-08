@@ -10,56 +10,82 @@ import time
 from typing import Dict, Optional
 
 
+# Singleton instance
+_instance = None
+_instance_lock = threading.Lock()
+
+
+def get_progress_instance() -> 'UpdateProgress':
+    """Get the global UpdateProgress singleton."""
+    global _instance
+    if _instance is None:
+        with _instance_lock:
+            if _instance is None:
+                _instance = UpdateProgress()
+    return _instance
+
+
 class UpdateProgress:
     """Thread-safe progress tracker for update operations."""
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._progress: Dict[str, any] = {}
+        self._state = {
+            'running': False,
+            'total_files': 0,
+            'current_file': '',
+            'progress': 0,  # 0-100
+            'success': 0,
+            'errors': 0,
+            'error_msg': None,
+            'started_at': None,
+        }
 
-    def start(self, operation: str, total_steps: int = 0) -> None:
-        """Mark operation as started."""
+    @property
+    def is_running(self) -> bool:
         with self._lock:
-            self._progress[operation] = {
-                'status': 'running',
-                'step': 0,
-                'total': total_steps,
-                'message': 'Starting...',
-                'started_at': time.time(),
-                'error': None,
+            return self._state['running']
+
+    def start_update(self, total_files: int = 0) -> None:
+        with self._lock:
+            self._state['running'] = True
+            self._state['total_files'] = total_files
+            self._state['current_file'] = ''
+            self._state['progress'] = 0
+            self._state['success'] = 0
+            self._state['errors'] = 0
+            self._state['error_msg'] = None
+            self._state['started_at'] = time.time()
+
+    def update_progress(self, message: str = '', file: str = '', progress: int = 0, total: int = 100) -> None:
+        with self._lock:
+            self._state['current_file'] = file
+            self._state['progress'] = min(progress, total)
+            # Store last message for API endpoint
+            self._state['last_message'] = message
+
+    def set_error(self, msg: str) -> None:
+        with self._lock:
+            self._state['error_msg'] = msg
+
+    def complete(self) -> None:
+        with self._lock:
+            self._state['running'] = False
+            self._state['progress'] = 100
+
+    def get_status(self) -> Dict:
+        with self._lock:
+            return dict(self._state)
+
+    def reset(self) -> None:
+        with self._lock:
+            self._state = {
+                'running': False,
+                'total_files': 0,
+                'current_file': '',
+                'progress': 0,
+                'success': 0,
+                'errors': 0,
+                'error_msg': None,
+                'started_at': None,
             }
-
-    def update(self, operation: str, step: int, message: str = '') -> None:
-        """Update progress for an operation."""
-        with self._lock:
-            if operation in self._progress:
-                self._progress[operation]['step'] = step
-                self._progress[operation]['message'] = message
-
-    def complete(self, operation: str, message: str = 'Completed') -> None:
-        """Mark operation as completed."""
-        with self._lock:
-            if operation in self._progress:
-                self._progress[operation]['status'] = 'completed'
-                self._progress[operation]['message'] = message
-
-    def fail(self, operation: str, error: str) -> None:
-        """Mark operation as failed."""
-        with self._lock:
-            if operation in self._progress:
-                self._progress[operation]['status'] = 'failed'
-                self._progress[operation]['error'] = error
-                self._progress[operation]['message'] = f'Error: {error}'
-
-    def get(self, operation: str) -> Optional[Dict]:
-        """Get current progress for an operation."""
-        with self._lock:
-            return self._progress.get(operation)
-
-    def clear(self, operation: str = None) -> None:
-        """Clear progress data."""
-        with self._lock:
-            if operation:
-                self._progress.pop(operation, None)
-            else:
-                self._progress.clear()
