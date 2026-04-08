@@ -144,7 +144,11 @@ class DnsmasqManager:
             lines.append(f'# === {ipset_name} ({len(domains)} domains) ===')
             for domain in sorted(domains):
                 lines.append(f'ipset=/{domain}/{ipset_name}')
-                lines.append(f'server=/{domain}/127.0.0.1#{VPN_DNS_PORT}')
+                # FIX: Не добавляем server= для bypass доменов.
+                # dnsmasq резолвит через upstream DNS (8.8.8.8), а ipset= автоматически
+                # добавляет полученный IP в ipset. Server=127.0.0.1#40500 (stubby) не работает,
+                # поэтому DNS-запросы фейлились.
+                # DNS через VPN идёт через iptables REDIRECT на порт прокси.
             total_domains += len(domains)
             lines.append('')
 
