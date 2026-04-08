@@ -19,7 +19,8 @@
       "Bash(ls *)",
       "Bash(del *)",
       "Bash(timeout *)",
-      "Bash(ssh *)"
+      "Bash(ssh *)",
+      "Bash(python3 *)"
     ]
   },
   "$version": 3,

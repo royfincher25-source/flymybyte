@@ -120,9 +120,134 @@ def _download_file(source_path: str, dest_path: str, progress, idx: int, total: 
     return False
 
 
+def _load_local_manifest() -> dict:
+    """Load local MANIFEST.json if exists."""
+    manifest_path = os.path.join(WEB_UI_DIR, 'MANIFEST.json')
+    try:
+        with open(manifest_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _download_remote_manifest() -> dict:
+    """Download MANIFEST.json from GitHub."""
+    url = f"https://raw.githubusercontent.com/{GITHUB_REPO['owner']}/{GITHUB_REPO['repo']}/{GITHUB_REPO['branch']}/MANIFEST.json"
+    try:
+        resp = requests.get(url, timeout=15)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception:
+        pass
+    return {}
+
+
+def _compute_local_md5(filepath: str) -> str:
+    """Compute MD5 of a local file on the router."""
+    import hashlib
+    h = hashlib.md5()
+    try:
+        with open(filepath, 'rb') as f:
+            for chunk in iter(lambda: f.read(8192), b''):
+                h.update(chunk)
+        return h.hexdigest()
+    except (FileNotFoundError, PermissionError):
+        return None
+
+
 def download_all_files(progress) -> tuple:
-    """Download files sequentially (max_workers=1) to avoid DNS overload on router."""
-    from concurrent.futures import ThreadPoolExecutor
+    """Incremental update: compare manifests and download only changed files."""
+    from core.constants import FILES_TO_UPDATE
+
+    progress.update_progress('Загрузка MANIFEST.json...', file='', progress=1, total=100)
+
+    # 1. Try to get remote manifest
+    remote = _download_remote_manifest()
+    if not remote:
+        # Fallback: download ALL files (old behavior)
+        logger.warning("MANIFEST.json not available, falling back to full update")
+        return _download_all_files_fallback(progress)
+
+    # 2. Load local manifest
+    local = _load_local_manifest()
+    local_files = local.get('files', {})
+    remote_files = remote.get('files', {})
+
+    # 3. Determine what needs updating
+    files_to_download = {}
+    files_to_delete = []
+
+    for source_path, info in remote_files.items():
+        local_info = local_files.get(source_path, {})
+        local_md5 = local_info.get('md5', '')
+
+        # Check if file exists locally and matches
+        if local_md5 and local_md5 == info.get('md5', ''):
+            # File exists and is up to date — skip
+            continue
+
+        files_to_download[source_path] = info['dest']
+
+    # Find files that were removed from remote
+    for source_path in local_files:
+        if source_path not in remote_files:
+            info = local_files[source_path]
+            files_to_delete.append(info.get('dest', ''))
+
+    total = len(files_to_download) + len(files_to_delete)
+    if total == 0:
+        logger.info("All files are up to date")
+        return 0, 0
+
+    logger.info(f"Update plan: {len(files_to_download)} files to download, {len(files_to_delete)} to delete")
+
+    # 4. Download changed files
+    results = {'success': 0, 'errors': 0}
+    step = 5
+    for i, (source, dest) in enumerate(files_to_download.items(), 1):
+        progress.update_progress(
+            f'Скачивание {i}/{len(files_to_download)}',
+            file=source,
+            progress=step + i * 80 // max(len(files_to_download), 1),
+            total=100
+        )
+        success = _download_file(source, dest, progress, i, len(files_to_download))
+        if success:
+            results['success'] += 1
+        else:
+            results['errors'] += 1
+
+    # 5. Delete removed files
+    for i, dest_path in enumerate(files_to_delete):
+        progress.update_progress(
+            f'Удаление {i+1}/{len(files_to_delete)}',
+            file=dest_path,
+            progress=85 + i * 10 // max(len(files_to_delete), 1),
+            total=100
+        )
+        try:
+            if os.path.exists(dest_path):
+                os.remove(dest_path)
+                logger.info(f"Deleted removed file: {dest_path}")
+                results['success'] += 1
+        except Exception as e:
+            logger.error(f"Failed to delete {dest_path}: {e}")
+            results['errors'] += 1
+
+    # 6. Save new manifest locally
+    if results['errors'] == 0:
+        try:
+            manifest_path = os.path.join(WEB_UI_DIR, 'MANIFEST.json')
+            with open(manifest_path, 'w', encoding='utf-8') as f:
+                json.dump(remote, f, indent=2)
+        except Exception as e:
+            logger.warning(f"Failed to save local MANIFEST.json: {e}")
+
+    return results['success'], results['errors']
+
+
+def _download_all_files_fallback(progress) -> tuple:
+    """Fallback: download ALL files (old behavior when manifest unavailable)."""
     files_to_update = FILES_TO_UPDATE
     total_files = len(files_to_update)
     results = {'success': 0, 'errors': 0}
