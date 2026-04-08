@@ -249,7 +249,30 @@ def download_all_files(progress) -> tuple:
                 files_to_delete.append(info.get('dest', ''))
 
     total = len(files_to_download) + len(files_to_delete)
-    logger.info(f"[UPDATE] Update plan: {len(files_to_download)} files to download, {len(files_to_delete)} to delete")
+    
+    # CRITICAL: Always check if local VERSION matches remote
+    # Local MANIFEST.json might have been copied with old code, making hashes match
+    # but actual files on disk could be outdated
+    try:
+        local_version_file = os.path.join(WEB_UI_DIR, 'VERSION')
+        if os.path.exists(local_version_file):
+            with open(local_version_file, 'r') as f:
+                local_ver = f.read().strip()
+            # Get remote version from manifest
+            remote_ver_url = _github_url('VERSION')
+            resp = requests.get(remote_ver_url, timeout=10)
+            if resp.status_code == 200:
+                remote_ver = resp.text.strip()
+                logger.info(f"[UPDATE] Local version: {local_ver}, Remote version: {remote_ver}")
+                if local_ver != remote_ver:
+                    logger.info(f"[UPDATE] Version mismatch — forcing full update")
+                    return _download_all_files_fallback(progress)
+    except Exception as e:
+        logger.warning(f"[UPDATE] Failed to compare versions: {e}")
+        # Safe fallback: download everything
+        return _download_all_files_fallback(progress)
+
+    logger.info(f"[UPDATE] Update plan: {total} files to download, {len(files_to_delete)} to delete")
     if total == 0:
         logger.info("All files are up to date")
         return 0, 0
