@@ -863,6 +863,33 @@ def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
         return False, str(e)
 
 
+def _is_process_running(proc_pattern: str) -> bool:
+    """Check if process is running via /proc or pgrep fallback."""
+    try:
+        for pid_dir in os.listdir('/proc'):
+            if not pid_dir.isdigit():
+                continue
+            cmdline_path = f'/proc/{pid_dir}/cmdline'
+            try:
+                with open(cmdline_path, 'rb') as f:
+                    cmdline = f.read(256).decode('utf-8', errors='ignore')
+                    if proc_pattern in cmdline:
+                        return True
+            except (FileNotFoundError, PermissionError, ProcessLookupError):
+                continue
+    except Exception as e:
+        logger.debug(f"[SVC] /proc check failed: {e}")
+    # Fallback to pgrep
+    try:
+        result = subprocess.run(
+            ['pgrep', '-f', proc_pattern],
+            capture_output=True, text=True, timeout=3
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def check_service_status(init_script: str) -> str:
     """
     Check service status with caching (60s TTL).
@@ -889,10 +916,9 @@ def check_service_status(init_script: str) -> str:
         status = "❌ Скрипт не найден"
     else:
         try:
-            # OPTIMIZATION: Extract service name from init script
-            # S24xray → xray, S22trojan → trojan, S35tor → tor, S22shadowsocks → ss
+            # Extract service name from init script
             script_name = os.path.basename(init_script)
-            
+
             # Map init script to process name pattern
             process_patterns = {
                 'S24xray': 'xray',
@@ -903,34 +929,12 @@ def check_service_status(init_script: str) -> str:
                 'S56dnsmasq': 'dnsmasq',
                 'S99unblock': 'unblock',
             }
-            
+
             proc_pattern = process_patterns.get(script_name, script_name.replace('S', '').split('init')[0])
-            
-            # OPTIMIZATION: Check /proc directly instead of pgrep
-            # This avoids subprocess overhead and is 10-50x faster
-            service_running = False
-            try:
-                for pid_dir in os.listdir('/proc'):
-                    if not pid_dir.isdigit():
-                        continue
-                    cmdline_path = f'/proc/{pid_dir}/cmdline'
-                    try:
-                        with open(cmdline_path, 'rb') as f:
-                            cmdline = f.read(256).decode('utf-8', errors='ignore')
-                            if proc_pattern in cmdline:
-                                service_running = True
-                                break
-                    except (FileNotFoundError, PermissionError, ProcessLookupError):
-                        continue
-            except Exception as e:
-                logger.debug(f"[SVC] /proc check failed: {e}")
-                # Fallback to pgrep if /proc fails
-                pgrep_result = subprocess.run(
-                    ['pgrep', '-f', proc_pattern],
-                    capture_output=True, text=True, timeout=3
-                )
-                service_running = pgrep_result.returncode == 0
-            
+
+            # FIX: Use centralized _is_process_running with /proc + pgrep fallback
+            service_running = _is_process_running(proc_pattern)
+
             if service_running:
                 status = "✅ Активен"
                 logger.debug(f"[SVC] {init_script}: ACTIVE (via /proc)")

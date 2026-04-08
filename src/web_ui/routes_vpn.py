@@ -329,7 +329,7 @@ def key_toggle(service: str):
                     logger.warning(f"[TOGGLE] {service} restart_service returned: {output}")
                 
                 # Ждём чтобы процесс успел стартовать перед проверкой статуса
-                time.sleep(1)
+                time.sleep(3)
             except Exception as e:
                 flash(f'❌ Ошибка при включении: {str(e)}', 'danger')
                 logger.error(f"[TOGGLE] {service} start error: {e}")
