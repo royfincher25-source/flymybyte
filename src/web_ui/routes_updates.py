@@ -94,6 +94,8 @@ def _download_file(source_path: str, dest_path: str, progress, idx: int, total: 
     else:
         url = _github_url(f'src/{source_path}')
     progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
+    logger.info(f"[UPDATE] Downloading {source_path} -> {dest_path}")
+    logger.info(f"[UPDATE] URL: {url}")
     
     last_error = None
     for attempt in range(1, max_retries + 1):
@@ -114,6 +116,8 @@ def _download_file(source_path: str, dest_path: str, progress, idx: int, total: 
             is_executable = filename.endswith('.sh') or filename in ['S99web_ui', 'S99unblock']
             os.chmod(dest_path, 0o755 if is_executable else 0o644)
             logger.info(f"Updated {dest_path}")
+            if source_path == 'VERSION':
+                logger.info(f"[UPDATE] VERSION file updated to: {response.text.strip()}")
             return True
         except requests.exceptions.ConnectionError as e:
             last_error = e
@@ -310,9 +314,18 @@ def _download_all_files_fallback(progress) -> tuple:
             results['errors'] += 1
 
     with ThreadPoolExecutor(max_workers=1) as executor:
+        futures = []
         for i, (source_path, dest_path) in enumerate(files_to_update.items(), 1):
-            executor.submit(download_and_track, source_path, dest_path, i)
+            futures.append(executor.submit(download_and_track, source_path, dest_path, i))
+        # Wait for all downloads to complete
+        for f in futures:
+            try:
+                f.result(timeout=300)
+            except Exception as e:
+                logger.error(f"[UPDATE] Download task failed: {e}")
+                results['errors'] += 1
 
+    logger.info(f"[UPDATE] Fallback complete: {results['success']} success, {results['errors']} errors")
     return results['success'], results['errors']
 
 
