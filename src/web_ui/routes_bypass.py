@@ -400,6 +400,6 @@ def download_list_from_catalog(name: str):
 
 
 def bulk_add_to_ipset(name, entries):
-    """Wrapper to avoid import cycle — uses core.services.bulk_add_to_ipset."""
-    from core.services import bulk_add_to_ipset as _bulk_add
+    """Wrapper for ipset bulk add."""
+    from core.ipset_ops import bulk_add_to_ipset as _bulk_add
     return _bulk_add(name, entries)
