@@ -1,0 +1,32 @@
+# Telegram — полный список доменов и IP-диапазонов для VLESS обхода
+# Использовать: скопировать содержимое в /opt/etc/unblock/vless.txt
+# CIDR-диапазоны НЕ копируются в файл — они добавляются через ipset add
+
+# === Домены Telegram ===
+telegram.org
+t.me
+telegram.me
+web.telegram.org
+core.telegram.org
+api.telegram.org
+mtproxy.telegram.org
+cdn1.telegram-cdn.org
+cdn2.telegram-cdn.org
+cdn3.telegram-cdn.org
+cdn4.telegram-cdn.org
+cdn5.telegram-cdn.org
+cdn6.telegram-cdn.org
+
+# === IP-диапазоны Telegram MTProto (добавлять через ipset add, НЕ в txt файл) ===
+# 149.154.160.0/20 (149.154.160.1 — 149.154.175.254)
+# 149.154.164.0/22
+# 149.154.168.0/21
+# 91.108.4.0/22 (91.108.4.1 — 91.108.7.254)
+# 95.161.64.0/19 (95.161.64.1 — 95.161.95.254)
+
+# === Команды для добавления CIDR в ipset (выполнять вручную) ===
+# ipset add unblockvless 149.154.160.0/20
+# ipset add unblockvless 149.154.164.0/22
+# ipset add unblockvless 149.154.168.0/21
+# ipset add unblockvless 91.108.4.0/22
+# ipset add unblockvless 95.161.64.0/19
