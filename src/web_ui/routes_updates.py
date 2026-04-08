@@ -93,14 +93,17 @@ def _download_file(source_path: str, dest_path: str, progress, idx: int, total: 
         url = _github_url('VERSION')
     else:
         url = _github_url(f'src/{source_path}')
-    progress.update_progress(f'Загрузка {source_path}', file=source_path, progress=idx, total=total)
-    logger.info(f"[UPDATE] Downloading {source_path} -> {dest_path}")
+    progress.update_progress(f'Загрузка {idx}/{total}: {source_path}', file=source_path, progress=idx, total=total)
+    logger.info(f"[UPDATE] [{idx}/{total}] Downloading {source_path}")
     logger.info(f"[UPDATE] URL: {url}")
+    logger.info(f"[UPDATE] Destination: {dest_path}")
     
     last_error = None
     for attempt in range(1, max_retries + 1):
         try:
+            logger.info(f"[UPDATE] [{idx}/{total}] HTTP request (attempt {attempt})")
             response = requests.get(url, timeout=FILE_DOWNLOAD_TIMEOUT)
+            logger.info(f"[UPDATE] [{idx}/{total}] HTTP {response.status_code} ({len(response.content)} bytes)")
             if response.status_code == 404:
                 logger.info(f"Skipping removed file: {source_path}")
                 return True
@@ -307,11 +310,14 @@ def _download_all_files_fallback(progress) -> tuple:
     results = {'success': 0, 'errors': 0}
 
     def download_and_track(source_path, dest_path, idx):
+        logger.info(f"[UPDATE] Starting download task: {source_path} (#{idx})")
         success = _download_file(source_path, dest_path, progress, idx, total_files)
         if success:
             results['success'] += 1
+            logger.info(f"[UPDATE] ✓ {source_path}")
         else:
             results['errors'] += 1
+            logger.error(f"[UPDATE] ✗ {source_path}")
 
     with ThreadPoolExecutor(max_workers=1) as executor:
         futures = []
