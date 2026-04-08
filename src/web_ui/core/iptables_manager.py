@@ -51,19 +51,17 @@ class IptablesManager:
         errors = []
 
         for proto in ['tcp', 'udp']:
-            rule = ['-t', self._table, '-C', self._chain, '-p', proto,
+            # Сначала удаляем существующее правило (если есть), чтобы избежать дубликатов
+            check_rule = ['-t', self._table, '-D', self._chain, '-p', proto,
+                          '-m', 'set', '--match-set', ipset_name, 'dst',
+                          '-j', 'REDIRECT', '--to-port', str(port)]
+            subprocess.run(['iptables'] + check_rule, capture_output=True, text=True, timeout=5)
+
+            # Добавляем правило через -I (insert в начало цепочки)
+            rule = ['-t', self._table, '-I', self._chain, '-p', proto,
                     '-m', 'set', '--match-set', ipset_name, 'dst',
                     '-j', 'REDIRECT', '--to-port', str(port)]
 
-            # Проверяем не существует ли уже
-            result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                logger.debug(f"Rule already exists: {ipset_name} {proto} -> {port}")
-                rules_added.append(f"{proto} (exists)")
-                continue
-
-            # Добавляем правило
-            rule[3] = '-A'  # Меняем -C на -A
             result = subprocess.run(['iptables'] + rule, capture_output=True, text=True, timeout=5)
             if result.returncode == 0:
                 rules_added.append(proto)
