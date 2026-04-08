@@ -159,22 +159,29 @@ def download_all_files(progress) -> tuple:
     """Incremental update: compare manifests and download only changed files."""
     from core.constants import FILES_TO_UPDATE
 
+    logger.info("[UPDATE] Starting incremental update via MANIFEST.json")
     progress.update_progress('Загрузка MANIFEST.json...', file='', progress=1, total=100)
 
     # 1. Try to get remote manifest
+    logger.info("[UPDATE] Downloading remote MANIFEST.json")
     remote = _download_remote_manifest()
+    logger.info(f"[UPDATE] Remote manifest type: {type(remote).__name__}, keys: {list(remote.keys()) if isinstance(remote, dict) else 'N/A'}")
     if not remote or not isinstance(remote, dict):
         logger.warning("MANIFEST.json not available or invalid, falling back to full update")
         return _download_all_files_fallback(progress)
 
     # 2. Load local manifest
+    logger.info("[UPDATE] Loading local MANIFEST.json")
     local = _load_local_manifest()
+    logger.info(f"[UPDATE] Local manifest type: {type(local).__name__}")
     if not isinstance(local, dict):
         local = {}
     local_files = local.get('files', {})
+    logger.info(f"[UPDATE] Local files type: {type(local_files).__name__}")
     if not isinstance(local_files, dict):
         local_files = {}
     remote_files = remote.get('files', {})
+    logger.info(f"[UPDATE] Remote files type: {type(remote_files).__name__}, count: {len(remote_files)}")
     if not isinstance(remote_files, dict):
         logger.warning("Remote MANIFEST has invalid format, falling back to full update")
         return _download_all_files_fallback(progress)
@@ -183,8 +190,10 @@ def download_all_files(progress) -> tuple:
     files_to_download = {}
     files_to_delete = []
 
+    logger.info("[UPDATE] Comparing manifests...")
     for source_path, info in remote_files.items():
         if not isinstance(info, dict):
+            logger.warning(f"[UPDATE] Skipping {source_path}: invalid info type {type(info).__name__}")
             continue
         local_info = local_files.get(source_path, {})
         if not isinstance(local_info, dict):
@@ -199,13 +208,14 @@ def download_all_files(progress) -> tuple:
         files_to_download[source_path] = info['dest']
 
     # Find files that were removed from remote
-    for source_path in local_files:
+    for source_path in list(local_files.keys()):
         if source_path not in remote_files:
             info = local_files[source_path]
             if isinstance(info, dict):
                 files_to_delete.append(info.get('dest', ''))
 
     total = len(files_to_download) + len(files_to_delete)
+    logger.info(f"[UPDATE] Update plan: {len(files_to_download)} files to download, {len(files_to_delete)} to delete")
     if total == 0:
         logger.info("All files are up to date")
         return 0, 0
