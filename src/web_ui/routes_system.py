@@ -4,68 +4,15 @@ FlyMyByte Web Interface - System Routes
 Blueprint for service management, system stats, DNS monitor, and logs:
 /service/*, /stats, /logs, /api/system/*
 """
-import secrets
 import logging
 import os
 import subprocess
 import time
-from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, request, session, flash, current_app, jsonify
 from typing import List, Dict, Tuple
+from core.decorators import login_required, validate_csrf_token, csrf_required
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# INLINED DECORATORS
-# =============================================================================
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
-            is_ajax = (
-                request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-                or 'application/json' in request.headers.get('Accept', '')
-            )
-            if is_ajax or request.is_json:
-                return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect(url_for('core.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def get_csrf_token():
-    if 'csrf_token' not in session:
-        session['csrf_token'] = secrets.token_hex(32)
-    return session['csrf_token']
-
-
-def validate_csrf_token() -> bool:
-    token = session.get('csrf_token')
-    form_token = request.form.get('csrf_token')
-    if not token or not form_token or token != form_token:
-        logger.warning("CSRF token validation failed")
-        return False
-    return True
-
-
-def csrf_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if request.method == 'POST':
-            if not validate_csrf_token():
-                from flask import flash
-                flash('Ошибка безопасности: неверный токен', 'danger')
-                is_ajax = (
-                    request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-                    or 'application/json' in request.headers.get('Accept', '')
-                )
-                if is_ajax or request.is_json:
-                    return jsonify({'success': False, 'error': 'CSRF token validation failed'}), 400
-                return redirect(url_for('core.index'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 from core.constants import (
@@ -166,14 +113,14 @@ def schedule_webui_restart():
         with open(TMP_RESTART_SCRIPT, 'w') as f:
             f.write(f'#!/bin/sh\nsleep 5\n{INIT_SCRIPTS["web_ui"]} restart\nrm -f {TMP_RESTART_SCRIPT}\n')
         os.chmod(TMP_RESTART_SCRIPT, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
-        os.system(f'{TMP_RESTART_SCRIPT} &')
+        # FIX: Use subprocess.Popen instead of os.system for better control
+        subprocess.Popen(['sh', TMP_RESTART_SCRIPT], start_new_session=True)
         logger.info("S99web_ui restart scheduled")
     except Exception as e:
         logger.warning(f"Failed to schedule restart: {e}")
         try:
-            rc = os.system(f'{INIT_SCRIPTS["web_ui"]} restart &')
-            if rc != 0:
-                logger.error(f"Fallback restart failed with exit code: {rc}")
+            # FIX: Use subprocess.Popen instead of os.system
+            subprocess.Popen(['sh', INIT_SCRIPTS["web_ui"], 'restart'], start_new_session=True)
         except Exception as e2:
             logger.error(f"Fallback restart exception: {e2}")
 

@@ -1991,10 +1991,10 @@ class DNSSpoofing:
         }
 
         try:
+            # FIX: Use subprocess with list args instead of shell=True to prevent injection
             try:
                 proc_result = subprocess.run(
-                    f'nslookup {domain} {VPN_DNS_HOST} 2>/dev/null',
-                    shell=True,
+                    ['nslookup', domain, VPN_DNS_HOST],
                     capture_output=True,
                     text=True,
                     timeout=5
@@ -2018,9 +2018,9 @@ class DNSSpoofing:
                 logger.debug(f"test_domain nslookup error for {domain}: {e}")
 
             try:
+                # FIX: Use list args, no shell
                 proc_result = subprocess.run(
-                    f'nslookup {domain} 2>/dev/null',
-                    shell=True,
+                    ['nslookup', domain],
                     capture_output=True,
                     text=True,
                     timeout=5

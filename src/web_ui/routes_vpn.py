@@ -6,56 +6,12 @@ Blueprint for VPN key management: /keys/*
 import logging
 import os
 import subprocess
-from functools import wraps
+import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from flask import Blueprint, render_template, redirect, url_for, request, session, flash, jsonify
+from core.decorators import login_required, validate_csrf_token, csrf_required
 
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# INLINED DECORATORS
-# =============================================================================
-
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('authenticated'):
-            is_ajax = (
-                request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-                or 'application/json' in request.headers.get('Accept', '')
-            )
-            if is_ajax or request.is_json:
-                return jsonify({'success': False, 'error': 'Authentication required'}), 401
-            return redirect(url_for('core.login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-
-def validate_csrf_token() -> bool:
-    token = session.get('csrf_token')
-    form_token = request.form.get('csrf_token')
-    if not token or not form_token or token != form_token:
-        logger.warning("CSRF token validation failed")
-        return False
-    return True
-
-
-def csrf_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if request.method == 'POST':
-            if not validate_csrf_token():
-                flash('Ошибка безопасности: неверный токен', 'danger')
-                is_ajax = (
-                    request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-                    or 'application/json' in request.headers.get('Accept', '')
-                )
-                if is_ajax or request.is_json:
-                    return jsonify({'success': False, 'error': 'CSRF token validation failed'}), 400
-                return redirect(url_for('core.index'))
-        return f(*args, **kwargs)
-    return decorated_function
 
 
 from core.constants import CONFIG_PATHS, INIT_SCRIPTS, SERVICES
