@@ -103,6 +103,35 @@ def delete_backup(backup_name: str) -> Tuple[bool, str]:
         return False, f'Ошибка удаления: {e}'
 
 
+def restore_backup(backup_name: str) -> Tuple[bool, str]:
+    """Restore system from backup archive."""
+    backup_path = os.path.join(BACKUP_DIR, backup_name)
+    if not backup_name or not os.path.exists(backup_path):
+        return False, 'Бэкап не найден'
+
+    try:
+        import tarfile
+
+        # Extract to root (backup contains /opt/etc/... paths)
+        with tarfile.open(backup_path, 'r:gz') as tar:
+            # Safety: ensure no absolute path escapes
+            members = []
+            for member in tar.getmembers():
+                # Strip leading path separators to extract relative to /
+                safe_name = member.name.lstrip('/')
+                if safe_name:
+                    member.name = safe_name
+                    members.append(member)
+
+            tar.extractall('/', members=members)
+
+        logger.info(f"[BACKUP] Restored from {backup_name}")
+        return True, f'Восстановлено из {backup_name}. Перезагрузите роутер для применения настроек.'
+    except Exception as e:
+        logger.error(f"[BACKUP] Restore failed: {e}")
+        return False, f'Ошибка восстановления: {e}'
+
+
 # =============================================================================
 # SCHEDULE WEBUI RESTART (shared with updates)
 # =============================================================================
@@ -588,6 +617,14 @@ def service_backup():
         elif action == 'delete':
             backup_name = request.form.get('backup_name')
             success, message = delete_backup(backup_name)
+            if success:
+                flash(f'✅ {message}', 'success')
+            else:
+                flash(f'❌ {message}', 'danger')
+            return redirect(url_for('system.service_backup'))
+        elif action == 'restore':
+            backup_name = request.form.get('backup_name')
+            success, message = restore_backup(backup_name)
             if success:
                 flash(f'✅ {message}', 'success')
             else:

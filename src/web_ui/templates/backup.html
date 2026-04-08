@@ -100,6 +100,14 @@
                                     <i class="fm fm-trash"></i> Удалить
                                 </button>
                             </form>
+                            <form method="POST" action="{{ url_for('system.service_backup') }}" class="d-inline ms-1">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="action" value="restore">
+                                <input type="hidden" name="backup_name" value="{{ backup.name }}">
+                                <button type="submit" class="btn btn--sm btn--outline-success" onclick="return confirm('Восстановить из бэкапа {{ backup.name }}? Это перезапишет текущие настройки.')">
+                                    <i class="fm fm-rotate-ccw"></i> Восстановить
+                                </button>
+                            </form>
                         </td>
                     </tr>
                     {% endfor %}
