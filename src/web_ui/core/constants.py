@@ -277,6 +277,9 @@ IPSET_MAP = {
     'hysteria2': 'unblockhysteria2',
 }
 
+# Maximum entries per ipset bulk operation
+IPSET_MAX_BULK_ENTRIES = 5000
+
 # =============================================================================
 # DNS SPOOFING
 # =============================================================================
