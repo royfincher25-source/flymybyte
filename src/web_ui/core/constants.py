@@ -77,6 +77,7 @@ XRAY_DIR = '/opt/etc/xray'
 
 WEB_UI_LOG_FILE = '/opt/var/log/web_ui.log'
 TMP_RESTART_SCRIPT = '/tmp/restart_webui.sh'
+DNS_OVERRIDE_FLAG = '/opt/etc/web_ui/.dns_override.flag'  # Постоянный маркер DNS Override
 
 DNSMASQ_CONFIG = '/opt/etc/dnsmasq.conf'
 DNSMASQ_AI_CONFIG = '/opt/etc/unblock-ai.dnsmasq'

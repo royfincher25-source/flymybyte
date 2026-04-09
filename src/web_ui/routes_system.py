@@ -24,6 +24,7 @@ from core.constants import (
     BACKUP_DIR,
     BACKUP_FILES,
     TMP_RESTART_SCRIPT,
+    DNS_OVERRIDE_FLAG,
     SCRIPT_EXECUTION_TIMEOUT,
 )
 from core.app_config import WebConfig
@@ -310,8 +311,10 @@ def stats():
     total_domains = 0
     if os.path.exists(unblock_dir):
         from core.utils import load_bypass_list
+        # Игнорируем устаревшие файлы (после удаления Tor/Hysteria2)
+        IGNORED_FILES = {'tor.txt', 'hysteria2.txt', 'vpn.txt'}
         for filename in os.listdir(unblock_dir):
-            if filename.endswith('.txt'):
+            if filename.endswith('.txt') and filename not in IGNORED_FILES:
                 try:
                     filepath = os.path.join(unblock_dir, filename)
                     entries = load_bypass_list(filepath)
@@ -333,7 +336,7 @@ def stats():
 
     # DNS Override status
     # FIX #4: Проверяем маркерный файл для точного статуса
-    dns_override_enabled = os.path.exists('/tmp/dns_override_enabled')
+    dns_override_enabled = os.path.exists(DNS_OVERRIDE_FLAG)
     
     # Fallback: если маркера нет, проверяем iptables
     if not dns_override_enabled:
@@ -366,7 +369,7 @@ def stats():
 @login_required
 def service():
     # FIX #4: Проверяем маркерный файл для точного статуса
-    dns_override_enabled = os.path.exists('/tmp/dns_override_enabled')
+    dns_override_enabled = os.path.exists(DNS_OVERRIDE_FLAG)
     
     # Fallback: если маркера нет, проверяем iptables
     if not dns_override_enabled:
@@ -704,8 +707,10 @@ def service_dns_override(action):
             ipt.add_dns_redirect(local_ip, 5353)
             
             # 4. Создаём маркер
-            with open('/tmp/dns_override_enabled', 'w') as f:
-                f.write(local_ip)
+            # Создаём постоянный маркер (не /tmp — он очищается при перезагрузке)
+            os.makedirs(os.path.dirname(DNS_OVERRIDE_FLAG), exist_ok=True)
+            with open(DNS_OVERRIDE_FLAG, 'w') as f:
+                f.write(local_ip or '')
             
             flash('✅ DNS Override включен', 'success')
             logger.info("[ROUTES] DNS Override enabled successfully")
@@ -716,6 +721,9 @@ def service_dns_override(action):
             ipt.remove_dns_redirect(local_ip, 5353)
             
             # 2. Удаляем маркер
+            if os.path.exists(DNS_OVERRIDE_FLAG):
+                os.remove(DNS_OVERRIDE_FLAG)
+            # Также удаляем старый маркер если он существует
             if os.path.exists('/tmp/dns_override_enabled'):
                 os.remove('/tmp/dns_override_enabled')
             

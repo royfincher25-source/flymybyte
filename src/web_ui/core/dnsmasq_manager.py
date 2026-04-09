@@ -246,6 +246,22 @@ class DnsmasqManager:
 
         # Полный рестарт
         if os.path.exists(DNSMASQ_INIT_SCRIPT):
+            # Сначала тестируем конфиг на корректность
+            if os.path.exists(DNSMASQ_CONFIG):
+                try:
+                    test_result = subprocess.run(
+                        ['dnsmasq', '--test'],
+                        capture_output=True, text=True, timeout=5
+                    )
+                    if test_result.returncode != 0:
+                        logger.error(f"dnsmasq config test failed: {test_result.stderr}")
+                        return False, f"Config test failed: {test_result.stderr.strip()}"
+                    logger.info("dnsmasq config test passed")
+                except FileNotFoundError:
+                    logger.warning("dnsmasq binary not found, skipping config test")
+                except Exception as e:
+                    logger.warning(f"Config test error: {e}")
+
             try:
                 result = subprocess.run(
                     ['sh', DNSMASQ_INIT_SCRIPT, 'restart'],

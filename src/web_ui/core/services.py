@@ -1521,12 +1521,13 @@ class DNSSpoofing:
         config_path = Path(self._config_path)
         domains_path = Path(self._domains_path)
 
-        # FIX: check if config file has content, not just exists
+        # FIX: check if config file has actual server= rules, not just comments
         config_has_content = False
         if config_path.exists():
             try:
                 content = config_path.read_text(encoding='utf-8')
-                config_has_content = bool(content.strip())
+                # Check for real DNS rules (server=/domain.com/...), not comments
+                config_has_content = bool(re.search(r'^server=/', content, re.MULTILINE))
             except Exception:
                 pass
 
