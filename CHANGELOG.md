@@ -2,6 +2,15 @@
 
 Все значимые изменения в проекте будут документироваться в этом файле.
 
+## [2.6.0] - 2026-04-09
+
+### 🔧 Telegram
+
+- **Добавлены критически важные домены для Telegram Desktop/Mobile** — api.telegram.org, cdn1-8.telegram-cdn.org, pluto/venus/flame/vesta.telegram.org
+- **Создан скрипт add_telegram_ipranges.sh** — автоматическое добавление IP-диапазонов MTProto (149.154.x.x, 91.108.x.x, 95.161.x.x, 5.255.x.x, 185.76.x.x)
+- **Обновлён bypass_list/telegram.txt** — добавлены все CDN и API эндпоинты, расширены IP-диапазоны
+- **Обновлён unblockvless.txt** — полная поддержка Telegram Desktop, мобильных приложений и CDN
+
 ## [2.5.9] - 2026-04-09
 
 ### ⚡ Оптимизация

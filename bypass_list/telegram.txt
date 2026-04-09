@@ -2,31 +2,64 @@
 # Использовать: скопировать содержимое в /opt/etc/unblock/vless.txt
 # CIDR-диапазоны НЕ копируются в файл — они добавляются через ipset add
 
-# === Домены Telegram ===
+# === Основные домены Telegram ===
 telegram.org
 t.me
 telegram.me
 web.telegram.org
+
+# === API и MTProto эндпоинты (критично для Desktop/Mobile) ===
 core.telegram.org
 api.telegram.org
 mtproxy.telegram.org
+pluto.telegram.org
+venus.telegram.org
+flame.telegram.org
+vesta.telegram.org
+
+# === CDN серверы Telegram (критично для фото/видео/файлов) ===
+cdn-telegram.org
+telegram-cdn.org
 cdn1.telegram-cdn.org
 cdn2.telegram-cdn.org
 cdn3.telegram-cdn.org
 cdn4.telegram-cdn.org
 cdn5.telegram-cdn.org
 cdn6.telegram-cdn.org
+cdn7.telegram-cdn.org
+cdn8.telegram-cdn.org
+
+# === Дополнительные домены ===
+telesco.pe
+telegra.ph
+graph.org
+fragment.com
+contest.com
+comments.app
+telegram.dog
+telegram.space
+tdesktop.com
+tg.dev
+tx.me
 
 # === IP-диапазоны Telegram MTProto (добавлять через ipset add, НЕ в txt файл) ===
-# 149.154.160.0/20 (149.154.160.1 — 149.154.175.254)
-# 149.154.164.0/22
-# 149.154.168.0/21
-# 91.108.4.0/22 (91.108.4.1 — 91.108.7.254)
-# 95.161.64.0/19 (95.161.64.1 — 95.161.95.254)
+# Основной диапазон серверов Telegram:
+# 149.154.160.0/20 (149.154.160.1 — 149.154.175.254) — основные серверы
+# 149.154.164.0/22 — подсеть
+# 149.154.168.0/21 — подсеть
+# 91.108.4.0/22 (91.108.4.1 — 91.108.7.254) — серверы для мобильных приложений
+# 95.161.64.0/19 (95.161.64.1 — 95.161.95.254) — новые серверы (2020+)
+# 5.255.255.0/24 — CDN серверы (иногда используется)
+# 185.76.151.0/24 — дополнительные CDN серверы
 
-# === Команды для добавления CIDR в ipset (выполнять вручную) ===
+# === Команды для добавления CIDR в ipset (выполнять вручную или через скрипт) ===
 # ipset add unblockvless 149.154.160.0/20
 # ipset add unblockvless 149.154.164.0/22
 # ipset add unblockvless 149.154.168.0/21
 # ipset add unblockvless 91.108.4.0/22
 # ipset add unblockvless 95.161.64.0/19
+# ipset add unblockvless 5.255.255.0/24
+# ipset add unblockvless 185.76.151.0/24
+
+# === Альтернатива: использовать скрипт автоматического добавления ===
+# sh /opt/etc/web_ui/resources/scripts/add_telegram_ipranges.sh

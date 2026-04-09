@@ -3,16 +3,14 @@
 # Обновлено: 10 марта 2026 г.
 
 # =============================================================================
-# TELEGRAM
+# TELEGRAM (обновлено 2026-04-09 — добавлены критически важные домены для Desktop/Mobile)
 # =============================================================================
+# Основные домены
 cdn-telegram.org
 comments.app
 contest.com
 fragment.com
 graph.org
-graph.whatsapp.com
-graph.whatsapp.net
-openai.com
 t.me
 tdesktop.com
 telega.one
@@ -25,8 +23,31 @@ telegram.space
 telesco.pe
 tg.dev
 tx.me
-wa.me
 web.telegram.org
+
+# CDN серверы (критично для Desktop/Mobile версий)
+cdn1.telegram-cdn.org
+cdn2.telegram-cdn.org
+cdn3.telegram-cdn.org
+cdn4.telegram-cdn.org
+cdn5.telegram-cdn.org
+cdn6.telegram-cdn.org
+cdn7.telegram-cdn.org
+cdn8.telegram-cdn.org
+
+# API и MTProto эндпоинты (для мобильных приложений и Desktop)
+api.telegram.org
+core.telegram.org
+mtproxy.telegram.org
+pluto.telegram.org
+venus.telegram.org
+flame.telegram.org
+vesta.telegram.org
+
+# WhatsApp (смежные домены)
+graph.whatsapp.com
+graph.whatsapp.net
+wa.me
 whatsapp-plus.info
 whatsapp-plus.me
 whatsapp-plus.net
