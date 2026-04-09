@@ -14,7 +14,7 @@ from core.decorators import login_required, validate_csrf_token, csrf_required
 logger = logging.getLogger(__name__)
 
 
-from core.constants import CONFIG_PATHS, INIT_SCRIPTS, SERVICES
+from core.constants import CONFIG_PATHS, INIT_SCRIPTS, SERVICES, IPSET_MAP
 from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_shadowsocks_key, shadowsocks_config,
@@ -28,6 +28,50 @@ bp = Blueprint('vpn', __name__, template_folder='templates', static_folder='stat
 
 executor = ThreadPoolExecutor(max_workers=4)
 
+# Словарь парсеров и генераторов конфигов для каждого сервиса
+SERVICE_PARSERS = {
+    'vless': {
+        'parser': parse_vless_key,
+        'config_gen': vless_config,
+        'config_writer': write_json_config,
+        'error_msg': 'Не удалось распарсить ключ VLESS: отсутствуют server/port',
+    },
+    'shadowsocks': {
+        'parser': parse_shadowsocks_key,
+        'config_gen': shadowsocks_config,
+        'config_writer': write_json_config,
+        'error_msg': 'Не удалось распарсить ключ: отсутствуют server/port',
+    },
+    'trojan': {
+        'parser': parse_trojan_key,
+        'config_gen': trojan_config,
+        'config_writer': write_json_config,
+        'error_msg': 'Не удалось распарсить ключ Trojan: отсутствуют server/port',
+    },
+    'tor': {
+        'parser': None,  # Tor использует bridges_text
+        'config_gen': tor_config,
+        'config_writer': write_tor_config,
+        'error_msg': None,  # Tor не требует валидации server/port
+    },
+}
+
+# Маппинг сервисов на процессы для pgrep
+PROC_NAME_MAP = {
+    'shadowsocks': 'ss-redir',
+    'vless': 'xray',
+    'trojan': 'trojan',
+    'tor': 'tor',
+}
+
+# Конфигурация сервисов для toggle/disable с ipset и портами
+SERVICE_TOGGLE_CONFIG = {
+    'vless': {'ipset': 'unblockvless', 'port': 10810},
+    'shadowsocks': {'ipset': 'unblocksh', 'port': 1082},
+    'trojan': {'ipset': 'unblocktroj', 'port': 10829},
+    'tor': {'ipset': 'unblocktor', 'port': 9141},
+}
+
 
 # =============================================================================
 # ROUTES
@@ -37,10 +81,12 @@ executor = ThreadPoolExecutor(max_workers=4)
 @login_required
 def keys():
     services = {
-        'vless': {'name': 'VLESS', 'config': CONFIG_PATHS['vless'], 'init': INIT_SCRIPTS['vless']},
-        'shadowsocks': {'name': 'Shadowsocks', 'config': CONFIG_PATHS['shadowsocks'], 'init': INIT_SCRIPTS['shadowsocks']},
-        'trojan': {'name': 'Trojan', 'config': CONFIG_PATHS['trojan'], 'init': INIT_SCRIPTS['trojan']},
-        'tor': {'name': 'Tor', 'config': CONFIG_PATHS['tor'], 'init': INIT_SCRIPTS['tor']},
+        svc_id: {
+            'name': svc_info['name'],
+            'config': CONFIG_PATHS.get(svc_id, svc_info.get('config')),
+            'init': INIT_SCRIPTS.get(svc_id, svc_info.get('init')),
+        }
+        for svc_id, svc_info in SERVICES.items()
     }
     for svc_name, service in services.items():
         if not os.path.exists(service['init']):
@@ -64,43 +110,34 @@ def keys():
 @login_required
 @csrf_required
 def key_config(service: str):
-    services_config = {
-        'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless']},
-        'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks']},
-        'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan']},
-        'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor']},
-    }
-    if service not in services_config:
+    if service not in SERVICES:
         flash('Неверный сервис', 'danger')
         return redirect(url_for('vpn.keys'))
-    svc = services_config[service]
+
+    svc_info = SERVICES[service]
+    svc = {
+        'name': svc_info['name'],
+        'config_path': CONFIG_PATHS.get(service, svc_info.get('config')),
+        'init_script': INIT_SCRIPTS.get(service, svc_info.get('init')),
+    }
     if request.method == 'POST':
         key = request.form.get('key', '').strip()
         if not key:
             flash('Введите ключ', 'warning')
             return redirect(url_for('vpn.key_config', service=service))
         try:
-            if service == 'vless':
-                parsed = parse_vless_key(key)
+            parser_info = SERVICE_PARSERS.get(service)
+            if not parser_info:
+                raise ValueError('Неподдерживаемый сервис')
+
+            if parser_info['parser']:
+                parsed = parser_info['parser'](key)
                 if not parsed.get('server') or not parsed.get('port'):
-                    raise ValueError('Не удалось распарсить ключ VLESS: отсутствуют server/port')
-                cfg = vless_config(key)
-                write_json_config(cfg, svc['config_path'])
-            elif service == 'shadowsocks':
-                parsed = parse_shadowsocks_key(key)
-                if not parsed.get('server') or not parsed.get('port'):
-                    raise ValueError('Не удалось распарсить ключ: отсутствуют server/port')
-                cfg = shadowsocks_config(key)
-                write_json_config(cfg, svc['config_path'])
-            elif service == 'trojan':
-                parsed = parse_trojan_key(key)
-                if not parsed.get('server') or not parsed.get('port'):
-                    raise ValueError('Не удалось распарсить ключ Trojan: отсутствуют server/port')
-                cfg = trojan_config(key)
-                write_json_config(cfg, svc['config_path'])
-            elif service == 'tor':
-                cfg = tor_config(key)
-                write_tor_config(cfg, svc['config_path'])
+                    raise ValueError(parser_info['error_msg'])
+                cfg = parser_info['config_gen'](key)
+            else:
+                cfg = parser_info['config_gen'](key)
+            parser_info['config_writer'](cfg, svc['config_path'])
             try:
                 future = executor.submit(restart_service, svc['name'], svc['init_script'])
                 success, output = future.result(timeout=30)
@@ -122,16 +159,23 @@ def key_config(service: str):
 @login_required
 @csrf_required
 def key_toggle(service: str):
-    services_config = {
-        'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless'], 'ipset': 'unblockvless', 'port': 10810},
-        'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks'], 'ipset': 'unblocksh', 'port': 1082},
-        'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan'], 'ipset': 'unblocktroj', 'port': 10829},
-        'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor'], 'ipset': 'unblocktor', 'port': 9141},
-    }
-    if service not in services_config:
+    if service not in SERVICES:
         flash('Неверный сервис', 'danger')
         return redirect(url_for('vpn.keys'))
-    svc = services_config[service]
+
+    svc_info = SERVICES[service]
+    toggle_config = SERVICE_TOGGLE_CONFIG.get(service)
+    if not toggle_config:
+        flash('Сервис не поддерживает toggle', 'warning')
+        return redirect(url_for('vpn.keys'))
+
+    svc = {
+        'name': svc_info['name'],
+        'config_path': CONFIG_PATHS.get(service, svc_info.get('config')),
+        'init_script': INIT_SCRIPTS.get(service, svc_info.get('init')),
+        'ipset': toggle_config['ipset'],
+        'port': toggle_config['port'],
+    }
     config_exists = os.path.exists(svc['config_path'])
 
     if config_exists:
@@ -163,13 +207,7 @@ def key_toggle(service: str):
                 
                 # Шаг 3: Если PID не найден — ищем через pgrep
                 if not pid:
-                    proc_name_map = {
-                        'shadowsocks': 'ss-redir',
-                        'vless': 'xray',
-                        'trojan': 'trojan',
-                        'tor': 'tor',
-                    }
-                    proc_name = proc_name_map.get(service, service)
+                    proc_name = PROC_NAME_MAP.get(service, service)
                     pgrep_result = subprocess.run(['pgrep', '-f', proc_name], capture_output=True, text=True, timeout=3)
                     if pgrep_result.returncode == 0 and pgrep_result.stdout.strip():
                         pid = pgrep_result.stdout.strip().split('\n')[0]
@@ -288,16 +326,23 @@ def key_toggle(service: str):
 @login_required
 @csrf_required
 def key_disable(service: str):
-    services_config = {
-        'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless'], 'ipset': 'unblockvless', 'port': 10810},
-        'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks'], 'ipset': 'unblocksh', 'port': 1082},
-        'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan'], 'ipset': 'unblocktroj', 'port': 10829},
-        'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor'], 'ipset': 'unblocktor', 'port': 9141},
-    }
-    if service not in services_config:
+    if service not in SERVICES:
         flash('Неверный сервис', 'danger')
         return redirect(url_for('vpn.keys'))
-    svc = services_config[service]
+
+    svc_info = SERVICES[service]
+    toggle_config = SERVICE_TOGGLE_CONFIG.get(service)
+    if not toggle_config:
+        flash('Сервис не поддерживает disable', 'warning')
+        return redirect(url_for('vpn.keys'))
+
+    svc = {
+        'name': svc_info['name'],
+        'config_path': CONFIG_PATHS.get(service, svc_info.get('config')),
+        'init_script': INIT_SCRIPTS.get(service, svc_info.get('init')),
+        'ipset': toggle_config['ipset'],
+        'port': toggle_config['port'],
+    }
     try:
         import time
         import re
@@ -339,13 +384,7 @@ def key_disable(service: str):
                         pid = pid_match.group(1)
                 
                 if not pid:
-                    proc_name_map = {
-                        'shadowsocks': 'ss-redir',
-                        'vless': 'xray',
-                        'trojan': 'trojan',
-                        'tor': 'tor',
-                    }
-                    proc_name = proc_name_map.get(service, service)
+                    proc_name = PROC_NAME_MAP.get(service, service)
                     pgrep_result = subprocess.run(['pgrep', '-f', proc_name], capture_output=True, text=True, timeout=3)
                     if pgrep_result.returncode == 0 and pgrep_result.stdout.strip():
                         pid = pgrep_result.stdout.strip().split('\n')[0]
