@@ -369,6 +369,13 @@ def resolve_single(domain: str, timeout: float = DEFAULT_TIMEOUT) -> List[str]:
     Returns:
         List of IP addresses
     """
+    # Skip wildcard domains (*.example.com) — DNS cannot resolve them
+    if domain.startswith('*.'):
+        return []
+    # Skip domains with @ads suffix (tracking/ads lists)
+    if ' @ads' in domain or ' @trackers' in domain:
+        return []
+
     try:
         # FIX: Use socket.getaddrinfo instead of nslookup subprocess
         # nslookup on BusyBox often fails or has different output format
@@ -378,10 +385,10 @@ def resolve_single(domain: str, timeout: float = DEFAULT_TIMEOUT) -> List[str]:
         logger.debug(f"Resolved {domain} -> {ips}")
         return ips
     except socket.gaierror as e:
-        logger.warning(f"Failed to resolve {domain}: {e}")
+        logger.debug(f"Failed to resolve {domain}: {e}")
         return []
     except socket.timeout:
-        logger.warning(f"Timeout resolving {domain}")
+        logger.debug(f"Timeout resolving {domain}")
         return []
     except Exception as e:
         logger.error(f"Unexpected error resolving {domain}: {e}")

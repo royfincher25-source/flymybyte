@@ -609,6 +609,7 @@ def service_restart_webui():
 def service_restore_dns():
     logger.info("[ROUTES] /service/restore-dns - Starting DNS restoration")
     results = []
+
     # 1. Check if dnsmasq is running
     try:
         result = subprocess.run(['pgrep', 'dnsmasq'], capture_output=True, text=True)
@@ -621,46 +622,70 @@ def service_restore_dns():
     except Exception:
         results.append('⚠️ Не удалось проверить dnsmasq')
 
-    # 2. Remove DNS redirect rules
+    # 2. Sanitize dnsmasq.conf — remove obsolete entries (Tor references)
     try:
-        for proto in ['udp', 'tcp']:
-            subprocess.run(
-                ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to-destination', '192.168.1.1:5353'],
-                capture_output=True, text=True, timeout=5
-            )
-            subprocess.run(
-                ['iptables', '-t', 'nat', '-D', 'PREROUTING', '-p', proto, '--dport', '53', '-j', 'DNAT', '--to-destination', '192.168.1.1'],
-                capture_output=True, text=True, timeout=5
-            )
-            subprocess.run(
-                ['iptables', '-D', 'PREROUTING', '-t', 'nat', '-p', proto, '--dport', '53', '-j', 'REDIRECT', '--to-ports', '5353'],
-                capture_output=True, text=True, timeout=5
-            )
-        results.append('✅ Правила перенаправления DNS удалены')
-        logger.info("[ROUTES] DNS restore: redirect rules removed")
+        from core.dnsmasq_manager import DnsmasqManager
+        mgr = DnsmasqManager()
+        mgr._sanitize_dnsmasq_conf()
+        results.append('✅ Конфиг dnsmasq очищен')
+        logger.info("[ROUTES] DNS restore: dnsmasq.conf sanitized")
     except Exception as e:
-        results.append(f'⚠️ Ошибка удаления правил: {e}')
-        logger.error(f"[ROUTES] DNS restore: failed to remove rules: {e}")
+        results.append(f'⚠️ Очистка конфига: {e}')
+        logger.error(f"[ROUTES] DNS restore: sanitize error: {e}")
 
-    # 3. Try to fix dnsmasq config and restart
+    # 3. Restart dnsmasq
     try:
-        result = subprocess.run(['dnsmasq', '--test'], capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            for init_script in ['/opt/etc/init.d/S56dnsmasq', '/opt/etc/init.d/S99unblock']:
-                if os.path.exists(init_script):
-                    logger.info(f"[ROUTES] DNS restore: restarting via {init_script}")
-                    subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
-                    results.append('✅ dnsmasq перезапущен')
-                    break
-            else:
-                results.append('⚠️ Скрипт запуска dnsmasq не найден')
-                logger.error("[ROUTES] DNS restore: dnsmasq init script not found")
+        for init_script in ['/opt/etc/init.d/S56dnsmasq', '/opt/etc/init.d/S99unblock']:
+            if os.path.exists(init_script):
+                logger.info(f"[ROUTES] DNS restore: restarting via {init_script}")
+                subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
+                results.append('✅ dnsmasq перезапущен')
+                break
         else:
-            results.append(f'⚠️ Ошибка в dnsmasq.conf: {result.stderr.strip()[:100]}')
-            logger.error(f"[ROUTES] DNS restore: dnsmasq config invalid: {result.stderr.strip()[:100]}")
+            results.append('⚠️ Скрипт запуска dnsmasq не найден')
+            logger.error("[ROUTES] DNS restore: dnsmasq init script not found")
     except Exception as e:
-        results.append(f'⚠️ Ошибка проверки dnsmasq: {e}')
-        logger.error(f"[ROUTES] DNS restore: dnsmasq check error: {e}")
+        results.append(f'⚠️ Ошибка перезапуска dnsmasq: {e}')
+        logger.error(f"[ROUTES] DNS restore: restart error: {e}")
+
+    # 4. Regenerate bypass config and refresh ipset for all active VPN services
+    try:
+        from core.dnsmasq_manager import DnsmasqManager
+        mgr = DnsmasqManager()
+        ok, msg = mgr.generate_bypass_config()
+        if ok:
+            results.append(f'✅ Списки обхода обновлены: {msg}')
+            logger.info(f"[ROUTES] DNS restore: bypass config regenerated: {msg}")
+        else:
+            results.append(f'⚠️ Списки обхода: {msg}')
+            logger.warning(f"[ROUTES] DNS restore: bypass config error: {msg}")
+    except Exception as e:
+        results.append(f'⚠️ Ошибка генерации списков: {e}')
+        logger.error(f"[ROUTES] DNS restore: bypass config error: {e}")
+
+    # 5. Restart active VPN services to restore iptables rules
+    vpn_services = [
+        ('vless', '/opt/etc/init.d/S24xray'),
+        ('shadowsocks', '/opt/etc/init.d/S22shadowsocks'),
+        ('trojan', '/opt/etc/init.d/S22trojan'),
+    ]
+
+    for svc_name, init_script in vpn_services:
+        try:
+            if os.path.exists(init_script):
+                # Check if service config exists
+                config_map = {
+                    'vless': '/opt/etc/xray/vless.json',
+                    'shadowsocks': '/opt/etc/shadowsocks.json',
+                    'trojan': '/opt/etc/init.d/trojan.json',
+                }
+                config_path = config_map.get(svc_name, '')
+                if config_path and os.path.exists(config_path):
+                    subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
+                    results.append(f'✅ {svc_name} перезапущен')
+                    logger.info(f"[ROUTES] DNS restore: {svc_name} restarted")
+        except Exception as e:
+            logger.warning(f"[ROUTES] DNS restore: {svc_name} restart error: {e}")
 
     logger.info(f"[ROUTES] DNS restore completed: {results}")
     flash('Восстановление DNS: ' + ', '.join(results), 'warning')
