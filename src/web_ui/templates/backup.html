@@ -121,3 +121,74 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+var restorePolling = false;
+
+function pollRestoreStatus() {
+    if (restorePolling) return;
+    restorePolling = true;
+    
+    fetch('{{ url_for("system.api_restore_status") }}')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.running) {
+                showRestoreProgress(data);
+                setTimeout(pollRestoreStatus, 1500);
+            } else if (data.message && data.step === 'done') {
+                hideRestoreProgress();
+                location.reload();
+            } else if (data.message && data.step === 'error') {
+                hideRestoreProgress();
+                alert('Ошибка: ' + data.message);
+            }
+        })
+        .catch(function() {
+            setTimeout(pollRestoreStatus, 3000);
+        });
+}
+
+function showRestoreProgress(data) {
+    var el = document.getElementById('restore-progress');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'restore-progress';
+        el.className = 'card shadow-sm mb-4';
+        el.innerHTML = '<div class="card__body">' +
+            '<h5 class="card-title"><i class="fm fm-arrow-clockwise fm-spin"></i> Восстановление...</h5>' +
+            '<div class="progress-bar mt-2"><div class="progress-bar__fill" style="width: 0%" id="restore-progress-bar"></div></div>' +
+            '<p class="text-muted small mt-2" id="restore-step-text"></p>' +
+            '</div>';
+        var firstCard = document.querySelector('.card.shadow-sm.mb-4');
+        if (firstCard) firstCard.parentNode.insertBefore(el, firstCard);
+    }
+    
+    var bar = document.getElementById('restore-progress-bar');
+    var text = document.getElementById('restore-step-text');
+    if (bar && text) {
+        var steps = ['init', 'stopping_webui', 'extracting', 'copying', 'permissions', 'restarting_dnsmasq', 'restarting_webui', 'cleanup', 'done'];
+        var idx = steps.indexOf(data.step);
+        var pct = Math.round((idx / (steps.length - 1)) * 100);
+        bar.style.width = pct + '%';
+        text.textContent = data.message;
+    }
+}
+
+function hideRestoreProgress() {
+    restorePolling = false;
+    var el = document.getElementById('restore-progress');
+    if (el) el.remove();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    var alerts = document.querySelectorAll('.alert');
+    for (var i = 0; i < alerts.length; i++) {
+        if (alerts[i].textContent.toLowerCase().indexOf('восстановление запущено') !== -1) {
+            pollRestoreStatus();
+            break;
+        }
+    }
+});
+</script>
+{% endblock %}

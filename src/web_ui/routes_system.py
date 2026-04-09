@@ -103,32 +103,165 @@ def delete_backup(backup_name: str) -> Tuple[bool, str]:
         return False, f'Ошибка удаления: {e}'
 
 
-def restore_backup(backup_name: str) -> Tuple[bool, str]:
-    """Restore system from backup archive."""
+# =============================================================================
+# SAFE RESTORE — останавливает сервер, распаковывает во временную директорию,
+# копирует файлы и перезапускает сервисы
+# =============================================================================
+
+_RESTORE_STATUS = {'running': False, 'success': False, 'message': '', 'step': ''}
+
+
+def _get_restore_status() -> Dict:
+    return dict(_RESTORE_STATUS)
+
+
+def _set_restore_status(running: bool, success: bool, message: str, step: str):
+    _RESTORE_STATUS['running'] = running
+    _RESTORE_STATUS['success'] = success
+    _RESTORE_STATUS['message'] = message
+    _RESTORE_STATUS['step'] = step
+
+
+def restore_backup_async(backup_name: str) -> Tuple[bool, str]:
+    """
+    Безопасное восстановление: останавливает web_ui, распаковывает во /tmp,
+    копирует файлы, перезапускает сервисы.
+    """
+    import tarfile
+    import shutil
+    import time
+
     backup_path = os.path.join(BACKUP_DIR, backup_name)
     if not backup_name or not os.path.exists(backup_path):
         return False, 'Бэкап не найден'
 
-    try:
-        import tarfile
+    # Запуск в фоне
+    def _do_restore():
+        _set_restore_status(True, False, 'Начало восстановления...', 'init')
+        tmp_dir = f'/tmp/restore_{int(time.time())}'
 
-        with tarfile.open(backup_path, 'r:gz') as tar:
-            members = []
-            for member in tar.getmembers():
-                # Бэкап сохраняет пути БЕЗ /opt/ (arcname=_backup_arcname)
-                # Восстанавливаем префикс /opt/ при извлечении
-                safe_name = member.name.lstrip('/')
-                if safe_name:
-                    member.name = 'opt/' + safe_name
-                    members.append(member)
+        try:
+            # Шаг 1: Останавливаем веб-сервер
+            _set_restore_status(True, False, 'Остановка веб-интерфейса...', 'stopping_webui')
+            logger.info("[RESTORE] Stopping web UI")
+            try:
+                subprocess.run(['sh', INIT_SCRIPTS['web_ui'], 'stop'], capture_output=True, timeout=10)
+            except Exception:
+                pass
+            time.sleep(2)
 
-            tar.extractall('/', members=members)
+            # Убиваем процесс python3 если ещё жив
+            try:
+                subprocess.run(['killall', '-9', 'python3'], capture_output=True, timeout=5)
+            except Exception:
+                pass
+            time.sleep(2)
 
-        logger.info(f"[BACKUP] Restored from {backup_name}")
-        return True, f'Восстановлено из {backup_name}. Перезагрузите роутер для применения настроек.'
-    except Exception as e:
-        logger.error(f"[BACKUP] Restore failed: {e}")
-        return False, f'Ошибка восстановления: {e}'
+            # Шаг 2: Распаковываем во временную директорию
+            _set_restore_status(True, False, 'Распаковка архива...', 'extracting')
+            logger.info("[RESTORE] Extracting to %s", tmp_dir)
+            os.makedirs(tmp_dir, exist_ok=True)
+
+            with tarfile.open(backup_path, 'r:gz') as tar:
+                tar.extractall(tmp_dir)
+
+            # Шаг 3: Копируем файлы
+            _set_restore_status(True, False, 'Копирование файлов...', 'copying')
+            logger.info("[RESTORE] Copying files")
+
+            restore_map = {
+                'etc/web_ui': '/opt/etc/web_ui',
+                'etc/xray': '/opt/etc/xray',
+                'etc/trojan': '/opt/etc/trojan',
+                'etc/unblock': '/opt/etc/unblock',
+                'etc/init.d': '/opt/etc/init.d',
+                'etc/ndm': '/opt/etc/ndm',
+                'etc/dnsmasq.conf': '/opt/etc/dnsmasq.conf',
+                'etc/crontab': '/opt/etc/crontab',
+                'etc/unblock-ai.dnsmasq': '/opt/etc/unblock-ai.dnsmasq',
+                'bin': '/opt/bin',
+                'root': '/opt/root',
+                'var/log': '/opt/var/log',
+            }
+
+            for src_rel, dst_abs in restore_map.items():
+                src_path = os.path.join(tmp_dir, src_rel)
+                if os.path.exists(src_path):
+                    if os.path.isdir(src_path):
+                        if os.path.exists(dst_abs):
+                            shutil.rmtree(dst_abs, ignore_errors=True)
+                        shutil.copytree(src_path, dst_abs, dirs_exist_ok=True)
+                    else:
+                        os.makedirs(os.path.dirname(dst_abs), exist_ok=True)
+                        shutil.copy2(src_path, dst_abs)
+                    logger.info("[RESTORE] Restored %s -> %s", src_rel, dst_abs)
+
+            # Шаг 4: Восстанавливаем права
+            _set_restore_status(True, False, 'Восстановление прав...', 'permissions')
+            try:
+                for d in ['/opt/bin', '/opt/etc/init.d']:
+                    if os.path.exists(d):
+                        for f in os.listdir(d):
+                            fp = os.path.join(d, f)
+                            if os.path.isfile(fp):
+                                os.chmod(fp, 0o755)
+            except Exception as e:
+                logger.warning("[RESTORE] Permission restore error: %s", e)
+
+            # Шаг 5: Перезапускаем dnsmasq
+            _set_restore_status(True, False, 'Перезапуск dnsmasq...', 'restarting_dnsmasq')
+            try:
+                subprocess.run(['sh', INIT_SCRIPTS['dnsmasq'], 'restart'], capture_output=True, timeout=15)
+            except Exception as e:
+                logger.warning("[RESTORE] dnsmasq restart error: %s", e)
+
+            # Шаг 6: Перезапускаем web_ui
+            _set_restore_status(True, False, 'Перезапуск веб-интерфейса...', 'restarting_webui')
+            try:
+                subprocess.Popen(
+                    ['sh', INIT_SCRIPTS['web_ui'], 'start'],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as e:
+                logger.warning("[RESTORE] web_ui start error: %s", e)
+
+            # Шаг 7: Очистка
+            _set_restore_status(True, False, 'Очистка временных файлов...', 'cleanup')
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+            _set_restore_status(False, True, 'Восстановление завершено. Перезагрузите роутер.', 'done')
+            logger.info("[RESTORE] Restore completed successfully")
+
+        except Exception as e:
+            logger.error("[RESTORE] Restore failed: %s", e, exc_info=True)
+            _set_restore_status(False, False, f'Ошибка восстановления: {e}', 'error')
+            # Попытка перезапустить web_ui даже при ошибке
+            try:
+                subprocess.Popen(
+                    ['sh', INIT_SCRIPTS['web_ui'], 'start'],
+                    start_new_session=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception:
+                pass
+            # Очистка
+            try:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+    # Запуск в отдельном потоке
+    import threading
+    thread = threading.Thread(target=_do_restore, daemon=True)
+    thread.start()
+
+    return True, 'Восстановление запущено в фоновом режиме. Не закрывайте страницу.'
 
 
 # =============================================================================
@@ -620,13 +753,20 @@ def service_backup():
             return redirect(url_for('system.service_backup'))
         elif action == 'restore':
             backup_name = request.form.get('backup_name')
-            success, message = restore_backup(backup_name)
+            success, message = restore_backup_async(backup_name)
             if success:
                 flash(f'✅ {message}', 'success')
             else:
                 flash(f'❌ {message}', 'danger')
             return redirect(url_for('system.service_backup'))
     return render_template('backup.html', backups=backups)
+
+
+@bp.route('/api/restore/status')
+@login_required
+def api_restore_status():
+    """Получить статус фонового восстановления."""
+    return jsonify(_get_restore_status())
 
 
 # DNS Monitor
