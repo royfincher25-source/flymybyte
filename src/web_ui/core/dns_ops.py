@@ -64,8 +64,20 @@ def update_dnsmasq_dns(server_host: str, fallback_servers: list = None) -> Tuple
         # Remove existing bare server= lines, keep domain-specific ones
         lines = []
         removed_servers = 0
+        # Patterns to sanitize (obsolete ipsets removed in v2.7.0)
+        OBSOLETE_PATTERNS = [
+            'ipset=/onion/unblocktor',
+            'ipset=/onion/unblock4-tor',
+            'ipset=/onion/unblock6-tor',
+            'conf-file=/opt/etc/unblock-tor.dnsmasq',
+        ]
+        removed_obsolete = 0
         for line in content.split('\n'):
             stripped = line.strip()
+            # Remove obsolete Tor references
+            if any(pattern in stripped for pattern in OBSOLETE_PATTERNS):
+                removed_obsolete += 1
+                continue
             if stripped.startswith('server=/'):
                 lines.append(line)
             elif stripped.startswith('server='):
@@ -73,6 +85,9 @@ def update_dnsmasq_dns(server_host: str, fallback_servers: list = None) -> Tuple
                 pass
             else:
                 lines.append(line)
+
+        if removed_obsolete > 0:
+            logger.info(f"[DNS] Removed {removed_obsolete} obsolete lines (Tor references)")
 
         logger.debug(f"[DNS] Removed {removed_servers} old server= lines, keeping {len(lines)} lines")
 
@@ -304,18 +319,16 @@ class DNSMonitor:
         if best_server:
             self._current_server = best_server
             logger.info(f"Selected primary DNS: {best_server['name']} ({best_latency}ms)")
-
-            fallback = [s['host'] for s in self._servers['primary'] if s['host'] != best_server['host']]
-            success, msg = update_dnsmasq_dns(best_server['host'], fallback_servers=fallback)
-            if success:
-                logger.info(f"dnsmasq updated to use {best_server['name']}")
-            else:
-                logger.error(f"Failed to update dnsmasq: {msg}")
+            # FIX: Не перезаписываем dnsmasq.conf при каждом запуске.
+            # dnsmasq уже настроен на 1.1.1.1 + 8.8.8.8 в dnsmasq.conf.
+            # Автоматическая перезапись может ломать DNS если провайдер блокирует Cloudflare.
+            # Мониторинг только логирует статус, НЕ меняет конфиг.
+            logger.debug(f"[DNS] Not updating dnsmasq config — using pre-configured DNS servers")
         else:
             self._switch_to_backup()
 
     def _switch_to_backup(self) -> None:
-        """Switch to backup DNS server"""
+        """Switch to backup DNS server (only for monitoring, not config update)."""
         logger.warning("Switching to backup DNS")
 
         for server in self._servers['backup']:
@@ -323,14 +336,8 @@ class DNSMonitor:
             if result['success']:
                 self._current_server = server
                 self._failures = 0
-
-                fallback = [s['host'] for s in self._servers['backup'] if s['host'] != server['host']]
-                success, msg = update_dnsmasq_dns(server['host'], fallback_servers=fallback)
-                if success:
-                    logger.info(f"Switched to backup DNS: {server['name']} (dnsmasq updated)")
-                else:
-                    logger.error(f"Failed to update dnsmasq: {msg}")
-
+                # FIX: Не перезаписываем dnsmasq.conf — только меняем внутреннее состояние
+                logger.info(f"Monitoring switched to backup DNS: {server['name']}")
                 return
 
         logger.error("No working backup DNS found")

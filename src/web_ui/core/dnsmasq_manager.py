@@ -190,6 +190,50 @@ class DnsmasqManager:
             logger.error(f"Failed to write AI config: {e}")
             return False, str(e)
 
+    def _sanitize_dnsmasq_conf(self):
+        """
+        Удалить устаревшие/битые строки из dnsmasq.conf.
+
+        Исправляет:
+        - ipset=/onion/unblocktor (удалён в v2.7.0)
+        - server=/onion/... (Tor удалён)
+        """
+        config_path = DNSMASQ_CONFIG
+        if not os.path.exists(config_path):
+            return
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            # Строки которые нужно удалить
+            obsolete_patterns = [
+                'ipset=/onion/unblocktor',
+                'ipset=/onion/unblock4-tor',
+                'ipset=/onion/unblock6-tor',
+                'conf-file=/opt/etc/unblock-tor.dnsmasq',
+            ]
+
+            cleaned = []
+            removed = 0
+            for line in lines:
+                stripped = line.strip()
+                is_obsolete = any(pattern in stripped for pattern in obsolete_patterns)
+                if is_obsolete:
+                    logger.info(f"[SANITIZE] Removed obsolete line: {stripped}")
+                    removed += 1
+                else:
+                    cleaned.append(line)
+
+            if removed > 0:
+                # Сохраняем только если были изменения
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    f.writelines(cleaned)
+                logger.info(f"[SANITIZE] Removed {removed} obsolete lines from dnsmasq.conf")
+
+        except Exception as e:
+            logger.warning(f"[SANITIZE] Failed to sanitize dnsmasq.conf: {e}")
+
     def generate_all(self) -> Tuple[bool, str]:
         """
         Сгенерировать ОБА конфига (bypass + AI).
@@ -240,7 +284,10 @@ class DnsmasqManager:
 
         # Полный рестарт
         if os.path.exists(DNSMASQ_INIT_SCRIPT):
-            # Сначала тестируем конфиг на корректность
+            # Сначала исправляем устаревшие строки в dnsmasq.conf
+            self._sanitize_dnsmasq_conf()
+
+            # Затем тестируем конфиг на корректность
             if os.path.exists(DNSMASQ_CONFIG):
                 try:
                     test_result = subprocess.run(
