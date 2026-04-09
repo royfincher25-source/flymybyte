@@ -1,0 +1,78 @@
+# OpenAI / ChatGPT — полный список доменов для VLESS обхода
+# Использовать: скопировать содержимое в /opt/etc/unblock/vless.txt
+# Версия: 2.5.8 | Обновлено: 2026-04-09
+
+# === ChatGPT Web ===
+chatgpt.com
+www.chatgpt.com
+chat.openai.com
+ios.chat.openai.com
+
+# === OpenAI Main ===
+openai.com
+www.openai.com
+help.openai.com
+platform.openai.com
+beta.openai.com
+dashboard.openai.com
+blog.openai.com
+status.openai.com
+
+# === OpenAI API ===
+api.openai.com
+api.openai.com.cdn.cloudflare.net
+oaiusercontent.com
+files.oaiusercontent.com
+web.oaiusercontent.com
+
+# === Authentication ===
+auth.openai.com
+sso.openai.com
+auth0.openai.com
+
+# === CDN и контент ===
+cdn.openai.com
+openaiapi.azureedge.net
+static.cloudflareinsights.com
+
+# === DALL-E ===
+dall-e.com
+www.dall-e.com
+labs.openai.com
+
+# === GPT Store и плагины ===
+plugins.openai.com
+gpts.openai.com
+
+# === Anthropic (Claude AI) ===
+claude.ai
+www.claude.ai
+console.anthropic.com
+api.anthropic.com
+anthropic.com
+
+# === Google AI (Gemini, Colab) ===
+aistudio.google.com
+gemini.google.com
+colab.research.google.com
+generativelanguage.googleapis.com
+ai.google.com
+console.cloud.google.com
+
+# === Microsoft AI (Copilot) ===
+copilot.microsoft.com
+bing.com
+www.bing.com
+edgeservices.bing.com
+
+# === IP-диапазоны (добавлять через ipset add, НЕ в txt файл) ===
+# OpenAI использует Cloudflare и Azure CDN
+# Основные диапазоны Cloudflare:
+# - 104.16.0.0/13
+# - 104.24.0.0/14
+# - 172.64.0.0/13
+
+# === Команды для добавления CIDR в ipset (выполнять вручную) ===
+# ipset add unblockvless 104.16.0.0/13
+# ipset add unblockvless 104.24.0.0/14
+# ipset add unblockvless 172.64.0.0/13
