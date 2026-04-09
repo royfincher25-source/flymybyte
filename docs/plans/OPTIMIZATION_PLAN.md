@@ -27,37 +27,34 @@
 - ✅ **DNS spoofing** — класс `DNSSpoofing` в `services.py` (1463 строка)
 
 ### Остаётся выполнить:
-- ❌ Удаление Tor сервиса
 - ❌ Объединение Shadowsocks + Trojan в единый "Прокси" сервис
 - ❌ Удаление shell скриптов (замена на Python менеджеры)
 - ❌ Объединение DNS-обхода AI с основным bypass
 
 ### ✅ Выполнено:
 - ✅ **Удаление Hysteria2** (v2.6.1) — ~464 строки удалено, рефакторинг routes_vpn.py
+- ✅ **Удаление Tor** (v2.7.0) — ~239 строк удалено
 
 ---
 
-## ✅ ПРИОРИТЕТ 1: Удаление Hysteria2 — ВЫПОЛНЕНО
+## ✅ ПРИОРИТЕТ 2: Удаление Tor — ВЫПОЛНЕНО
 
-**Версия:** v2.6.1
+**Версия:** v2.7.0
 **Дата выполнения:** 9 апреля 2026
 
 **Что сделано:**
-- ✅ Удалены `parse_hysteria2_key()` и `hysteria2_config()` из `core/services.py` (~156 строк)
-- ✅ Удалены все константы HYSTERIA2_* из `constants.py`
+- ✅ Удалены `parse_tor_bridges()`, `tor_config()`, `write_tor_config()` из `services.py`
+- ✅ Удалён `tor_template.torrc` из `resources/config/`
+- ✅ Удалены константы `TOR_DIR` из `constants.py`
 - ✅ Удалена обработка из `routes_vpn.py` и `routes_system.py`
-- ✅ Удалены плитки из `keys.html`, `key_generic.html`, `stats.html`
-- ✅ Удалены упоминания из `service.html`, `bypass.html`
-- ✅ Обновлены 8 shell скриптов (удалён ipset `unblockhysteria2`)
-- ✅ Удалён `TEST_SCENARIO.md`
-- ✅ **Рефакторинг** `routes_vpn.py`:
-  - Вынесены `SERVICE_PARSERS` — словарь парсеров/генераторов
-  - Вынесены `SERVICE_TOGGLE_CONFIG` — конфигурация ipset/портов
-  - Вынесен `PROC_NAME_MAP` — маппинг имён процессов
-  - Устранено дублирование словарей (было 3 → 1 константа)
+- ✅ Удалены плитки из `keys.html`, `key_generic.html`, `stats.html`, `service.html`, `bypass.html`, `backup.html`
+- ✅ Обновлены 10 shell скриптов (удалён ipset `unblocktor`)
+- ✅ Удалён `unblocktor.txt` из `resources/lists/`
+- ✅ Удалена строка `ipset=/onion/unblocktor` из `dnsmasq.conf`
+- ✅ Обновлён `core/__init__.py` (удалены экспорты Tor)
 
-**Экономия:** ~464 строки кода, ~10MB RAM на роутере
-**Коммиты:** `4b00466` (удаление), `e5b5573` (рефакторинг)
+**Экономия:** ~239 строк кода, ~5MB RAM на роутере
+**Коммиты:** `6a2bd38` (удаление), `937daf4` (версия 2.7.0)
 
 ---
 
