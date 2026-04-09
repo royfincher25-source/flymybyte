@@ -16,9 +16,9 @@ MAX_TOTAL_INPUT_SIZE = 50 * 1024
 # DNS
 # =============================================================================
 
-DNS_CHECK_INTERVAL = 60
-DNS_TIMEOUT = 3
-DNS_FAILURE_THRESHOLD = 3
+DNS_CHECK_INTERVAL = 300  # Увеличено с 60 до 300 секунд (5 минут) для снижения нагрузки на CPU
+DNS_TIMEOUT = 2  # Уменьшено с 3 до 2 секунд (оптимально для локальных DNS)
+DNS_FAILURE_THRESHOLD = 5  # Увеличено с 3 до 5 (меньше ложных переключений)
 
 DEFAULT_DNS_SERVERS = {
     'primary': [

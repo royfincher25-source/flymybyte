@@ -127,6 +127,7 @@ FAILURE_THRESHOLD = DNS_FAILURE_THRESHOLD
 def check_dns_server(host: str, port: int = 53, timeout: float = 2.0) -> Dict[str, Any]:
     """
     Check if DNS server is reachable via TCP connection test.
+    Optimized: reduced timeout and added early exit for faster response.
 
     Args:
         host: DNS server IP
@@ -137,15 +138,16 @@ def check_dns_server(host: str, port: int = 53, timeout: float = 2.0) -> Dict[st
         Dict with success, latency_ms, error
     """
     start_time = time.time()
+    sock = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
         result = sock.connect_ex((host, port))
-        sock.close()
 
         latency_ms = (time.time() - start_time) * 1000
 
         if result == 0:
+            sock.close()
             return {
                 'success': True,
                 'latency_ms': round(latency_ms, 2),
@@ -153,6 +155,7 @@ def check_dns_server(host: str, port: int = 53, timeout: float = 2.0) -> Dict[st
                 'port': port,
             }
         else:
+            sock.close()
             return {
                 'success': False,
                 'latency_ms': round(latency_ms, 2),
@@ -162,6 +165,8 @@ def check_dns_server(host: str, port: int = 53, timeout: float = 2.0) -> Dict[st
             }
 
     except socket.timeout:
+        if sock:
+            sock.close()
         return {
             'success': False,
             'latency_ms': round((time.time() - start_time) * 1000, 2),
@@ -170,6 +175,8 @@ def check_dns_server(host: str, port: int = 53, timeout: float = 2.0) -> Dict[st
             'error': 'Timeout',
         }
     except Exception as e:
+        if sock:
+            sock.close()
         return {
             'success': False,
             'latency_ms': round((time.time() - start_time) * 1000, 2),
@@ -245,8 +252,9 @@ class DNSMonitor:
         }
 
     def _monitor_loop(self) -> None:
-        """Background monitoring loop"""
+        """Background monitoring loop - optimized for low CPU usage"""
         logger.info("DNSMonitor loop started")
+        check_count = 0
 
         while self._running:
             try:
@@ -259,15 +267,20 @@ class DNSMonitor:
 
                     if result['success']:
                         self._failures = 0
-                        logger.debug(f"DNS check OK: {self._current_server['name']} ({result['latency_ms']}ms)")
+                        # Логируем только каждый 10-й успешный check для снижения нагрузки на I/O
+                        check_count += 1
+                        if check_count % 10 == 0:
+                            logger.debug(f"DNS check OK: {self._current_server['name']} ({result['latency_ms']}ms)")
                     else:
                         self._failures += 1
-                        logger.warning(f"DNS check failed: {self._current_server['name']} - {result['error']}")
+                        logger.warning(f"DNS check failed: {self._current_server['name']} - {result['error']} (failures: {self._failures}/{FAILURE_THRESHOLD})")
 
                         if self._failures >= FAILURE_THRESHOLD:
+                            logger.warning(f"DNS failure threshold reached, switching to backup")
                             self._switch_to_backup()
 
                 else:
+                    logger.info("No current DNS server, selecting best primary")
                     self._select_best_primary()
 
                 self._last_check = datetime.now()
