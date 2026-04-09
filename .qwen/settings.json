@@ -21,7 +21,13 @@
       "Bash(timeout *)",
       "Bash(ssh *)",
       "Bash(python3 *)",
-      "Bash(echo *)"
+      "Bash(echo *)",
+      "WebSearch",
+      "WebFetch(github.com)",
+      "WebFetch(openwrt.org)",
+      "WebFetch(habr.com)",
+      "WebFetch(swsmile.info)",
+      "WebFetch(www.keepwn.com)"
     ]
   },
   "$version": 3,

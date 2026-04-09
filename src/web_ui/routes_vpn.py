@@ -14,7 +14,7 @@ from core.decorators import login_required, validate_csrf_token, csrf_required
 logger = logging.getLogger(__name__)
 
 
-from core.constants import CONFIG_PATHS, INIT_SCRIPTS, SERVICES, IPSET_MAP
+from core.constants import CONFIG_PATHS, INIT_SCRIPTS, SERVICES, IPSET_MAP, PROC_NAME_MAP, SERVICE_TOGGLE_CONFIG
 from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_shadowsocks_key, shadowsocks_config,
@@ -58,22 +58,6 @@ SERVICE_PARSERS = {
         'error_msg': 'Не удалось распарсить ключ Trojan: отсутствуют server/port',
     },
 }
-
-# Маппинг сервисов на процессы для pgrep
-PROC_NAME_MAP = {
-    'shadowsocks': 'ss-redir',
-    'vless': 'xray',
-    'trojan': 'trojan',
-}
-
-# Конфигурация сервисов для toggle/disable с ipset и портами
-SERVICE_TOGGLE_CONFIG = {
-    'vless': {'ipset': 'unblockvless', 'port': 10810},
-    'proxy': {'ipset': 'unblockproxy', 'port': 1080},
-    'shadowsocks': {'ipset': 'unblocksh', 'port': 1082},
-    'trojan': {'ipset': 'unblocktroj', 'port': 10829},
-}
-
 
 # =============================================================================
 # ROUTES

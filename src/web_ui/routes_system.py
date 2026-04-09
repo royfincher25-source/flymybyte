@@ -8,7 +8,7 @@ import logging
 import os
 import subprocess
 import time
-from flask import Blueprint, render_template, redirect, url_for, request, session, flash, current_app, jsonify
+from flask import Blueprint, render_template, redirect, url_for, request, session, flash
 from typing import List, Dict, Tuple
 from core.decorators import login_required, validate_csrf_token, csrf_required
 

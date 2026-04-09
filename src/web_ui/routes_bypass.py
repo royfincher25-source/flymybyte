@@ -14,6 +14,17 @@ from core.decorators import login_required, validate_csrf_token, csrf_required
 logger = logging.getLogger(__name__)
 
 
+def _safe_path(base_dir: str, filename: str) -> str:
+    """Проверить что файл действительно внутри base_dir (защита от path traversal)."""
+    safe_name = secure_filename(filename)
+    filepath = os.path.join(base_dir, f"{safe_name}.txt")
+    real_path = os.path.realpath(filepath)
+    real_dir = os.path.realpath(base_dir)
+    if not real_path.startswith(real_dir + os.sep):
+        raise ValueError(f"Invalid file path: {filename}")
+    return filepath
+
+
 from core.constants import (
     MAX_ENTRIES_PER_REQUEST,
     MAX_ENTRY_LENGTH,
@@ -207,11 +218,12 @@ def bypass():
 @login_required
 def view_bypass(filename: str):
     config = WebConfig()
-    filename = secure_filename(filename)
-    if not filename:
-        flash('Неверное имя файла', 'danger')
+    try:
+        filepath = _safe_path(config.unblock_dir, filename)
+    except ValueError as e:
+        flash(str(e), 'danger')
         return redirect(url_for('bypass.bypass'))
-    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
+    filename = os.path.splitext(os.path.basename(filepath))[0]
     entries = load_bypass_list(filepath)
     return render_template('bypass_view.html', filename=filename, entries=entries, filepath=filepath)
 
@@ -397,9 +409,3 @@ def download_list_from_catalog(name: str):
     else:
         flash(f'❌ {message}', 'danger')
     return redirect(url_for('bypass.bypass_catalog'))
-
-
-def bulk_add_to_ipset(name, entries):
-    """Wrapper for ipset bulk add."""
-    from core.ipset_ops import bulk_add_to_ipset as _bulk_add
-    return _bulk_add(name, entries)

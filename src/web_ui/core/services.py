@@ -820,62 +820,6 @@ def write_json_config(config: Dict[str, Any], filepath: str) -> None:
         raise
 
 
-def create_backup(backup_type='full'):
-    """
-    Create backup of all flymybyte files.
-    
-    Args:
-        backup_type: 'full' or 'custom'
-    
-    Returns:
-        Tuple of (success: bool, message: str)
-    """
-    import shutil
-    import tarfile
-    from datetime import datetime
-    
-    try:
-        backup_dir = '/opt/root/backup'
-        os.makedirs(backup_dir, exist_ok=True)
-        
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        backup_file = f'{backup_dir}/backup_{timestamp}.tar.gz'
-        
-        files_to_backup = [
-            '/opt/etc/web_ui',
-            '/opt/etc/xray',
-            '/opt/etc/unblock',
-            '/opt/bin',
-            '/opt/etc/dnsmasq.conf',
-            '/opt/etc/crontab',
-            '/opt/etc/shadowsocks.json',
-            '/opt/etc/trojan',
-            '/opt/etc/ndm',
-            '/opt/etc/init.d',
-            '/opt/root/script.sh',
-            '/opt/etc/unblock-ai.dnsmasq',
-            '/opt/etc/unblock/ai-domains.txt',
-        ]
-        
-        existing_files = [f for f in files_to_backup if os.path.exists(f)]
-        
-        if not existing_files:
-            return False, 'Нет файлов для бэкапа'
-        
-        with tarfile.open(backup_file, 'w:gz') as tar:
-            for f in existing_files:
-                tar.add(f, arcname=os.path.basename(f))
-        
-        backup_size = os.path.getsize(backup_file)
-        size_mb = backup_size / 1024 / 1024
-        
-        return True, f'Бэкап создан: {backup_file} ({size_mb:.1f} МБ, {len(existing_files)} объектов)'
-    
-    except Exception as e:
-        logger.error(f'Backup error: {e}')
-        return False, str(e)
-
-
 def get_local_version():
     """Получить локальную версию"""
     # На роутере VERSION файл находится в /opt/etc/web_ui/
@@ -891,7 +835,7 @@ def get_local_version():
             try:
                 with open(local_version_file, 'r', encoding='utf-8') as f:
                     return f.read().strip()
-            except:
+            except Exception:
                 pass
         return 'N/A'
 
@@ -920,101 +864,6 @@ def get_remote_version():
 # Prevents OOM when adding thousands of entries in single operation
 IPSET_MAX_BULK_ENTRIES = 5000  # Maximum entries per bulk operation
 IPSET_BATCH_SIZE = 1000  # Process entries in batches of 1000
-
-
-def _sanitize_for_ipset(text: str) -> str:
-    """
-    Sanitize text for safe use in ipset commands.
-
-    Removes dangerous characters that could be used for command injection.
-
-    Args:
-        text: Input text to sanitize
-
-    Returns:
-        Sanitized text safe for ipset commands
-    """
-    if not text:
-        raise ValueError("Empty entry")
-
-    # Remove dangerous shell characters
-    dangerous_pattern = r'[;|&`$(){}<>\\!#~*?\[\]\r\n]'
-    sanitized = re.sub(dangerous_pattern, '', text)
-
-    # Strip whitespace
-    sanitized = sanitized.strip()
-
-    if not sanitized:
-        raise ValueError("Invalid entry after sanitization")
-
-    return sanitized
-
-
-def _is_valid_ipset_entry(entry: str) -> bool:
-    """
-    Validate entry (IP address or domain).
-
-    Args:
-        entry: IP or domain string
-
-    Returns:
-        True if valid
-    """
-    if not entry or len(entry) > 253:
-        return False
-
-    # IPv4 pattern
-    ipv4_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
-    if re.match(ipv4_pattern, entry):
-        parts = entry.split('.')
-        try:
-            return all(0 <= int(p) <= 255 for p in parts)
-        except ValueError:
-            return False
-
-    # IPv6 pattern (simplified)
-    if ':' in entry:
-        return True
-
-    # Domain pattern
-    domain_pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
-    return bool(re.match(domain_pattern, entry))
-
-
-def _parse_ipset_error(stderr: str, commands: List[str]) -> str:
-    """
-    Parse ipset restore error output to identify failed entries.
-
-    Args:
-        stderr: Error output from ipset restore
-        commands: List of commands that were executed
-
-    Returns:
-        Detailed error message with failed entries
-    """
-    error_lines = stderr.strip().split('\n')
-    failed_entries = []
-
-    for line in error_lines:
-        match = re.search(r'line (\d+)', line, re.IGNORECASE)
-        if match:
-            line_num = int(match.group(1))
-            if 1 <= line_num <= len(commands):
-                failed_cmd = commands[line_num - 1]
-                parts = failed_cmd.split()
-                if len(parts) >= 3:
-                    failed_entries.append(parts[2])
-
-    if failed_entries:
-        sample = failed_entries[:5]
-        remaining = len(failed_entries) - len(sample)
-        msg = f"Failed entries: {', '.join(sample)}"
-        if remaining > 0:
-            msg += f" (and {remaining} more)"
-        logger.error(f"ipset restore failed for {len(failed_entries)} entries")
-        return msg
-    else:
-        return stderr[:200]
 
 
 # ===========================================================================
@@ -1138,11 +987,6 @@ LIST_CATALOG: Dict[str, Dict[str, Any]] = {
 def get_catalog() -> Dict[str, Dict[str, Any]]:
     """Get full catalog"""
     return LIST_CATALOG
-
-
-def get_list_info(name: str) -> Dict[str, Any]:
-    """Get info about specific list"""
-    return LIST_CATALOG.get(name, {})
 
 
 def _parse_list_content(content: str, fmt: str) -> List[str]:

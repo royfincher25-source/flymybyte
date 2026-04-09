@@ -19,20 +19,14 @@ import subprocess
 import shutil
 from typing import List, Dict, Tuple, Set, Optional
 
+from .constants import DNSMASQ_CONFIG, DNSMASQ_AI_CONFIG, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT
+
 logger = logging.getLogger(__name__)
 
 # Пути
-DNSMASQ_CONF = '/opt/etc/dnsmasq.conf'
 DNSMASQ_BYPASS_CONF = '/opt/etc/unblock.dnsmasq'
-DNSMASQ_AI_CONF = '/opt/etc/unblock-ai.dnsmasq'
-UNBLOCK_DIR = '/opt/etc/unblock'
-AI_DOMAINS_FILE = '/opt/etc/unblock/ai-domains.txt'
-
 DNSMASQ_INIT_SCRIPT = '/opt/etc/init.d/S56dnsmasq'
 DNSMASQ_TEMPLATE = '/opt/etc/web_ui/resources/config/dnsmasq.conf'
-
-# VPN DNS порт (stubby / DNS-over-TLS)
-VPN_DNS_PORT = 40500
 
 
 class DnsmasqManager:
@@ -40,7 +34,7 @@ class DnsmasqManager:
 
     def __init__(self, unblock_dir: str = UNBLOCK_DIR):
         self._unblock_dir = unblock_dir
-        self._ai_domains_file = AI_DOMAINS_FILE
+        self._ai_domains_file = AI_DOMAINS_LIST
 
     # =========================================================================
     # DOMAIN LOADING
@@ -175,7 +169,7 @@ class DnsmasqManager:
         if not domains:
             # Создаём пустой файл
             try:
-                with open(DNSMASQ_AI_CONF, 'w') as f:
+                with open(DNSMASQ_AI_CONFIG, 'w') as f:
                     f.write('# AI domains config (empty)\n')
                 return True, "No AI domains found, empty config created"
             except Exception as e:
@@ -186,10 +180,10 @@ class DnsmasqManager:
             lines.append(f'server=/{domain}/127.0.0.1#{VPN_DNS_PORT}')
 
         try:
-            temp_path = DNSMASQ_AI_CONF + '.tmp'
+            temp_path = DNSMASQ_AI_CONFIG + '.tmp'
             with open(temp_path, 'w', encoding='utf-8') as f:
                 f.write('\n'.join(lines) + '\n')
-            os.replace(temp_path, DNSMASQ_AI_CONF)
+            os.replace(temp_path, DNSMASQ_AI_CONFIG)
             logger.info(f"Generated AI config: {len(domains)} domains")
             return True, f"Generated {len(domains)} AI domains"
         except Exception as e:
