@@ -29,6 +29,7 @@ bp = Blueprint('vpn', __name__, template_folder='templates', static_folder='stat
 executor = ThreadPoolExecutor(max_workers=4)
 
 # Словарь парсеров и генераторов конфигов для каждого сервиса
+# shadowsocks и trojan используют общий parse_proxy_key() для оптимизации
 SERVICE_PARSERS = {
     'vless': {
         'parser': parse_vless_key,
@@ -43,13 +44,15 @@ SERVICE_PARSERS = {
         'error_msg': 'Не удалось распарсить ключ: отсутствуют server/port',
     },
     'shadowsocks': {
-        'parser': parse_shadowsocks_key,
+        # Используем общий парсер — он автоопределяет ss:// или trojan://
+        'parser': parse_proxy_key,
         'config_gen': shadowsocks_config,
         'config_writer': write_json_config,
-        'error_msg': 'Не удалось распарсить ключ: отсутствуют server/port',
+        'error_msg': 'Не удалось распарсить ключ Shadowsocks: отсутствуют server/port',
     },
     'trojan': {
-        'parser': parse_trojan_key,
+        # Используем общий парсер — он автоопределяет ss:// или trojan://
+        'parser': parse_proxy_key,
         'config_gen': trojan_config,
         'config_writer': write_json_config,
         'error_msg': 'Не удалось распарсить ключ Trojan: отсутствуют server/port',
