@@ -38,7 +38,7 @@ iptables -t mangle -F PREROUTING 2>/dev/null && log "  Mangle PREROUTING flushed
 
 # 4. Очищаем ipset
 log "Step 4: Flushing ipsets..."
-for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj unblocksh6 unblocktor6 unblockvless6 unblocktroj6; do
+for setname in unblocksh unblocktor unblockvless unblocktroj unblocksh6 unblocktor6 unblockvless6 unblocktroj6; do
     ipset flush "$setname" 2>/dev/null && log "  Flushed $setname" || log "  $setname not found"
 done
 

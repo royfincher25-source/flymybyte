@@ -41,7 +41,7 @@ case "$1" in
     if [ "$IPSET_OK" = "true" ]; then
         log "Verifying ipset entries..."
         TOTAL_ENTRIES=0
-        for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
+        for setname in unblocksh unblocktor unblockvless unblocktroj; do
             if ipset list "$setname" -n >/dev/null 2>&1; then
                 count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]")
                 count=${count:-0}
@@ -90,7 +90,7 @@ case "$1" in
         iptables -t nat -F PREROUTING 2>/dev/null && log "  Flushed PREROUTING ($proto)" || log_error "  Failed to flush PREROUTING ($proto)"
     done
     log "  Clearing ipsets..."
-    for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
+    for setname in unblocksh unblocktor unblockvless unblocktroj; do
         ipset flush "$setname" 2>/dev/null && log "  Flushed $setname" || log "  $setname not found"
     done
     ;;

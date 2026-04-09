@@ -87,7 +87,6 @@ AI_DOMAINS_LIST = '/opt/etc/unblock/ai-domains.txt'
 
 SHADOWSOCKS_CONFIG = '/opt/etc/shadowsocks.json'
 TROJAN_CONFIG_DIR = '/opt/etc/trojan'
-HYSTERIA2_CONFIG = '/opt/etc/hysteria2.json'
 CRONTAB_FILE = '/opt/etc/crontab'
 
 # =============================================================================
@@ -113,11 +112,6 @@ SERVICES = {
         'init': f'{INIT_DIR}/S24xray',
         'config': f'{XRAY_DIR}/vless.json',
     },
-    'hysteria2': {
-        'name': 'Hysteria 2',
-        'init': f'{INIT_DIR}/S22hysteria2',
-        'config': HYSTERIA2_CONFIG,
-    },
     'shadowsocks': {
         'name': 'Shadowsocks',
         'init': f'{INIT_DIR}/S22shadowsocks',
@@ -137,7 +131,6 @@ SERVICES = {
 
 INIT_SCRIPTS = {
     'vless': SERVICES['vless']['init'],
-    'hysteria2': SERVICES['hysteria2']['init'],
     'shadowsocks': SERVICES['shadowsocks']['init'],
     'trojan': SERVICES['trojan']['init'],
     'tor': SERVICES['tor']['init'],
@@ -148,7 +141,6 @@ INIT_SCRIPTS = {
 
 CONFIG_PATHS = {
     'vless': SERVICES['vless']['config'],
-    'hysteria2': SERVICES['hysteria2']['config'],
     'shadowsocks': SERVICES['shadowsocks']['config'],
     'trojan': SERVICES['trojan']['config'],
     'tor': SERVICES['tor']['config'],
@@ -234,7 +226,6 @@ BACKUP_FILES = [
     f'{TOR_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
-    HYSTERIA2_CONFIG,
     f'{UNBLOCK_DIR}',
     DNSMASQ_AI_CONFIG,
     AI_DOMAINS_LIST,
@@ -253,7 +244,6 @@ UPDATE_BACKUP_FILES = [
     f'{TOR_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
-    HYSTERIA2_CONFIG,
     f'{UNBLOCK_DIR}',
     DNSMASQ_AI_CONFIG,
     AI_DOMAINS_LIST,
@@ -274,7 +264,6 @@ IPSET_MAP = {
     'ss': 'unblocksh',
     'tor': 'unblocktor',
     'trojan': 'unblocktroj',
-    'hysteria2': 'unblockhysteria2',
 }
 
 # Maximum entries per ipset bulk operation

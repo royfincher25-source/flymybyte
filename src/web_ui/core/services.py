@@ -596,160 +596,6 @@ def trojan_config(key: str) -> Dict[str, Any]:
 
 
 # =============================================================================
-# HYSTERIA 2 PARSER
-# =============================================================================
-
-def parse_hysteria2_key(key: str) -> Dict[str, Any]:
-    """
-    Parse Hysteria 2 key.
-    
-    Format: hysteria2://[password]:[sni]@[server]:[port]?[params]#name
-    
-    Examples:
-        hysteria2://mypassword@server.com:443#MyVPN
-        hysteria2://mypassword@sni.com@server.com:443?insecure=0#MyVPN
-        hysteria2://obfsPassword@sni.com@server.com:443?insecure=0&obfs=sensitive&obfspwd=obfsPassword#MyVPN
-    
-    Args:
-        key: Hysteria 2 key string
-    
-    Returns:
-        Dict with parsed configuration
-    
-    Raises:
-        ValueError: If key format is invalid
-    """
-    cache_key = f'hysteria2:{hashlib.md5(key.encode()).hexdigest()}'
-    
-    if Cache.is_valid(cache_key):
-        logger.debug(f"Hysteria2 cache hit: {cache_key[:20]}...")
-        return Cache.get(cache_key)
-    
-    if not key.startswith('hysteria2://'):
-        raise ValueError("Неверный формат ключа Hysteria 2")
-    
-    key = key.strip()
-    key = ''.join(c for c in key if ord(c) >= 32 or c in '\t\n\r')
-    key = unquote(key)
-    
-    try:
-        key = key.encode('ascii', 'ignore').decode('ascii')
-    except Exception as e:
-        logger.error(f"Hysteria2 ASCII encode error: {e}")
-    
-    logger.debug(f"Hysteria2 normalized key: {key[:80]}...")
-    
-    url = key[11:]
-    parsed = urlparse(url)
-    
-    if not parsed.hostname:
-        raise ValueError("Сервер не найден в ключе")
-    
-    if not parsed.port:
-        raise ValueError("Порт не найден в ключе")
-    
-    auth_info = parsed.username or ''
-    if '@' in auth_info:
-        auth_parts = auth_info.rsplit('@', 1)
-        password = auth_parts[0]
-        sni = auth_parts[1] if auth_parts[1] else parsed.hostname
-    else:
-        password = auth_info
-        sni = parsed.hostname
-    
-    if not password:
-        raise ValueError("Пароль не найден в ключе")
-    
-    params = parse_qs(parsed.query)
-    
-    result = {
-        'password': password,
-        'server': parsed.hostname,
-        'port': parsed.port,
-        'sni': sni,
-        'insecure': params.get('insecure', ['0'])[0] == '1',
-        'obfs': params.get('obfs', [''])[0],
-        'obfs_password': params.get('obfspwd', [''])[0],
-        'name': parsed.fragment or 'Hysteria2',
-    }
-    
-    Cache.set(cache_key, result)
-    logger.debug(f"parse_hysteria2_key: parsed {result['server']}:{result['port']}")
-    
-    return result
-
-
-def hysteria2_config(key: str) -> Dict[str, Any]:
-    """
-    Generate Hysteria 2 configuration from key.
-
-    Args:
-        key: Hysteria 2 key string
-
-    Returns:
-        Dict with full configuration for hysteria server
-    """
-    logger.debug("hysteria2_config: parsing key")
-
-    parsed = parse_hysteria2_key(key)
-
-    config = {
-        'server': f"{parsed['server']}:{parsed['port']}",
-        'auth': {
-            'type': 'password',
-            'password': parsed['password'],
-        },
-        'tls': {
-            'enabled': True,
-            'insecure': parsed['insecure'],
-            'sni': parsed['sni'],
-            'alpn': ['h3'],
-        },
-        'bandwidth': None,
-        'socks5': {
-            'listen': '127.0.0.1:1080',
-        },
-        'http': {
-            'listen': '127.0.0.1:8080',
-        },
-    }
-
-    if parsed['obfs'] and parsed['obfs_password']:
-        config['obfs'] = {
-            'type': parsed['obfs'],
-            'password': parsed['obfs_password'],
-        }
-
-    logger.debug("hysteria2_config: generated")
-    return config
-
-
-def write_hysteria2_config(config: Dict[str, Any], filepath: str) -> None:
-    """
-    Write Hysteria 2 configuration to file.
-    
-    Args:
-        config: Configuration dict
-        filepath: Path to write config
-    """
-    logger.debug(f"write_hysteria2_config: writing to {filepath}")
-    
-    try:
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        temp_path = filepath + '.tmp'
-        
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=2, ensure_ascii=False)
-        
-        os.replace(temp_path, filepath)
-        logger.debug(f"write_hysteria2_config: config written to {filepath}")
-        
-    except Exception as e:
-        logger.error(f"write_hysteria2_config: error writing config: {e}")
-        raise
-
-
-# =============================================================================
 # TOR PARSER
 # =============================================================================
 
@@ -922,7 +768,6 @@ def check_service_status(init_script: str) -> str:
             # Map init script to process name pattern
             process_patterns = {
                 'S24xray': 'xray',
-                'S22hysteria2': 'hysteria',
                 'S22shadowsocks': 'ss-redir',
                 'S22trojan': 'trojan',
                 'S35tor': 'tor',
@@ -1056,7 +901,6 @@ def create_backup(backup_type='full'):
             '/opt/etc/crontab',
             '/opt/etc/shadowsocks.json',
             '/opt/etc/trojan',
-            '/opt/etc/hysteria2.json',
             '/opt/etc/ndm',
             '/opt/etc/init.d',
             '/opt/root/script.sh',

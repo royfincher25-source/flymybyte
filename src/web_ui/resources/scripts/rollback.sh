@@ -67,7 +67,7 @@ iptables -t mangle -F PREROUTING 2>/dev/null && log "  Mangle PREROUTING flushed
 
 # 3. Flush ipsets
 log "Step 3: Flushing ipsets..."
-for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj unblocksh6 unblocktor6 unblockvless6 unblocktroj6; do
+for setname in unblocksh unblocktor unblockvless unblocktroj unblocksh6 unblocktor6 unblockvless6 unblocktroj6; do
     ipset flush "$setname" 2>/dev/null
     ipset destroy "$setname" 2>/dev/null
 done

@@ -271,7 +271,7 @@ if [ "$1" = "-install" ]; then
         echo "  ✅ unblocktor.txt created" || echo "  ℹ️ unblocktor.txt preserved"
 
     # Пустые файлы - только создать если не существуют
-    for file in "${UNBLOCK_DIR}shadowsocks.txt" "${UNBLOCK_DIR}hysteria2.txt" "${UNBLOCK_DIR}trojan.txt" "${UNBLOCK_DIR}vpn.txt"; do
+    for file in "${UNBLOCK_DIR}shadowsocks.txt" "${UNBLOCK_DIR}trojan.txt" "${UNBLOCK_DIR}vpn.txt"; do
         [ ! -f "$file" ] && touch "$file" && chmod 644 "$file" && echo "  ✅ $(basename $file) created"
     done
     echo "  ℹ️ Existing lists preserved"

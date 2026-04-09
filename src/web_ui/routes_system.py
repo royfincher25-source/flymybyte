@@ -166,7 +166,6 @@ def stats():
     config = WebConfig()
     services = {
         'vless': {'name': 'VLESS', 'init': INIT_SCRIPTS['vless'], 'config': CONFIG_PATHS['vless']},
-        'hysteria2': {'name': 'Hysteria 2', 'init': INIT_SCRIPTS['hysteria2'], 'config': CONFIG_PATHS['hysteria2']},
         'shadowsocks': {'name': 'Shadowsocks', 'init': INIT_SCRIPTS['shadowsocks'], 'config': CONFIG_PATHS['shadowsocks']},
         'trojan': {'name': 'Trojan', 'init': INIT_SCRIPTS['trojan'], 'config': CONFIG_PATHS['trojan']},
         'tor': {'name': 'Tor', 'init': INIT_SCRIPTS['tor'], 'config': CONFIG_PATHS['tor']},

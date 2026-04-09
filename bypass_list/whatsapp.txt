@@ -1,0 +1,41 @@
+# WhatsApp — полный список доменов для обхода блокировок
+# Использовать: скопировать содержимое в /opt/etc/unblock/vless.txt (или другой список)
+# Обновлён: 2026-04-09
+
+# === Основные домены WhatsApp ===
+whatsapp.com
+www.whatsapp.com
+web.whatsapp.com
+api.whatsapp.com
+wa.me
+
+# === Дополнительные домены ===
+whatsapp.net
+www.whatsapp.net
+whatsapp.org
+whatsapp.tv
+whatsappbrand.com
+whatsapp.cc
+whatsapp.info
+whatsapp-plus.me
+whatsapp-plus.net
+whatsapp-plus.info
+
+# === WhatsApp Business ===
+business.whatsapp.com
+
+# === CDN и медиа ===
+graph.whatsapp.com
+graph.whatsapp.net
+static.whatsapp.net
+scontent.whatsapp.net
+
+# === WhatsApp Web (критично для работы веб-версии) ===
+web.whatsapp.com
+edge-chat.whatsapp.com
+edge-chat.facebook.com
+
+# === Серверы звонков и сообщений ===
+mmg.whatsapp.net
+media.whatsapp.net
+pps.whatsapp.net

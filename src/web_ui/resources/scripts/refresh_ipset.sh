@@ -31,7 +31,6 @@ if [ -n "$IPSET_NAME" ] && [ -z "$2" ]; then
         unblocksh) BYPASS_FILE="/opt/etc/unblock/shadowsocks.txt" ;;
         unblocktor) BYPASS_FILE="/opt/etc/unblock/tor.txt" ;;
         unblocktroj) BYPASS_FILE="/opt/etc/unblock/trojan.txt" ;;
-        unblockhysteria2) BYPASS_FILE="/opt/etc/unblock/hysteria2.txt" ;;
         unblock*)
             VPN_NAME=$(echo "$1" | sed 's/unblock//')
             BYPASS_FILE="/opt/etc/unblock/${VPN_NAME}.txt"

@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 from core.constants import CONFIG_PATHS, INIT_SCRIPTS, SERVICES
 from core.services import (
     parse_vless_key, vless_config, write_json_config,
-    parse_hysteria2_key, hysteria2_config, write_hysteria2_config,
     parse_shadowsocks_key, shadowsocks_config,
     parse_trojan_key, trojan_config,
     parse_tor_bridges, tor_config, write_tor_config,
@@ -39,7 +38,6 @@ executor = ThreadPoolExecutor(max_workers=4)
 def keys():
     services = {
         'vless': {'name': 'VLESS', 'config': CONFIG_PATHS['vless'], 'init': INIT_SCRIPTS['vless']},
-        'hysteria2': {'name': 'Hysteria 2', 'config': CONFIG_PATHS['hysteria2'], 'init': INIT_SCRIPTS['hysteria2']},
         'shadowsocks': {'name': 'Shadowsocks', 'config': CONFIG_PATHS['shadowsocks'], 'init': INIT_SCRIPTS['shadowsocks']},
         'trojan': {'name': 'Trojan', 'config': CONFIG_PATHS['trojan'], 'init': INIT_SCRIPTS['trojan']},
         'tor': {'name': 'Tor', 'config': CONFIG_PATHS['tor'], 'init': INIT_SCRIPTS['tor']},
@@ -68,7 +66,6 @@ def keys():
 def key_config(service: str):
     services_config = {
         'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless']},
-        'hysteria2': {'name': 'Hysteria 2', 'config_path': CONFIG_PATHS['hysteria2'], 'init_script': INIT_SCRIPTS['hysteria2']},
         'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks']},
         'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan']},
         'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor']},
@@ -95,12 +92,6 @@ def key_config(service: str):
                     raise ValueError('Не удалось распарсить ключ: отсутствуют server/port')
                 cfg = shadowsocks_config(key)
                 write_json_config(cfg, svc['config_path'])
-            elif service == 'hysteria2':
-                parsed = parse_hysteria2_key(key)
-                if not parsed.get('server') or not parsed.get('port'):
-                    raise ValueError('Не удалось распарсить ключ Hysteria 2: отсутствуют server/port')
-                cfg = hysteria2_config(key)
-                write_hysteria2_config(cfg, svc['config_path'])
             elif service == 'trojan':
                 parsed = parse_trojan_key(key)
                 if not parsed.get('server') or not parsed.get('port'):
@@ -133,7 +124,6 @@ def key_config(service: str):
 def key_toggle(service: str):
     services_config = {
         'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless'], 'ipset': 'unblockvless', 'port': 10810},
-        'hysteria2': {'name': 'Hysteria 2', 'config_path': CONFIG_PATHS['hysteria2'], 'init_script': INIT_SCRIPTS['hysteria2'], 'ipset': 'unblockhysteria2', 'port': 0},
         'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks'], 'ipset': 'unblocksh', 'port': 1082},
         'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan'], 'ipset': 'unblocktroj', 'port': 10829},
         'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor'], 'ipset': 'unblocktor', 'port': 9141},
@@ -176,7 +166,6 @@ def key_toggle(service: str):
                     proc_name_map = {
                         'shadowsocks': 'ss-redir',
                         'vless': 'xray',
-                        'hysteria2': 'hysteria',
                         'trojan': 'trojan',
                         'tor': 'tor',
                     }
@@ -301,7 +290,6 @@ def key_toggle(service: str):
 def key_disable(service: str):
     services_config = {
         'vless': {'name': 'VLESS', 'config_path': CONFIG_PATHS['vless'], 'init_script': INIT_SCRIPTS['vless'], 'ipset': 'unblockvless', 'port': 10810},
-        'hysteria2': {'name': 'Hysteria 2', 'config_path': CONFIG_PATHS['hysteria2'], 'init_script': INIT_SCRIPTS['hysteria2'], 'ipset': 'unblockhysteria2', 'port': 0},
         'shadowsocks': {'name': 'Shadowsocks', 'config_path': CONFIG_PATHS['shadowsocks'], 'init_script': INIT_SCRIPTS['shadowsocks'], 'ipset': 'unblocksh', 'port': 1082},
         'trojan': {'name': 'Trojan', 'config_path': CONFIG_PATHS['trojan'], 'init_script': INIT_SCRIPTS['trojan'], 'ipset': 'unblocktroj', 'port': 10829},
         'tor': {'name': 'Tor', 'config_path': CONFIG_PATHS['tor'], 'init_script': INIT_SCRIPTS['tor'], 'ipset': 'unblocktor', 'port': 9141},
@@ -354,7 +342,6 @@ def key_disable(service: str):
                     proc_name_map = {
                         'shadowsocks': 'ss-redir',
                         'vless': 'xray',
-                        'hysteria2': 'hysteria',
                         'trojan': 'trojan',
                         'tor': 'tor',
                     }

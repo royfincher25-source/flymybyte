@@ -9,9 +9,6 @@
             <i class="fm fm-circle-fill text-warning"></i> Shadowsocks
         {% elif service == 'vless' %}
             <i class="fm fm-circle-fill text-success"></i> VLESS
-        {% elif service == 'hysteria2' %}
-            <i class="fm fm-lightning-charge-fill text-warning"></i> Hysteria 2
-            <span class="badge badge--secondary ms-1">Бета</span>
         {% elif service == 'trojan' %}
             <i class="fm fm-circle-fill text-info"></i> Trojan
         {% elif service == 'tor' %}
@@ -68,29 +65,7 @@
                     Ключ должен содержать UUID, сервер, порт и параметры безопасности
                 </div>
             </div>
-            
-            {% elif service == 'hysteria2' %}
-            <div class="alert alert--warning small" role="alert">
-                <i class="fm fm-exclamation-triangle"></i> <strong>Бета-версия!</strong> Hysteria 2 требует больше ресурсов и может нестабильно работать на роутерах с 128MB RAM (KN-1210/1211/1212). Рекомендуется для мощных Keenetic (KN-1810+).
-            </div>
-            <p class="card__text text-muted">
-                Вставьте ключ Hysteria 2 в формате:<br>
-                <code>hysteria2://password@sni@server:port?insecure=0#name</code>
-            </p>
-            <div class="mb-3">
-                <textarea 
-                    name="key" 
-                    id="key" 
-                    class="input" 
-                    rows="4"
-                    placeholder="hysteria2://password@sni.example.com@server.example.com:443#MyVPN"
-                    required
-                ></textarea>
-                <div class="small text-muted">
-                    Поддерживаются ключи с параметрами: insecure, obfs, obfspwd
-                </div>
-            </div>
-            
+
             {% elif service == 'trojan' %}
             <p class="card__text text-muted">
                 Вставьте ключ Trojan в формате:<br>
@@ -168,22 +143,7 @@ bridge obfs4 192.0.2.2:8443 ... cert=... iat-mode=..."
             <li>Безопасность: tls, reality, none</li>
             <li>Транспорт: tcp, ws, grpc</li>
         </ul>
-        
-        {% elif service == 'hysteria2' %}
-        <p class="card__text">
-            Hysteria 2 — быстрый и устойчивый к блокировкам протокол на основе QUIC.
-            <strong class="text-warning">Требует больше оперативной памяти и CPU.</strong>
-        </p>
-        <ul class="mb-0">
-            <li>Пароль: случайная строка (auth)</li>
-            <li>SNI: домен для TLS сертификата</li>
-            <li>obfs: optional obfuscation (sensitive)</li>
-            <li>obfspwd: пароль для обфускации</li>
-        </ul>
-        <div class="alert alert--warning small mt-2 mb-0" role="alert">
-            <strong>Внимание:</strong> Не рекомендуется для Keenetic KN-1210/1211/1212 (128MB RAM)
-        </div>
-        
+
         {% elif service == 'trojan' %}
         <p class="card__text">
             Ключи Trojan предоставляются сервером Trojan.
