@@ -28,27 +28,36 @@
 
 ### Остаётся выполнить:
 - ❌ Удаление Tor сервиса
-- ❌ Удаление Hysteria2
 - ❌ Объединение Shadowsocks + Trojan в единый "Прокси" сервис
 - ❌ Удаление shell скриптов (замена на Python менеджеры)
 - ❌ Объединение DNS-обхода AI с основным bypass
 
+### ✅ Выполнено:
+- ✅ **Удаление Hysteria2** (v2.6.1) — ~464 строки удалено, рефакторинг routes_vpn.py
+
 ---
 
-## 🔴 ПРИОРИТЕТ 1: Удаление Hysteria2
+## ✅ ПРИОРИТЕТ 1: Удаление Hysteria2 — ВЫПОЛНЕНО
 
-**Статус:** Всё ещё в коде (parsers + config generation)
-**Почему сейчас:** Hysteria2 — специализированный протокол для мобильных сетей, на Wi-Fi/Ethernet не даёт преимуществ перед VLESS
+**Версия:** v2.6.1
+**Дата выполнения:** 9 апреля 2026
 
-**Что удалить:**
-- [ ] `parse_hysteria2_key()` и `hysteria2_config()` из `core/services.py` (~100 строк)
-- [ ] Упоминания Hysteria2 из `keys.html` (плитка сервиса)
-- [ ] `routes_vpn.py` — обработка Hysteria2 в `get_services_status()`
-- [ ] `constants.py` — константы HYSTERIA2_*
-- [ ] Если есть init скрипт `S22hysteria2` на роутере
-- [ ] ipset `unblockhysteria2` из всех упоминаний
+**Что сделано:**
+- ✅ Удалены `parse_hysteria2_key()` и `hysteria2_config()` из `core/services.py` (~156 строк)
+- ✅ Удалены все константы HYSTERIA2_* из `constants.py`
+- ✅ Удалена обработка из `routes_vpn.py` и `routes_system.py`
+- ✅ Удалены плитки из `keys.html`, `key_generic.html`, `stats.html`
+- ✅ Удалены упоминания из `service.html`, `bypass.html`
+- ✅ Обновлены 8 shell скриптов (удалён ipset `unblockhysteria2`)
+- ✅ Удалён `TEST_SCENARIO.md`
+- ✅ **Рефакторинг** `routes_vpn.py`:
+  - Вынесены `SERVICE_PARSERS` — словарь парсеров/генераторов
+  - Вынесены `SERVICE_TOGGLE_CONFIG` — конфигурация ipset/портов
+  - Вынесен `PROC_NAME_MAP` — маппинг имён процессов
+  - Устранено дублирование словарей (было 3 → 1 константа)
 
-**Экономия:** ~10MB RAM, ~150 строк кода, упрощение UI
+**Экономия:** ~464 строки кода, ~10MB RAM на роутере
+**Коммиты:** `4b00466` (удаление), `e5b5573` (рефакторинг)
 
 ---
 
