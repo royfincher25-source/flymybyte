@@ -19,6 +19,7 @@ from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_shadowsocks_key, shadowsocks_config,
     parse_trojan_key, trojan_config,
+    parse_proxy_key, proxy_config,
     restart_service, check_service_status,
 )
 
@@ -34,6 +35,12 @@ SERVICE_PARSERS = {
         'config_gen': vless_config,
         'config_writer': write_json_config,
         'error_msg': 'Не удалось распарсить ключ VLESS: отсутствуют server/port',
+    },
+    'proxy': {
+        'parser': parse_proxy_key,
+        'config_gen': proxy_config,
+        'config_writer': write_json_config,
+        'error_msg': 'Не удалось распарсить ключ: отсутствуют server/port',
     },
     'shadowsocks': {
         'parser': parse_shadowsocks_key,
@@ -59,6 +66,7 @@ PROC_NAME_MAP = {
 # Конфигурация сервисов для toggle/disable с ipset и портами
 SERVICE_TOGGLE_CONFIG = {
     'vless': {'ipset': 'unblockvless', 'port': 10810},
+    'proxy': {'ipset': 'unblockproxy', 'port': 1080},
     'shadowsocks': {'ipset': 'unblocksh', 'port': 1082},
     'trojan': {'ipset': 'unblocktroj', 'port': 10829},
 }

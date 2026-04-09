@@ -112,6 +112,11 @@ SERVICES = {
         'init': f'{INIT_DIR}/S24xray',
         'config': f'{XRAY_DIR}/vless.json',
     },
+    'proxy': {
+        'name': 'Прокси',
+        'init': f'{INIT_DIR}/S22proxy',
+        'config': '/opt/etc/proxy.json',
+    },
     'shadowsocks': {
         'name': 'Shadowsocks',
         'init': f'{INIT_DIR}/S22shadowsocks',
@@ -126,6 +131,7 @@ SERVICES = {
 
 INIT_SCRIPTS = {
     'vless': SERVICES['vless']['init'],
+    'proxy': SERVICES['proxy']['init'],
     'shadowsocks': SERVICES['shadowsocks']['init'],
     'trojan': SERVICES['trojan']['init'],
     'unblock': f'{INIT_DIR}/S99unblock',
@@ -135,6 +141,7 @@ INIT_SCRIPTS = {
 
 CONFIG_PATHS = {
     'vless': SERVICES['vless']['config'],
+    'proxy': SERVICES['proxy']['config'],
     'shadowsocks': SERVICES['shadowsocks']['config'],
     'trojan': SERVICES['trojan']['config'],
     'dnsmasq': DNSMASQ_CONFIG,
@@ -251,6 +258,7 @@ UPDATE_BACKUP_FILES = [
 
 IPSET_MAP = {
     'vless': 'unblockvless',
+    'proxy': 'unblockproxy',
     'shadowsocks': 'unblocksh',
     'ss': 'unblocksh',
     'trojan': 'unblocktroj',

@@ -470,6 +470,59 @@ def shadowsocks_config(key: str) -> Dict[str, Any]:
 
 
 # =============================================================================
+# UNIFIED PROXY PARSER (SS + Trojan)
+# =============================================================================
+
+def parse_proxy_key(key: str) -> Dict[str, Any]:
+    """
+    Unified proxy parser — auto-detects Shadowsocks or Trojan by URL scheme.
+
+    Returns dict with 'protocol' field ('ss' or 'trojan').
+
+    Args:
+        key: Proxy key string (ss://... or trojan://...)
+
+    Returns:
+        Dict with parsed configuration and 'protocol' field
+
+    Raises:
+        ValueError: If key format is invalid
+    """
+    if key.startswith('ss://'):
+        parsed = parse_shadowsocks_key(key)
+        parsed['protocol'] = 'ss'
+        return parsed
+    elif key.startswith('trojan://'):
+        parsed = parse_trojan_key(key)
+        parsed['protocol'] = 'trojan'
+        return parsed
+    else:
+        raise ValueError("Неверный формат ключа. Поддерживаются ss:// и trojan://")
+
+
+def proxy_config(key: str) -> Dict[str, Any]:
+    """
+    Unified proxy config generator — delegates to ss_config or trojan_config.
+
+    Args:
+        key: Proxy key string
+
+    Returns:
+        Dict with full configuration and 'protocol' field
+    """
+    if key.startswith('ss://'):
+        cfg = shadowsocks_config(key)
+        cfg['protocol'] = 'ss'
+        return cfg
+    elif key.startswith('trojan://'):
+        cfg = trojan_config(key)
+        cfg['protocol'] = 'trojan'
+        return cfg
+    else:
+        raise ValueError("Неверный формат ключа")
+
+
+# =============================================================================
 # TROJAN PARSER
 # =============================================================================
 
