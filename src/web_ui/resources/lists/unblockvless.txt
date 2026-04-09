@@ -39,6 +39,43 @@ whatsapp.tv
 whatsappbrand.com
 
 # =============================================================================
+# OPENAI (ChatGPT, GPT-4, DALL-E, API)
+# =============================================================================
+# ChatGPT Web
+chatgpt.com
+www.chatgpt.com
+chat.openai.com
+ios.chat.openai.com
+
+# OpenAI Main
+openai.com
+www.openai.com
+help.openai.com
+platform.openai.com
+beta.openai.com
+dashboard.openai.com
+
+# OpenAI API
+api.openai.com
+api.openai.com.cdn.cloudflare.net
+oaiusercontent.com
+openaiapi.azureedge.net
+
+# Authentication
+auth.openai.com
+sso.openai.com
+
+# OpenAI Services
+cdn.openai.com
+files.oaiusercontent.com
+web.oaiusercontent.com
+browser-intake-datadoghq.com
+
+# DALL-E
+dall-e.com
+www.dall-e.com
+
+# =============================================================================
 # ПРОЧИЕ
 # =============================================================================
 forum.ru-board.com

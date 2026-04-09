@@ -270,7 +270,7 @@ def run_unblock_update() -> Tuple[bool, str]:
         return False, "Script not found"
     logger.info(f"[UPDATE] Running unblock_update.sh from {script_path}")
     try:
-        result = subprocess.run(['sh', script_path], capture_output=True, text=True, timeout=60)
+        result = subprocess.run(['sh', script_path], capture_output=True, text=True, timeout=180)
         success = result.returncode == 0
         output = result.stdout.strip() or result.stderr.strip()
         if success:

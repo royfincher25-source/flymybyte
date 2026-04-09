@@ -1,0 +1,73 @@
+# TikTok — полный список доменов и IP-диапазонов для VLESS обхода
+# Использовать: скопировать содержимое в /opt/etc/unblock/vless.txt
+# CIDR-диапазоны НЕ копируются в файл — они добавляются через ipset add
+
+# === Основные домены TikTok ===
+tiktok.com
+www.tiktok.com
+m.tiktok.com
+vm.tiktok.com
+vt.tiktok.com
+snssdk.com
+tiktokv.com
+tiktokcdn.com
+byteoversea.com
+ibytedtos.com
+musical.ly
+tiktokmusic.com
+
+# === API и CDN ===
+api.tiktok.com
+api16.tiktokv.com
+api22.tiktokv.com
+webcast.tiktok.com
+webcast16.tiktokv.com
+webcast22.tiktokv.com
+im.tiktok.com
+im16.tiktokv.com
+im22.tiktokv.com
+rtc.tiktokv.com
+log16.tiktokv.com
+log22.tiktokv.com
+mon.tiktokv.com
+mon16.tiktokv.com
+mon22.tiktokv.com
+frontier.tiktokv.com
+ frontier16.tiktokv.com
+ frontier22.tiktokv.com
+
+# === Стриминг и видео ===
+v16-webapp.tiktok.com
+v16-web.tiktok.com
+v19.tiktokcdn.com
+v16m.tiktokcdn.com
+v16.tiktokcdn.com
+p16-sign.tiktokcdn.com
+p16-sign-va.tiktokcdn.com
+p16-sign-sg.tiktokcdn.com
+p77-sign.tiktokcdn.com
+p16-webcast.tiktokcdn.com
+lf16-tiktok-web.tiktokcdn.com
+lf16-tiktok-common.tiktokcdn.com
+lf16-tiktok-va.tiktokcdn.com
+lf16-tiktok-sg.tiktokcdn.com
+
+# === Домены для авторизации и аналитики ===
+sso.tiktok.com
+account.tiktok.com
+analytics.tiktok.com
+ads.tiktok.com
+business.tiktok.com
+developers.tiktok.com
+effecthouse.tiktok.com
+
+# === IP-диапазоны TikTok/ByteDance (добавлять через ipset add, НЕ в txt файл) ===
+# TikTok использует Cloudflare и собственные CDN
+# Основные диапазоны:
+# - Cloudflare (104.16.x.x — 104.31.x.x, 172.64.x.x)
+# - ByteDance собственные серверы
+
+# === Команды для добавления CIDR в ipset (выполнять вручную) ===
+# ipset add unblockvless 104.16.0.0/13
+# ipset add unblockvless 104.24.0.0/14
+# ipset add unblockvless 172.64.0.0/13

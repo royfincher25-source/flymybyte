@@ -75,8 +75,16 @@ def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
 
     cmd_text = "\n".join(commands)
     try:
+        # FIX: Flush set before restore to avoid "already added" errors
+        subprocess.run(
+            ['ipset', 'flush', setname],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
         result = subprocess.run(
-            ['ipset', 'restore'],
+            ['ipset', 'restore', '-exist'],
             input=cmd_text,
             capture_output=True,
             text=True,
