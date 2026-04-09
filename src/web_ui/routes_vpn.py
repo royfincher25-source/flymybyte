@@ -19,7 +19,6 @@ from core.services import (
     parse_vless_key, vless_config, write_json_config,
     parse_shadowsocks_key, shadowsocks_config,
     parse_trojan_key, trojan_config,
-    parse_tor_bridges, tor_config, write_tor_config,
     restart_service, check_service_status,
 )
 
@@ -48,12 +47,6 @@ SERVICE_PARSERS = {
         'config_writer': write_json_config,
         'error_msg': 'Не удалось распарсить ключ Trojan: отсутствуют server/port',
     },
-    'tor': {
-        'parser': None,  # Tor использует bridges_text
-        'config_gen': tor_config,
-        'config_writer': write_tor_config,
-        'error_msg': None,  # Tor не требует валидации server/port
-    },
 }
 
 # Маппинг сервисов на процессы для pgrep
@@ -61,7 +54,6 @@ PROC_NAME_MAP = {
     'shadowsocks': 'ss-redir',
     'vless': 'xray',
     'trojan': 'trojan',
-    'tor': 'tor',
 }
 
 # Конфигурация сервисов для toggle/disable с ipset и портами
@@ -69,7 +61,6 @@ SERVICE_TOGGLE_CONFIG = {
     'vless': {'ipset': 'unblockvless', 'port': 10810},
     'shadowsocks': {'ipset': 'unblocksh', 'port': 1082},
     'trojan': {'ipset': 'unblocktroj', 'port': 10829},
-    'tor': {'ipset': 'unblocktor', 'port': 9141},
 }
 
 

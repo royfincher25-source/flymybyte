@@ -29,7 +29,6 @@ if [ -n "$IPSET_NAME" ] && [ -z "$2" ]; then
     case "$IPSET_NAME" in
         unblockvless) BYPASS_FILE="/opt/etc/unblock/vless.txt" ;;
         unblocksh) BYPASS_FILE="/opt/etc/unblock/shadowsocks.txt" ;;
-        unblocktor) BYPASS_FILE="/opt/etc/unblock/tor.txt" ;;
         unblocktroj) BYPASS_FILE="/opt/etc/unblock/trojan.txt" ;;
         unblock*)
             VPN_NAME=$(echo "$1" | sed 's/unblock//')

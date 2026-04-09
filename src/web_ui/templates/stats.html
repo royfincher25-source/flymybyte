@@ -77,8 +77,6 @@
                                 <i class="fm fm-circle-fill text-warning"></i> Shadowsocks
                             {% elif service_id == 'trojan' %}
                                 <i class="fm fm-circle-fill text-info"></i> Trojan
-                            {% elif service_id == 'tor' %}
-                                <i class="fm fm-circle-fill text-danger"></i> Tor
                             {% endif %}
                         </td>
                         <td>
@@ -178,7 +176,7 @@
             Статистика обновляется при загрузке страницы.
         </p>
         <p class="card__text text-muted small">
-            <strong>Сервисы:</strong> VLESS, Hysteria 2, Shadowsocks, Trojan, Tor<br>
+            <strong>Сервисы:</strong> VLESS, Shadowsocks, Trojan<br>
             <strong>Списки обхода:</strong> Файлы .txt в директории {{ config.unblock_dir if config else '/opt/etc/unblock/' }}
         </p>
     </div>

@@ -168,7 +168,6 @@ def stats():
         'vless': {'name': 'VLESS', 'init': INIT_SCRIPTS['vless'], 'config': CONFIG_PATHS['vless']},
         'shadowsocks': {'name': 'Shadowsocks', 'init': INIT_SCRIPTS['shadowsocks'], 'config': CONFIG_PATHS['shadowsocks']},
         'trojan': {'name': 'Trojan', 'init': INIT_SCRIPTS['trojan'], 'config': CONFIG_PATHS['trojan']},
-        'tor': {'name': 'Tor', 'init': INIT_SCRIPTS['tor'], 'config': CONFIG_PATHS['tor']},
     }
     for svc in services.values():
         svc['status'] = check_service_status(svc['init'])
@@ -428,7 +427,6 @@ def service_restart_all():
     logger.info("[ROUTES] /service/restart-all")
     services = [
         (SERVICES['shadowsocks']['name'], SERVICES['shadowsocks']['init'], SERVICES['shadowsocks']['config']),
-        (SERVICES['tor']['name'], SERVICES['tor']['init'], SERVICES['tor']['config']),
         (SERVICES['vless']['name'], SERVICES['vless']['init'], SERVICES['vless']['config']),
         (SERVICES['trojan']['name'], SERVICES['trojan']['init'], SERVICES['trojan']['config']),
     ]

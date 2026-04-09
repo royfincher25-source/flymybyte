@@ -70,7 +70,6 @@ BACKUP_DIR = '/opt/root/backup'
 INIT_DIR = '/opt/etc/init.d'
 NDM_DIR = '/opt/etc/ndm'
 XRAY_DIR = '/opt/etc/xray'
-TOR_DIR = '/opt/etc/tor'
 
 # =============================================================================
 # FILE PATHS
@@ -122,18 +121,12 @@ SERVICES = {
         'init': f'{INIT_DIR}/S22trojan',
         'config': f'{INIT_DIR}/trojan.json',
     },
-    'tor': {
-        'name': 'Tor',
-        'init': f'{INIT_DIR}/S35tor',
-        'config': f'{TOR_DIR}/torrc',
-    },
 }
 
 INIT_SCRIPTS = {
     'vless': SERVICES['vless']['init'],
     'shadowsocks': SERVICES['shadowsocks']['init'],
     'trojan': SERVICES['trojan']['init'],
-    'tor': SERVICES['tor']['init'],
     'unblock': f'{INIT_DIR}/S99unblock',
     'dnsmasq': f'{INIT_DIR}/S56dnsmasq',
     'web_ui': f'{INIT_DIR}/S99web_ui',
@@ -143,7 +136,6 @@ CONFIG_PATHS = {
     'vless': SERVICES['vless']['config'],
     'shadowsocks': SERVICES['shadowsocks']['config'],
     'trojan': SERVICES['trojan']['config'],
-    'tor': SERVICES['tor']['config'],
     'dnsmasq': DNSMASQ_CONFIG,
 }
 
@@ -223,7 +215,6 @@ FILES_TO_UPDATE = {
 BACKUP_FILES = [
     f'{WEB_UI_DIR}',
     f'{XRAY_DIR}',
-    f'{TOR_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
     f'{UNBLOCK_DIR}',
@@ -241,7 +232,6 @@ BACKUP_FILES = [
 UPDATE_BACKUP_FILES = [
     f'{WEB_UI_DIR}',
     f'{XRAY_DIR}',
-    f'{TOR_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
     f'{UNBLOCK_DIR}',
@@ -262,7 +252,6 @@ IPSET_MAP = {
     'vless': 'unblockvless',
     'shadowsocks': 'unblocksh',
     'ss': 'unblocksh',
-    'tor': 'unblocktor',
     'trojan': 'unblocktroj',
 }
 

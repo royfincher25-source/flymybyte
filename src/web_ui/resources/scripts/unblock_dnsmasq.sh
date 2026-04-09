@@ -80,7 +80,7 @@ i=0
 log "Processing predefined files..."
 
 # Process predefined files
-for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/tor.txt:unblocktor" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
+for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
     file=$(echo "$entry" | cut -d: -f1)
     setname=$(echo "$entry" | cut -d: -f2)
 

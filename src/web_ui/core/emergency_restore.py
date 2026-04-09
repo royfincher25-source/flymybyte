@@ -23,13 +23,11 @@ VPN_SERVICES = [
     ('S24xray', 'VLESS'),
     ('S22shadowsocks', 'Shadowsocks'),
     ('S22trojan', 'Trojan'),
-    ('S35tor', 'Tor'),
 ]
 
 # IPset списки
 IPSET_LIST = [
     'unblocksh',
-    'unblocktor',
     'unblockvless',
     'unblocktroj',
 ]

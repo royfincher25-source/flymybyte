@@ -93,7 +93,6 @@ class DnsmasqManager:
         # Маппинг файлов на ipset имена
         file_to_ipset = {
             'shadowsocks.txt': 'unblocksh',
-            'tor.txt': 'unblocktor',
             'vless.txt': 'unblockvless',
             'trojan.txt': 'unblocktroj',
         }

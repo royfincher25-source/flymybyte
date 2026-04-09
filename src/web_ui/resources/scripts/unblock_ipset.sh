@@ -170,7 +170,6 @@ check_service() {
     
     case "$setname" in
         unblocksh)        pattern="ss-redir" ;;
-        unblocktor)       pattern="tor" ;;
         unblockvless)     pattern="xray" ;;
         unblocktroj)      pattern="trojan" ;;
         *)                return 0 ;;
@@ -186,7 +185,7 @@ check_service() {
 }
 
 # Process predefined files
-for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/tor.txt:unblocktor" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
+for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
     file=$(echo "$entry" | cut -d: -f1)
     setname=$(echo "$entry" | cut -d: -f2)
 
@@ -244,7 +243,7 @@ wait
 
 # Summary
 log "=== Summary ==="
-for setname in unblocksh unblocktor unblockvless unblocktroj; do
+for setname in unblocksh unblockvless unblocktroj; do
     if ipset list "$setname" -n 2>/dev/null | grep -q "^${setname}$"; then
         count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]")
         count=${count:-0}

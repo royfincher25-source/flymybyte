@@ -11,8 +11,6 @@
             <i class="fm fm-circle-fill text-success"></i> VLESS
         {% elif service == 'trojan' %}
             <i class="fm fm-circle-fill text-info"></i> Trojan
-        {% elif service == 'tor' %}
-            <i class="fm fm-circle-fill text-danger"></i> Tor
         {% endif %}
     </h2>
     <div>
@@ -84,26 +82,6 @@
                     Ключ должен содержать пароль, сервер и порт
                 </div>
             </div>
-            
-            {% elif service == 'tor' %}
-            <p class="card__text text-muted">
-                Вставьте мосты Tor (каждый с новой строки):<br>
-                <code>bridge [transport] IP:ORPort [fingerprint] [options]</code>
-            </p>
-            <div class="mb-3">
-                <textarea 
-                    name="key" 
-                    id="key" 
-                    class="input" 
-                    rows="6"
-                    placeholder="bridge 192.0.2.1:443 AABBCCDD11223344556677889900DDEEFF112233
-bridge obfs4 192.0.2.2:8443 ... cert=... iat-mode=..."
-                    required
-                ></textarea>
-                <div class="small text-muted">
-                    Можно вводить несколько мостов, каждый с новой строки
-                </div>
-            </div>
             {% endif %}
             
             <div class="gap-2">
@@ -153,16 +131,6 @@ bridge obfs4 192.0.2.2:8443 ... cert=... iat-mode=..."
             <li>Пароль: случайная строка</li>
             <li>TLS: обязательное шифрование</li>
             <li>SNI: домен сервера</li>
-        </ul>
-        
-        {% elif service == 'tor' %}
-        <p class="card__text">
-            Мосты Tor можно получить:
-        </p>
-        <ul class="mb-0">
-            <li>На сайте <a href="https://bridges.torproject.org" target="_blank">bridges.torproject.org</a></li>
-            <li>В Telegram боте @GetBridgesBot</li>
-            <li>По запросу bridges@torproject.org (с Gmail)</li>
         </ul>
         {% endif %}
     </div>

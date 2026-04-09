@@ -19,8 +19,6 @@ WEB_URL="$BASE_URL/src/web_ui"
 # Чтение IP и портов (формат: key = value)
 lanip=$(grep "^routerip" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' "')
 localportsh=$(grep "^localportsh" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
-dnsporttor=$(grep "^dnsporttor" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
-localporttor=$(grep "^localporttor" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
 localportvless=$(grep "^localportvless" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
 localporttrojan=$(grep "^localporttrojan" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
 dnsovertlsport=$(grep "^dnsovertlsport" "$WEB_CONFIG" | awk -F'=' '{print $2}' | tr -d ' ')
@@ -42,7 +40,6 @@ read_path() {
 
 # Чтение путей из paths
 UNBLOCK_DIR=$(read_path "unblock_dir")
-TOR_CONFIG=$(read_path "tor_config")
 SHADOWSOCKS_CONFIG=$(read_path "shadowsocks_config")
 TROJAN_CONFIG=$(read_path "trojan_config")
 VLESS_CONFIG=$(read_path "vless_config")
@@ -58,14 +55,11 @@ UNBLOCK_UPDATE=$(read_path "unblock_update")
 KEENSNAP_DIR=$(read_path "keensnap_dir")
 SCRIPT_BU=$(read_path "script_bu")
 WEB_DIR=$(read_path "web_dir")
-TOR_TMP_DIR=$(read_path "tor_tmp_dir")
-TOR_DIR=$(read_path "tor_dir")
 XRAY_DIR=$(read_path "xray_dir")
 TROJAN_DIR=$(read_path "trojan_dir")
 INIT_SHADOWSOCKS=$(read_path "init_shadowsocks")
 INIT_TROJAN=$(read_path "init_trojan")
 INIT_XRAY=$(read_path "init_xray")
-INIT_TOR=$(read_path "init_tor")
 INIT_DNSMASQ=$(read_path "init_dnsmasq")
 INIT_UNBLOCK=$(read_path "init_unblock")
 INIT_WEB=$(read_path "init_web")
@@ -98,7 +92,6 @@ if [ "$1" = "-remove" ]; then
     echo "Все пакеты удалены. Начинаем удаление папок, файлов и настроек"
 
     # Очистка ipset
-    ipset flush unblocktor 2>/dev/null || true
     ipset flush unblocksh 2>/dev/null || true
     ipset flush unblockvless 2>/dev/null || true
     ipset flush unblocktroj 2>/dev/null || true
@@ -109,7 +102,6 @@ if [ "$1" = "-remove" ]; then
         "$INIT_SHADOWSOCKS" \
         "$INIT_TROJAN" \
         "$INIT_XRAY" \
-        "$INIT_TOR" \
         "$INIT_DNSMASQ" \
         "$INIT_UNBLOCK" \
         "$REDIRECT_SCRIPT" \
@@ -119,8 +111,6 @@ if [ "$1" = "-remove" ]; then
         "$UNBLOCK_DNSMASQ" \
         "$UNBLOCK_UPDATE" \
         "$DNSMASQ_CONF" \
-        "$TOR_TMP_DIR" \
-        "$TOR_DIR" \
         "$XRAY_DIR" \
         "$TEMPLATES_DIR" \
         "$TROJAN_DIR" \
@@ -196,7 +186,7 @@ if [ "$1" = "-install" ]; then
 
     curl -sL -o "$REDIRECT_SCRIPT" "$RESOURCES_URL/scripts/100-redirect.sh" && \
         sed -i -e "s/hash:net/${set_type}/g" -e "s/192.168.1.1/${lanip}/g" \
-               -e "s/1082/${localportsh}/g" -e "s/9141/${localporttor}/g" \
+               -e "s/1082/${localportsh}/g" \
                -e "s/10810/${localportvless}/g" -e "s/10829/${localporttrojan}/g" \
                "$REDIRECT_SCRIPT" && \
         chmod 755 "$REDIRECT_SCRIPT" && \
@@ -226,17 +216,15 @@ if [ "$1" = "-install" ]; then
     echo ""
     echo "⏳ Загрузка шаблонов конфигураций..."
     mkdir -p "$TEMPLATES_DIR"
-    for template in tor_template.torrc vless_template.json trojan_template.json shadowsocks_template.json; do
+    for template in vless_template.json trojan_template.json shadowsocks_template.json; do
         curl -sL -o "$TEMPLATES_DIR/$template" "$RESOURCES_URL/templates/$template" && \
             echo "  ✅ $template" || echo "  ❌ $template"
     done
 
     echo ""
     echo "⏳ Настройка конфигураций..."
-    mkdir -p "$TOR_TMP_DIR"
-    
+
     # Конфиги - НЕ перезаписывать если существуют (сохраняем ключи)
-    [ ! -f "$TOR_CONFIG" ] && cp "$TEMPLATES_DIR/tor_template.torrc" "$TOR_CONFIG" 2>/dev/null && echo "  ✅ Tor config created" || echo "  ℹ️ Tor config preserved"
     [ ! -f "$SHADOWSOCKS_CONFIG" ] && cp "$TEMPLATES_DIR/shadowsocks_template.json" "$SHADOWSOCKS_CONFIG" 2>/dev/null && echo "  ✅ Shadowsocks config created" || echo "  ℹ️ Shadowsocks config preserved"
     [ ! -f "$TROJAN_CONFIG" ] && cp "$TEMPLATES_DIR/trojan_template.json" "$TROJAN_CONFIG" 2>/dev/null && echo "  ✅ Trojan config created" || echo "  ℹ️ Trojan config preserved"
     [ ! -f "$VLESS_CONFIG" ] && cp "$TEMPLATES_DIR/vless_template.json" "$VLESS_CONFIG" 2>/dev/null && echo "  ✅ VLESS config created" || echo "  ℹ️ VLESS config preserved"
@@ -267,8 +255,6 @@ if [ "$1" = "-install" ]; then
     # Списки - НЕ перезаписывать если существуют (сохраняем пользовательские данные)
     [ ! -f "${UNBLOCK_DIR}vless.txt" ] && curl -sL -o "${UNBLOCK_DIR}vless.txt" "$RESOURCES_URL/lists/unblockvless.txt" && \
         echo "  ✅ unblockvless.txt created" || echo "  ℹ️ unblockvless.txt preserved"
-    [ ! -f "${UNBLOCK_DIR}tor.txt" ] && curl -sL -o "${UNBLOCK_DIR}tor.txt" "$RESOURCES_URL/lists/unblocktor.txt" && \
-        echo "  ✅ unblocktor.txt created" || echo "  ℹ️ unblocktor.txt preserved"
 
     # Пустые файлы - только создать если не существуют
     for file in "${UNBLOCK_DIR}shadowsocks.txt" "${UNBLOCK_DIR}trojan.txt" "${UNBLOCK_DIR}vpn.txt"; do

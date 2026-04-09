@@ -24,16 +24,10 @@
                                 <i class="fm fm-circle-fill text-warning"></i> Shadowsocks
                             {% elif service_id == 'trojan' %}
                                 <i class="fm fm-circle-fill text-info"></i> Trojan
-                            {% elif service_id == 'tor' %}
-                                <i class="fm fm-circle-fill text-danger"></i> Tor
                             {% endif %}
                         </h5>
                         <p class="card__text text-muted">
-                            {% if service_id == 'tor' %}
-                                Настройка Tor proxy и мостов
-                            {% else %}
-                                Настройка {{ service.name }} proxy
-                            {% endif %}
+                            Настройка {{ service.name }} proxy
                         </p>
                         <p class="mb-2">
                             <small class="text-muted">
@@ -82,7 +76,6 @@
             <li><strong>VLESS</strong> — современный протокол на базе Xray-core</li>
             <li><strong>Shadowsocks</strong> — быстрый и лёгкий прокси-протокол</li>
             <li><strong>Trojan</strong> — маскируется под обычный HTTPS-трафик</li>
-            <li><strong>Tor</strong> — анонимная сеть с поддержкой мостов</li>
         </ul>
     </div>
 </div>

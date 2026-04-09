@@ -21,7 +21,7 @@ log "=== Script started (type=$type, table=$table) ==="
 
 # Ensure all required ipsets exist
 log "Ensuring base ipsets exist..."
-for ipset_name in unblocksh unblocktor unblockvless unblocktroj; do
+for ipset_name in unblocksh unblockvless unblocktroj; do
     if ipset create "$ipset_name" hash:net -exist 2>/dev/null; then
         log "  Created ipset: $ipset_name"
     else
@@ -122,7 +122,6 @@ service_running() {
     
     case "$name" in
         unblocksh)        pattern="ss-redir" ;;
-        unblocktor)       pattern="tor" ;;
         unblockvless)     pattern="xray" ;;
         unblocktroj)      pattern="trojan" ;;
         *)                return 1 ;;
@@ -172,7 +171,6 @@ add_redirect() {
 }
 
 add_redirect unblocksh 1082
-add_redirect unblocktor 9141
 add_redirect unblockvless 10810
 add_redirect unblocktroj 10829
 

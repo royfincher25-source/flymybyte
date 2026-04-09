@@ -411,7 +411,7 @@ function escapeHtml(text) {
         <div class="card shadow-sm">
             <div class="card__body">
                 <h5 class="card__title"><i class="fm fm-arrow-repeat"></i> Перезапуск всех сервисов</h5>
-                <p class="text-muted small">VLESS, Shadowsocks, Trojan, Tor</p>
+                <p class="text-muted small">VLESS, Shadowsocks, Trojan</p>
                 <form method="POST" action="{{ url_for('system.service_restart_all') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button type="submit" class="btn btn--info btn--sm">
@@ -527,7 +527,7 @@ function escapeHtml(text) {
         <div class="modal__body">
             <p>Это действие выполнит полный сброс к рабочему состоянию:</p>
             <ul>
-                <li>⏹️ Остановит все VPN-сервисы (VLESS, Shadowsocks, Trojan, Tor)</li>
+                <li>⏹️ Остановит все VPN-сервисы (VLESS, Shadowsocks, Trojan)</li>
                 <li>🧹 Очистит все iptables и ipset правила</li>
                 <li>📄 Восстановит конфигурацию dnsmasq</li>
                 <li>🔄 Перезапустит DNS</li>

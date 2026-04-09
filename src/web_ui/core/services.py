@@ -1,7 +1,7 @@
 """
 FlyMyByte Web Interface - Key Parsers and Service Management
 
-Full-featured parsers for VPN keys (VLESS, Shadowsocks, Trojan, Tor).
+Full-featured parsers for VPN keys (VLESS, Shadowsocks, Trojan).
 Memory-optimized for embedded devices (128MB RAM).
 """
 import os
@@ -596,73 +596,6 @@ def trojan_config(key: str) -> Dict[str, Any]:
 
 
 # =============================================================================
-# TOR PARSER
-# =============================================================================
-
-def parse_tor_bridges(bridges_text: str) -> list:
-    """
-    Parse Tor bridge lines.
-    
-    Format: bridge [transport] IP:ORPort [fingerprint] [options]
-    
-    Args:
-        bridges_text: Multi-line string with bridge entries
-    
-    Returns:
-        List of valid bridge entries
-    """
-    bridges = []
-    
-    for line in bridges_text.strip().split('\n'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        
-        # Validate bridge format
-        if line.startswith('bridge '):
-            bridges.append(line)
-        elif ':' in line and '.' in line:
-            # Try to parse as IP:Port
-            bridges.append(f'bridge {line}')
-    
-    logger.debug(f"Tor bridges parsed: {len(bridges)} entries")
-    return bridges
-
-
-def tor_config(bridges_text: str) -> Dict[str, Any]:
-    """
-    Generate Tor configuration from bridges.
-    
-    Args:
-        bridges_text: Multi-line string with bridge entries
-    
-    Returns:
-        Dict with Tor configuration
-    """
-    logger.debug(f"tor_config: вызов с мостами")
-    
-    bridges = parse_tor_bridges(bridges_text)
-    
-    config = {
-        'ClientOnly': 1,
-        'SOCKSPort': '127.0.0.1:9141',
-        'DNSPort': '127.0.0.1:9053',
-        'Log': 'notice file /opt/var/log/tor.log',
-        'DataDirectory': '/opt/var/lib/tor',
-        'GeoIPFile': '/opt/share/tor/geoip',
-        'GeoIPv6File': '/opt/share/tor/geoip6',
-    }
-    
-    if bridges:
-        config['UseBridges'] = 1
-        for bridge in bridges:
-            config[f'Bridge'] = bridge.replace('bridge ', '')
-
-    logger.debug(f"tor_config: generated ({len(bridges)} bridges)")
-    return config
-
-
-# =============================================================================
 # SERVICE MANAGEMENT
 # =============================================================================
 
@@ -770,7 +703,6 @@ def check_service_status(init_script: str) -> str:
                 'S24xray': 'xray',
                 'S22shadowsocks': 'ss-redir',
                 'S22trojan': 'trojan',
-                'S35tor': 'tor',
                 'S56dnsmasq': 'dnsmasq',
                 'S99unblock': 'unblock',
             }
@@ -835,41 +767,6 @@ def write_json_config(config: Dict[str, Any], filepath: str) -> None:
         raise
 
 
-def write_tor_config(config: Dict[str, Any], filepath: str) -> None:
-    """
-    Write Tor configuration to file.
-
-    Args:
-        config: Configuration dict
-        filepath: Path to output file
-    """
-    logger.debug(f"write_tor_config: writing to {filepath}")
-    temp_path = filepath + '.tmp'
-
-    try:
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
-        
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            for key, value in config.items():
-                if isinstance(value, list):
-                    for item in value:
-                        f.write(f"{key} {item}\n")
-                else:
-                    f.write(f"{key} {value}\n")
-
-        os.replace(temp_path, filepath)
-        logger.debug(f"write_tor_config: Tor config written to {filepath}")
-
-    except Exception as e:
-        logger.exception(f"write_tor_config: error writing config: {e}")
-        try:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        except Exception:
-            logger.warning(f"write_tor_config: failed to remove temp file {temp_path}")
-        raise
-
-
 def create_backup(backup_type='full'):
     """
     Create backup of all flymybyte files.
@@ -894,7 +791,6 @@ def create_backup(backup_type='full'):
         files_to_backup = [
             '/opt/etc/web_ui',
             '/opt/etc/xray',
-            '/opt/etc/tor',
             '/opt/etc/unblock',
             '/opt/bin',
             '/opt/etc/dnsmasq.conf',
