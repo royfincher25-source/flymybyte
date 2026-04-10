@@ -17,14 +17,10 @@ from .constants import (
     SERVICES,
     PROC_NAME_MAP,
 )
-from .config import TIMEOUT_SERVICE_RESTART
 from .services import restart_service, check_service_status, refresh_ipset_from_file
-from .utils import Cache
+from .utils import Cache, logger
 from .iptables_manager import get_iptables_manager
 from .app_config import WebConfig
-from .exceptions import ServiceError
-
-logger = logging.getLogger(__name__)
 
 
 class VPNManager:
