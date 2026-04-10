@@ -35,8 +35,32 @@ from .ipset_ops import (
     bulk_add_to_ipset,
     bulk_remove_from_ipset,
     ensure_ipset_exists,
-    refresh_ipset_from_file,
 )
+
+
+def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool, str]:
+    """Refresh ipset from bypass list file (resolve domains + add IPs)."""
+    from .app_config import WebConfig
+    from .dns_ops import resolve_domains_for_ipset
+
+    config = WebConfig()
+    real_path = os.path.realpath(filepath)
+    real_dir = os.path.realpath(config.unblock_dir)
+    if not real_path.startswith(real_dir + os.sep):
+        return False, "Invalid file path"
+
+    if not os.path.exists(filepath):
+        logger.warning(f"File not found: {filepath}")
+        return False, f"File not found: {filepath}"
+
+    try:
+        logger.info(f"[IPSET] Refreshing from file: {filepath}")
+        count = resolve_domains_for_ipset(filepath, max_workers)
+        logger.info(f"[IPSET] Refresh complete: {count} IPs resolved and added from {filepath}")
+        return True, f"Resolved and added {count} IPs"
+    except Exception as e:
+        logger.error(f"[IPSET] Refresh failed for {filepath}: {e}")
+        return False, str(e)
 
 
 def write_json_config(config: Dict[str, Any], filepath: str) -> None:
