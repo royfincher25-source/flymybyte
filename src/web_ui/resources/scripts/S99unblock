@@ -157,7 +157,6 @@ case "$1" in
             # Also skip PID 0 and 1
             [ "$pid_num" -gt 1 ] 2>/dev/null || continue
             if [ -f "$pid/cmdline" ] && grep -q "dnsmasq_watchdog" "$pid/cmdline" 2>/dev/null; then
-                log "  Found watchdog: PID $pid_num, killing..."
                 kill -9 "$pid_num" 2>/dev/null && killed=$((killed+1))
             fi
         done
