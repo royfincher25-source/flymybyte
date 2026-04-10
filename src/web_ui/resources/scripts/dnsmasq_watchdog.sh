@@ -3,6 +3,19 @@
 # Запускать в фоне: /opt/bin/dnsmasq_watchdog.sh &
 # Или добавить в S99unblock start
 
+# FIX: Singleton protection — prevent multiple instances
+LOCKFILE="/tmp/dnsmasq_watchdog.pid"
+if [ -f "$LOCKFILE" ]; then
+    OLD_PID=$(cat "$LOCKFILE")
+    if kill -0 "$OLD_PID" 2>/dev/null; then
+        echo "Watchdog already running (PID $OLD_PID), exiting"
+        exit 0
+    else
+        rm -f "$LOCKFILE"
+    fi
+fi
+echo $$ > "$LOCKFILE"
+
 mkdir -p /opt/var/log
 LOGFILE="/opt/var/log/dnsmasq_watchdog.log"
 TAG="DNS-WD"
@@ -15,7 +28,15 @@ log_error() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') [$TAG] ERROR: $1" >> "$LOGFILE"
 }
 
-log "=== Watchdog started ==="
+# Cleanup on exit
+cleanup() {
+    rm -f "$LOCKFILE"
+    log "=== Watchdog stopped ==="
+    exit 0
+}
+trap cleanup EXIT TERM INT
+
+log "=== Watchdog started (PID $$) ==="
 
 DNS_REDIRECT_ACTIVE=true
 CHECK_INTERVAL=15
