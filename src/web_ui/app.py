@@ -7,6 +7,7 @@ import os
 import sys
 import atexit
 import signal
+import subprocess
 import secrets
 import logging
 from flask import Flask, session
@@ -77,10 +78,36 @@ def create_app(config_class=None):
     def inject_version():
         return dict(app_version=_app_version)
 
+    # DNS Monitor — disabled. Monitoring only, no config changes.
     from core.dns_ops import DNSMonitor
     dns_monitor = DNSMonitor()
-    dns_monitor.start()
-    logger.info("DNS monitor initialized and started")
+    # dns_monitor.start()  # DISABLED — causes dnsmasq.conf overwrite
+    logger.info("DNS monitor initialized (disabled — monitoring only)")
+
+    # Auto-restore VPN iptables rules on startup
+    try:
+        from core.dnsmasq_manager import DnsmasqManager
+        mgr = DnsmasqManager()
+        mgr._sanitize_dnsmasq_conf()
+        mgr.generate_bypass_config()
+        mgr.restart_dnsmasq()
+        logger.info("Bypass config regenerated and dnsmasq restarted")
+    except Exception as e:
+        logger.warning(f"Failed to regenerate bypass config: {e}")
+
+    # Restart active VPN services to restore iptables rules
+    vpn_startup_list = [
+        ('vless', '/opt/etc/init.d/S24xray', '/opt/etc/xray/vless.json'),
+        ('shadowsocks', '/opt/etc/init.d/S22shadowsocks', '/opt/etc/shadowsocks.json'),
+        ('trojan', '/opt/etc/init.d/S22trojan', '/opt/etc/init.d/trojan.json'),
+    ]
+    for svc_name, init_script, config_path in vpn_startup_list:
+        try:
+            if os.path.exists(config_path) and os.path.exists(init_script):
+                subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
+                logger.info(f"VPN service {svc_name} restarted (iptables rules restored)")
+        except Exception as e:
+            logger.warning(f"Failed to restart {svc_name}: {e}")
 
     def graceful_shutdown(signum=None, frame=None):
         logger.info("Graceful shutdown initiated...")
