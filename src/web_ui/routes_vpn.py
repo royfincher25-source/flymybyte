@@ -19,6 +19,11 @@ from core.key_manager import KeyManager
 bp = Blueprint('vpn', __name__, template_folder='templates', static_folder='static')
 
 
+def shutdown_executor():
+    """Placeholder for VPN executor shutdown."""
+    logger.info("VPN executor shutdown requested")
+
+
 @bp.route('/keys')
 @login_required
 def keys():
