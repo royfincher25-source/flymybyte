@@ -417,7 +417,7 @@ def get_vpn_interfaces() -> List[str]:
         import re
         interfaces = []
         for vpn in VPN_SERVICES:
-            pattern = rf'"{vpn}"[^}]*"id"\s*:\s*"([^"]+)"'
+            pattern = rf'"{vpn}"[^}}]*"id"\s*:\s*"([^"]+)"'
             matches = re.findall(pattern, result.stdout)
             interfaces.extend(matches)
         
