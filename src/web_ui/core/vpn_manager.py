@@ -142,7 +142,9 @@ class VPNManager:
             if pid:
                 self._force_kill(int(pid))
             
-            subprocess.run(['ipset', 'flush', self.ipset_name], capture_output=True)
+            # FIX: Не очищаем ipset при остановке сервиса!
+            # ipset должен оставаться для других работающих сервисов
+            # Очистка происходит только при полном обновлении через S99unblock
             
             ipt = get_iptables_manager()
             ipt.remove_vpn_redirect(self.ipset_name, self.port)
@@ -215,13 +217,8 @@ class VPNManager:
                     ['ipset', 'create', self.ipset_name, 'hash:net'],
                     capture_output=True
                 )
-            except Exception:
-                pass
-        
-        subprocess.run(
-            ['ipset', 'create', self.ipset_name, 'hash:net'],
-            capture_output=True
-        )
+        except Exception:
+            pass
         
         ipt = get_iptables_manager()
         ipt.add_vpn_redirect(self.ipset_name, self.port)

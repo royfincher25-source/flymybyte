@@ -345,6 +345,22 @@ def service_restart_all():
             results.append(f"❌ {name}: {str(e)}")
             logger.error(f"[ROUTES] service_restart_all Exception for {name}: {e}")
     flash('Перезапуск сервисов: ' + ', '.join(results), 'success')
+    
+    # FIX: После перезапуска VPN сервисов нужно обновить ipsets
+    try:
+        logger.info("[ROUTES] Updating ipsets after VPN restart...")
+        result = subprocess.run(
+            ['sh', INIT_SCRIPTS['unblock'], 'start'],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0:
+            results.append('✅ ipset обновлён')
+            logger.info("[ROUTES] ipsets updated successfully")
+        else:
+            logger.warning(f"[ROUTES] ipset update failed: {result.stderr}")
+    except Exception as e:
+        logger.warning(f"[ROUTES] ipset update error: {e}")
+    
     return redirect(url_for('system.service'))
 
 
