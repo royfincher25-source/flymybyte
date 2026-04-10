@@ -181,7 +181,12 @@ case "$1" in
   stop)
     log "Stopping unblock ipset..."
     log "  Stopping dnsmasq watchdog..."
-    killall dnsmasq_watchdog.sh 2>/dev/null && log "  Watchdog stopped" || log "  Watchdog not running"
+    for pid in /proc/[0-9]*; do
+        if [ -f "$pid/cmdline" ] && grep -q "dnsmasq_watchdog" "$pid/cmdline" 2>/dev/null; then
+            pid_num=$(basename "$pid")
+            kill -9 "$pid_num" 2>/dev/null && log "  Killed $pid_num" || true
+        fi
+    done
     log "  Flushing iptables redirect rules..."
     for proto in tcp udp; do
         iptables -t nat -F PREROUTING 2>/dev/null && log "  Flushed PREROUTING ($proto)" || log_error "  Failed to flush PREROUTING ($proto)"
