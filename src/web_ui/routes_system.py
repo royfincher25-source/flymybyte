@@ -665,8 +665,8 @@ def service_restore_dns():
 
     # 5. Restore iptables rules and refresh ipsets for active VPN services
     from core.iptables_manager import get_iptables_manager
-    from core.utils import refresh_ipset_from_file
-    from core.constants import UNBLOCK_DIR, SERVICE_TOGGLE_CONFIG, SERVICES
+    from core.services import refresh_ipset_from_file
+    from core.constants import SERVICE_TOGGLE_CONFIG
 
     vpn_services = [
         ('vless', '/opt/etc/init.d/S24xray', '/opt/etc/xray/vless.json', '/opt/etc/unblock/vless.txt'),
