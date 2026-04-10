@@ -204,7 +204,14 @@ case "$1" in
     ;;
   restart)
     log "Restarting unblock..."
-    $0 stop
+    # Kill all watchdogs first
+    for pid in /proc/[0-9]*; do
+        if [ -f "$pid/cmdline" ] && grep -q "dnsmasq_watchdog" "$pid/cmdline" 2>/dev/null; then
+            pid_num=$(basename "$pid")
+            kill -9 "$pid_num" 2>/dev/null
+        fi
+    done
+    rm -f /tmp/dnsmasq_watchdog.pid
     sleep 1
     $0 start
     ;;
