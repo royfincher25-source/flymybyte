@@ -360,25 +360,46 @@ def _download_all_files_fallback(progress) -> tuple:
 
 def run_update_scripts(progress, start_step: int) -> bool:
     """Phase 1: Apply configs without restarting services (to avoid DNS disruption)."""
+    logger.info("=" * 60)
+    logger.info("[UPDATE] ===== RUN_UPDATE_SCRIPTS STARTED =====")
+    logger.info("=" * 60)
     
     # Попробовать Python UnblockManager сначала
     try:
+        logger.info("[UPDATE] Step 1: Trying Python UnblockManager...")
         from core.service_locator import ServiceLocator
         unblock_mgr = ServiceLocator.unblock()
         
+        logger.info("[UPDATE] Getting initial status...")
+        status_before = unblock_mgr.get_status()
+        logger.info(f"[UPDATE] Status before: {status_before}")
+        
         progress.update_progress("Обновление bypass (Python)", progress=start_step, total=start_step + 3)
+        logger.info("[UPDATE] Calling unblock_mgr.update_all()...")
+        
         ok, msg = unblock_mgr.update_all(timeout=SCRIPT_EXECUTION_TIMEOUT)
         
+        logger.info(f"[UPDATE] update_all() result: ok={ok}, msg={msg}")
+        
+        status_after = unblock_mgr.get_status()
+        logger.info(f"[UPDATE] Status after: {status_after}")
+        
         if ok:
-            logger.info(f"[UPDATE] Python unblock completed: {msg}")
+            logger.info("[UPDATE] Python unblock completed successfully!")
             progress.update_progress("✅ Python bypass обновлён", progress=start_step + 1, total=start_step + 3)
+            logger.info("[UPDATE] ===== RUN_UPDATE_SCRIPTS COMPLETE (Python) =====")
+            logger.info("=" * 60)
             return True
         else:
             logger.warning(f"[UPDATE] Python unblock failed, falling back to shell: {msg}")
+            logger.warning("[UPDATE] Will try shell scripts...")
     except Exception as e:
-        logger.warning(f"[UPDATE] Python unblock error, falling back to shell: {e}")
+        logger.error(f"[UPDATE] Python unblock exception, falling back to shell: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
     
     # Fallback: использовать shell скрипты
+    logger.info("[UPDATE] ===== RUNNING SHELL SCRIPTS (FALLBACK) =====")
     scripts = [
         ('Запуск unblock_update.sh', [SCRIPT_UNBLOCK_UPDATE], SCRIPT_EXECUTION_TIMEOUT),
         ('Запуск unblock_dnsmasq.sh', [SCRIPT_UNBLOCK_DNSMASQ], SCRIPT_EXECUTION_TIMEOUT),
@@ -386,15 +407,25 @@ def run_update_scripts(progress, start_step: int) -> bool:
     ]
 
     for i, (msg, cmd, timeout) in enumerate(scripts):
+        logger.info(f"[UPDATE] Running: {msg} - {cmd}")
         progress.update_progress(msg, file=os.path.basename(cmd[0]) if cmd else '', progress=start_step + i, total=start_step + len(scripts))
         if not os.path.exists(cmd[0]):
+            logger.warning(f"[UPDATE] Script not found: {cmd[0]}, skipping")
             continue
         try:
             result = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
+            logger.info(f"[UPDATE] Script exit code: {result.returncode}")
             if result.returncode != 0:
-                logger.warning(f"{msg} failed: {result.stderr}")
+                logger.warning(f"[UPDATE] {msg} failed with code {result.returncode}")
+                if result.stderr:
+                    logger.warning(f"[UPDATE] stderr: {result.stderr[:200]}")
+            else:
+                logger.info(f"[UPDATE] {msg} completed successfully")
         except (subprocess.TimeoutExpired, Exception) as e:
-            logger.warning(f"{msg} error: {e}")
+            logger.warning(f"[UPDATE] {msg} error: {e}")
+    
+    logger.info("[UPDATE] ===== RUN_UPDATE_SCRIPTS COMPLETE (shell fallback) =====")
+    logger.info("=" * 60)
     return True
 
 

@@ -15,52 +15,79 @@ log_error() {
 
 log "=== S99unblock called with action: $1 ==="
 
+# Логируем системную информацию для отладки
+log "System info:"
+log "  - unblock.py exists: $([ -f /opt/bin/unblock.py ] && echo 'yes' || echo 'no')"
+log "  - unblock.py executable: $([ -x /opt/bin/unblock.py ] && echo 'yes' || echo 'no')"
+log "  - unblock_dnsmasq.sh exists: $([ -f /opt/bin/unblock_dnsmasq.sh ] && echo 'yes' || echo 'no')"
+log "  - unblock_ipset.sh exists: $([ -f /opt/bin/unblock_ipset.sh ] && echo 'yes' || echo 'no')"
+
 case "$1" in
   start)
-    log "Starting unblock ipset..."
+    log "========================================"
+    log "===== S99UNBLOCK START INITIATED ====="
+    log "========================================"
 
     # Step 0: Попробовать Python UnblockManager (новый подход)
+    log "Step 0: Checking for Python unblock.py..."
     PYTHON_OK=false
     if [ -x "/opt/bin/unblock.py" ]; then
-        log "Trying Python unblock.py..."
+        log "Found /opt/bin/unblock.py - executing..."
         if /opt/bin/unblock.py update >> "$LOGFILE" 2>&1; then
-            log "Python unblock.py completed successfully"
+            log ">>> Python unblock.py SUCCEEDED (exit code: $?)"
             PYTHON_OK=true
+            
+            # Логируем результат
+            log "IPSet status after Python:"
+            for setname in unblocksh unblockvless unblocktroj; do
+                count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]" || echo 0)
+                log "  - $setname: $count entries"
+            done
         else
-            log_error "Python unblock.py failed (exit code: $?), falling back to shell"
+            log_error ">>> Python unblock.py FAILED (exit code: $?)"
             PYTHON_OK=false
+            log "Falling back to shell scripts..."
         fi
     else
-        log "Python unblock.py not found, using shell scripts"
+        log "Python unblock.py NOT FOUND or NOT EXECUTABLE"
+        log "Will use shell scripts instead"
     fi
 
     # Step 1: Ensure dnsmasq is running (needed for DNS resolution in ipset script)
-    log "Ensuring dnsmasq is running..."
+    log "========================================"
+    log "Step 1: Ensuring dnsmasq is running..."
+    log "========================================"
     if /opt/etc/init.d/S56dnsmasq restart >> "$LOGFILE" 2>&1; then
-        log "  dnsmasq restarted"
+        log "  dnsmasq restarted successfully"
     else
         log_error "  dnsmasq restart failed, proceeding anyway"
     fi
     sleep 2
 
     # Step 2: Populate ipsets (только если Python не сработал)
+    log "========================================"
+    log "Step 2: Populating ipsets..."
+    log "========================================"
     if [ "$PYTHON_OK" = "false" ]; then
+        log "Python failed, using shell unblock_ipset.sh..."
         if /opt/bin/unblock_ipset.sh >> "$LOGFILE" 2>&1; then
-            log "unblock_ipset.sh completed successfully"
+            log "  unblock_ipset.sh completed successfully"
             IPSET_OK=true
         else
-            log_error "unblock_ipset.sh failed (exit code: $?)"
+            log_error "  unblock_ipset.sh failed (exit code: $?)"
             IPSET_OK=false
         fi
     else
         # Python уже сделал update_all() который включает ipset
         IPSET_OK=true
-        log "IPSet populated by Python"
+        log "  IPSet populated by Python (skipping shell)"
     fi
 
     # Step 3: Verify ipsets have entries before applying redirect rules
+    log "========================================"
+    log "Step 3: Verifying ipset entries..."
+    log "========================================"
     if [ "$IPSET_OK" = "true" ]; then
-        log "Verifying ipset entries..."
         TOTAL_ENTRIES=0
         for setname in unblocksh unblockvless unblocktroj; do
             if ipset list "$setname" -n >/dev/null 2>&1; then
@@ -74,33 +101,44 @@ case "$1" in
         done
 
         if [ "$TOTAL_ENTRIES" -lt 1 ]; then
-            log_error "No ipset entries found after unblock_ipset.sh — SKIPPING redirect rules to prevent internet loss"
+            log_error "No ipset entries found — SKIPPING redirect rules"
             IPSET_OK=false
         else
             log "Total ipset entries: $TOTAL_ENTRIES"
         fi
+    else
+        log "IPSet not ready, skipping verification"
     fi
 
     # Step 4: Apply iptables redirect rules ONLY if ipsets are populated
+    log "========================================"
+    log "Step 4: Applying iptables redirect rules..."
+    log "========================================"
     if [ "$IPSET_OK" = "true" ]; then
-        log "Setting up iptables redirect rules..."
         if /opt/etc/ndm/netfilter.d/100-redirect.sh >> "$LOGFILE" 2>&1; then
-            log "100-redirect.sh completed successfully"
+            log "  100-redirect.sh completed successfully"
         else
-            log_error "100-redirect.sh failed (exit code: $?)"
+            log_error "  100-redirect.sh failed (exit code: $?)"
         fi
     else
-        log_error "SKIPPING 100-redirect.sh — ipsets not ready (would cause internet loss)"
+        log_error "SKIPPING 100-redirect.sh — ipsets not ready"
     fi
 
     # Step 5: Start dnsmasq watchdog (monitors dnsmasq:5353, removes DNAT on crash)
+    log "========================================"
+    log "Step 5: Starting dnsmasq watchdog..."
+    log "========================================"
     if [ -x "/opt/bin/dnsmasq_watchdog.sh" ]; then
         killall dnsmasq_watchdog.sh 2>/dev/null
         /opt/bin/dnsmasq_watchdog.sh &
-        log "Started dnsmasq watchdog (PID: $!)"
+        log "  Started dnsmasq watchdog (PID: $!)"
     else
-        log "dnsmasq_watchdog.sh not found, skipping"
+        log "  dnsmasq_watchdog.sh not found, skipping"
     fi
+    
+    log "========================================"
+    log "===== S99UNBLOCK START COMPLETE ====="
+    log "========================================"
     ;;
   stop)
     log "Stopping unblock ipset..."
