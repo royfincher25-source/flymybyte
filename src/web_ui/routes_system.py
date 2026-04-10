@@ -663,29 +663,45 @@ def service_restore_dns():
         results.append(f'⚠️ Ошибка генерации списков: {e}')
         logger.error(f"[ROUTES] DNS restore: bypass config error: {e}")
 
-    # 5. Restart active VPN services to restore iptables rules
+    # 5. Restore iptables rules and refresh ipsets for active VPN services
+    from core.iptables_manager import get_iptables_manager
+    from core.utils import refresh_ipset_from_file
+    from core.constants import UNBLOCK_DIR, SERVICE_TOGGLE_CONFIG, SERVICES
+
     vpn_services = [
-        ('vless', '/opt/etc/init.d/S24xray'),
-        ('shadowsocks', '/opt/etc/init.d/S22shadowsocks'),
-        ('trojan', '/opt/etc/init.d/S22trojan'),
+        ('vless', '/opt/etc/init.d/S24xray', '/opt/etc/xray/vless.json', '/opt/etc/unblock/vless.txt'),
+        ('shadowsocks', '/opt/etc/init.d/S22shadowsocks', '/opt/etc/shadowsocks.json', '/opt/etc/unblock/shadowsocks.txt'),
+        ('trojan', '/opt/etc/init.d/S22trojan', '/opt/etc/init.d/trojan.json', '/opt/etc/unblock/trojan.txt'),
     ]
 
-    for svc_name, init_script in vpn_services:
+    ipt = get_iptables_manager()
+
+    for svc_name, init_script, config_path, bypass_file in vpn_services:
         try:
-            if os.path.exists(init_script):
-                # Check if service config exists
-                config_map = {
-                    'vless': '/opt/etc/xray/vless.json',
-                    'shadowsocks': '/opt/etc/shadowsocks.json',
-                    'trojan': '/opt/etc/init.d/trojan.json',
-                }
-                config_path = config_map.get(svc_name, '')
-                if config_path and os.path.exists(config_path):
-                    subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
-                    results.append(f'✅ {svc_name} перезапущен')
-                    logger.info(f"[ROUTES] DNS restore: {svc_name} restarted")
+            if os.path.exists(config_path) and os.path.exists(init_script):
+                # Restart the service
+                subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=15)
+                results.append(f'✅ {svc_name} перезапущен')
+                logger.info(f"[ROUTES] DNS restore: {svc_name} restarted")
+
+                # Restore iptables rules
+                toggle_cfg = SERVICE_TOGGLE_CONFIG.get(svc_name)
+                if toggle_cfg:
+                    ipset_name = toggle_cfg['ipset']
+                    port = toggle_cfg['port']
+                    ipt.add_rule(ipset_name, port, 'tcp')
+                    ipt.add_rule(ipset_name, port, 'udp')
+                    results.append(f'✅ iptables {svc_name} восстановлены')
+                    logger.info(f"[ROUTES] DNS restore: iptables rules for {svc_name} restored")
+
+                # Refresh ipset with resolved IPs
+                if os.path.exists(bypass_file):
+                    ok, msg = refresh_ipset_from_file(bypass_file, ipset_name)
+                    if ok:
+                        results.append(f'✅ ipset {svc_name} обновлён')
+                        logger.info(f"[ROUTES] DNS restore: ipset {ipset_name} refreshed: {msg}")
         except Exception as e:
-            logger.warning(f"[ROUTES] DNS restore: {svc_name} restart error: {e}")
+            logger.warning(f"[ROUTES] DNS restore: {svc_name} error: {e}")
 
     logger.info(f"[ROUTES] DNS restore completed: {results}")
     flash('Восстановление DNS: ' + ', '.join(results), 'warning')
