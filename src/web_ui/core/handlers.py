@@ -1,78 +1,275 @@
 """
-Error handlers and decorators for consistent error handling.
+FlyMyByte Web Interface - Route Handlers
+
+Common helpers for routes to reduce duplication.
 """
-from functools import wraps
-from flask import jsonify, request
+import os
 import logging
+from typing import Dict, Any, Optional, List, Tuple
+from flask import flash, redirect, url_for
 
-from .exceptions import (
-    FlyMyByteError,
-    ValidationError,
-    ServiceError,
-    ConfigError,
-    BackupError,
-    NetworkError,
-)
-
-logger = logging.getLogger(__name__)
+from .utils import logger
+from .app_config import WebConfig
 
 
-def api_error(f):
+def get_common_template_data() -> Dict[str, Any]:
     """
-    Decorator for consistent API error handling.
+    Get common template data used across all routes.
     
-    Catches FlyMyByteError subclasses and returns formatted JSON response.
+    Returns:
+        Dict with common template variables
     """
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except ValidationError as e:
-            logger.warning(f"Validation error: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e),
-                'error_type': 'validation'
-            }), 400
-        except FlyMyByteError as e:
-            logger.warning(f"Application error: {e}")
-            return jsonify({
-                'success': False,
-                'error': str(e),
-                'error_type': e.__class__.__name__.replace('Error', '').lower()
-            }), 400
-        except Exception as e:
-            logger.exception("Unexpected error in API")
-            return jsonify({
-                'success': False,
-                'error': 'Internal error',
-                'error_type': 'internal'
-            }), 500
-    return wrapper
+    config = WebConfig()
+    return {
+        'router_ip': config.router_ip,
+        'web_port': config.web_port,
+    }
 
 
-def handle_service_errors(f):
+def require_service_configured(mgr, service_name: str) -> Tuple[bool, str]:
     """
-    Decorator specifically for service operations.
+    Check if service has valid configuration.
+    
+    Args:
+        mgr: VPN manager instance
+        service_name: Human-readable service name
+    
+    Returns:
+        Tuple of (is_configured: bool, message: str)
     """
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        try:
-            return f(*args, **kwargs)
-        except ServiceError as e:
-            logger.warning(f"Service error: {e}")
-            return jsonify({'success': False, 'error': str(e)}), 503
-        except Exception as e:
-            logger.exception("Service operation failed")
-            return jsonify({'success': False, 'error': 'Service unavailable'}), 500
-    return wrapper
+    if not mgr.is_configured():
+        return False, f"Configure {service_name} key first"
+    
+    if not mgr.is_valid():
+        msg = mgr.get_last_error() or "Invalid configuration"
+        return False, msg
+    
+    return True, "OK"
 
 
-def require_json(f):
-    """Decorator to require JSON content type."""
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        if not request.is_json:
-            return jsonify({'success': False, 'error': 'JSON required'}), 400
-        return f(*args, **kwargs)
-    return wrapper
+def handle_service_error(error: Exception, service_name: str) -> Tuple[str, str]:
+    """
+    Handle service operation errors consistently.
+    
+    Args:
+        error: Exception that occurred
+        service_name: Service name for logging
+    
+    Returns:
+        Tuple of (message: str, category: str)
+    """
+    msg = str(error)
+    logger.error(f"[HANDLER] {service_name} error: {msg}")
+    return msg, "danger"
+
+
+def handle_service_success(service_name: str, action: str) -> Tuple[str, str]:
+    """
+    Generate success message for service operations.
+    
+    Args:
+        service_name: Service name
+        action: Action performed
+    
+    Returns:
+        Tuple of (message: str, category: str)
+    """
+    return f"✅ {service_name} {action}", "success"
+
+
+def handle_service_warning(service_name: str, message: str) -> Tuple[str, str]:
+    """
+    Generate warning message for service operations.
+    
+    Args:
+        service_name: Service name
+        message: Warning message
+    
+    Returns:
+        Tuple of (message: str, category: str)
+    """
+    return f"⚠️ {service_name}: {message}", "warning"
+
+
+def redirect_with_message(message: str, category: str, endpoint: str, **kwargs) -> Any:
+    """
+    Redirect to endpoint with flash message.
+    
+    Args:
+        message: Flash message text
+        category: Flash category (success, danger, warning, info)
+        endpoint: Target endpoint name
+        **kwargs: Arguments for url_for
+    
+    Returns:
+        Flask redirect response
+    """
+    flash(message, category)
+    return redirect(url_for(endpoint, **kwargs))
+
+
+def validate_file_path(filename: str, allowed_dirs: List[str]) -> Tuple[bool, str]:
+    """
+    Validate file path for security (prevent directory traversal).
+    
+    Args:
+        filename: Requested filename
+        allowed_dirs: List of allowed directories
+    
+    Returns:
+        Tuple of (is_valid: bool, error_message: str)
+    """
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        return False, "Invalid filename"
+    
+    for allowed_dir in allowed_dirs:
+        real_dir = os.path.realpath(allowed_dir)
+        if os.path.exists(real_dir):
+            return True, "OK"
+    
+    return False, "Directory not found"
+
+
+def get_safe_filename(filename: str) -> str:
+    """
+    Sanitize filename for safe use.
+    
+    Args:
+        filename: Original filename
+    
+    Returns:
+        Sanitized filename
+    """
+    # Remove potentially dangerous characters
+    sanitized = ''.join(c for c in filename if c.isalnum() or c in '._- ')
+    return sanitized[:255]
+
+
+def format_service_status(is_running: bool, is_configured: bool) -> str:
+    """
+    Format service status string.
+    
+    Args:
+        is_running: Whether service is running
+        is_configured: Whether service has configuration
+    
+    Returns:
+        Status emoji and text
+    """
+    if is_running and is_configured:
+        return "✅ Активен"
+    elif is_configured:
+        return "⚠️ Неактивен"
+    else:
+        return "❌ Не настроен"
+
+
+def parse_entries_from_input(raw_input: str, max_entries: int = 100) -> Tuple[List[str], List[str]]:
+    """
+    Parse domain/IP entries from raw input.
+    
+    Args:
+        raw_input: Raw user input
+        max_entries: Maximum number of entries to process
+    
+    Returns:
+        Tuple of (valid_entries, invalid_entries)
+    """
+    valid = []
+    invalid = []
+    
+    lines = raw_input.strip().split('\n')
+    
+    for line in lines[:max_entries]:
+        entry = line.strip()
+        
+        if not entry or entry.startswith('#'):
+            continue
+        
+        if len(entry) > 253:
+            invalid.append(entry)
+            continue
+        
+        valid.append(entry)
+    
+    return valid, invalid
+
+
+def handle_bypass_operation_result(
+    added_count: int,
+    removed_count: int,
+    error_msg: Optional[str] = None
+) -> None:
+    """
+    Handle bypass operation result with flash messages.
+    
+    Args:
+        added_count: Number of entries added
+        removed_count: Number of entries removed
+        error_msg: Error message if operation failed
+    """
+    if error_msg:
+        flash(f"❌ Ошибка: {error_msg}", "danger")
+    elif added_count > 0:
+        flash(f"✅ Успешно добавлено: {added_count} шт. Изменения применены", "success")
+    elif removed_count > 0:
+        flash(f"✅ Успешно удалено: {removed_count} шт. Изменения применены", "success")
+    else:
+        flash("ℹ️ Нет изменений", "info")
+
+
+def get_backup_list(backup_dir: str) -> List[Dict[str, Any]]:
+    """
+    Get list of available backups.
+    
+    Args:
+        backup_dir: Path to backup directory
+    
+    Returns:
+        List of backup info dicts
+    """
+    backups = []
+    
+    if not os.path.exists(backup_dir):
+        return backups
+    
+    for item in os.listdir(backup_dir):
+        item_path = os.path.join(backup_dir, item)
+        
+        if os.path.isdir(item_path):
+            size = 0
+            for root, dirs, files in os.walk(item_path):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    try:
+                        size += os.path.getsize(fp)
+                    except OSError:
+                        pass
+            
+            backups.append({
+                'name': item,
+                'path': item_path,
+                'size': size,
+                'size_mb': round(size / (1024 * 1024), 2),
+            })
+    
+    # Sort by name (newest first)
+    backups.sort(key=lambda x: x['name'], reverse=True)
+    return backups
+
+
+def format_bytes(bytes_count: int) -> str:
+    """
+    Format bytes to human-readable string.
+    
+    Args:
+        bytes_count: Number of bytes
+    
+    Returns:
+        Formatted string (e.g., "1.5 MB")
+    """
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if bytes_count < 1024.0:
+            return f"{bytes_count:.1f} {unit}"
+        bytes_count /= 1024.0
+    return f"{bytes_count:.1f} TB"
