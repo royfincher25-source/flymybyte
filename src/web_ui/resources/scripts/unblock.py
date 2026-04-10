@@ -1,9 +1,9 @@
 #!/opt/bin/python3
 """
 Unblock CLI - Python альтернатива shell скриптам.
-Usage: unblock.py [update|dnsmasq|ipset|status]
+Usage: unblock.py [update|dnsmasq|ipset|status|apply-redirects|sync-vpn]
 
-Этот скрипт вызывается из S99unblock как гиybridная альтернатива shell.
+Этот скрипт вызывается из S99unblock как гибридная альтернатива shell.
 
 Логирование:
 - Вывод в stdout/stderr для S99unblock
@@ -78,6 +78,15 @@ def main():
         print(f"<<< Result: ok={ok}, msg={msg}")
         print(msg)
         sys.exit(0 if ok else 1)
+    
+    elif cmd == 'sync-vpn':
+        print(">>> Syncing VPN interfaces...")
+        from core.iptables_manager import sync_vpn_interfaces, get_vpn_interfaces
+        vpn_interfaces = get_vpn_interfaces()
+        print(f"Found VPN interfaces: {vpn_interfaces}")
+        sync_vpn_interfaces()
+        print("VPN sync complete")
+        sys.exit(0)
     
     else:
         print(f"Unknown command: {cmd}")

@@ -18,7 +18,7 @@ import subprocess
 import logging
 import json
 import os
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -398,6 +398,219 @@ def is_service_running(pattern: str) -> bool:
 def is_dnsmasq_running() -> bool:
     """Check if dnsmasq process is running."""
     return is_service_running('dnsmasq')
+
+
+VPN_SERVICES = ['IKE', 'SSTP', 'OpenVPN', 'Wireguard', 'VPNL2TP']
+RT_TABLES_FILE = '/opt/etc/iproute2/rt_tables'
+
+
+def get_vpn_interfaces() -> List[str]:
+    """Get list of active VPN interfaces via NDMS API."""
+    try:
+        result = subprocess.run(
+            ['curl', '-s', 'localhost:79/rci/show/interface'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            return []
+        
+        import re
+        interfaces = []
+        for vpn in VPN_SERVICES:
+            pattern = rf'"{vpn}"[^}]*"id"\s*:\s*"([^"]+)"'
+            matches = re.findall(pattern, result.stdout)
+            interfaces.extend(matches)
+        
+        return list(set(interfaces))
+    except Exception as e:
+        logger.warning(f"Failed to get VPN interfaces: {e}")
+        return []
+
+
+def get_vpn_info(vpn_id: str) -> Optional[Dict[str, str]]:
+    """Get VPN interface info (IP, type, name) via NDMS API."""
+    try:
+        addr_result = subprocess.run(
+            ['curl', '-s', f'localhost:79/rci/show/interface/{vpn_id}/address'],
+            capture_output=True, text=True, timeout=5
+        )
+        vpn_ip = addr_result.stdout.strip().strip('"')
+        
+        if not vpn_ip:
+            return None
+        
+        type_result = subprocess.run(
+            ['ip', 'addr', 'show'],
+            capture_output=True, text=True, timeout=5
+        )
+        vpn_type = 'unknown'
+        for line in type_result.stdout.split('\n'):
+            if vpn_ip in line:
+                parts = line.split()
+                if parts:
+                    vpn_type = parts[0]
+                    break
+        
+        desc_result = subprocess.run(
+            ['curl', '-s', f'localhost:79/rci/show/interface/{vpn_id}/description'],
+            capture_output=True, text=True, timeout=5
+        )
+        vpn_name = desc_result.stdout.strip().strip('"')
+        
+        return {
+            'ip': vpn_ip,
+            'type': vpn_type,
+            'name': vpn_name,
+            'ipset_name': f'unblockvpn-{vpn_name}-{vpn_id}'
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get VPN info for {vpn_id}: {e}")
+        return None
+
+
+def ensure_rt_tables() -> None:
+    """Ensure rt_tables file exists."""
+    os.makedirs('/opt/etc/iproute2', exist_ok=True)
+    if not os.path.exists(RT_TABLES_FILE):
+        open(RT_TABLES_FILE, 'a').close()
+    os.chmod(RT_TABLES_FILE, 0o755)
+
+
+def get_vpn_table_name(vpn_id: str) -> str:
+    """Convert VPN ID to table name (lowercase)."""
+    return vpn_id.lower()
+
+
+def get_vpn_table_id(vpn_table: str) -> Optional[int]:
+    """Get fwmark ID for VPN table."""
+    try:
+        with open(RT_TABLES_FILE, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2 and parts[1] == vpn_table:
+                    return int(parts[0])
+    except Exception:
+        pass
+    return None
+
+
+def register_vpn_table(vpn_id: str) -> int:
+    """Register VPN in rt_tables, return fwmark ID."""
+    ensure_rt_tables()
+    vpn_table = get_vpn_table_name(vpn_id)
+    
+    existing_id = get_vpn_table_id(vpn_table)
+    if existing_id:
+        return existing_id
+    
+    max_id = 1000
+    try:
+        with open(RT_TABLES_FILE, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if parts and parts[0].isdigit():
+                    max_id = max(max_id, int(parts[0]))
+    except Exception:
+        pass
+    
+    new_id = max_id + 1
+    
+    try:
+        with open(RT_TABLES_FILE, 'a') as f:
+            f.write(f"{new_id} {vpn_table}\n")
+        logger.info(f"Registered VPN table: {vpn_table} -> {new_id}")
+    except Exception as e:
+        logger.warning(f"Failed to register VPN table: {e}")
+    
+    return new_id
+
+
+def setup_vpn_routes(vpn_id: str, vpn_ip: str, vpn_type: str) -> bool:
+    """Setup routing for VPN (routes + ipset)."""
+    vpn_table = get_vpn_table_name(vpn_id)
+    fwmark_id = register_vpn_table(vpn_id)
+    fwmark_hex = f"0x{fwmark_id}"
+    
+    subprocess.run(['ip', '-4', 'route', 'del', 'table', vpn_table, 'default'],
+                   capture_output=True, timeout=5)
+    
+    result = subprocess.run(
+        ['ip', '-4', 'route', 'add', 'table', vpn_table, 'default', 'via', vpn_ip, 'dev', vpn_type],
+        capture_output=True, timeout=5
+    )
+    
+    main_routes_result = subprocess.run(
+        ['ip', '-4', 'route', 'show', 'table', 'main'],
+        capture_output=True, text=True, timeout=5
+    )
+    
+    if main_routes_result.returncode == 0:
+        for line in main_routes_result.stdout.strip().split('\n'):
+            if line and not line.startswith('default'):
+                parts = line.split()
+                if parts:
+                    route_cmd = ['ip', '-4', 'route', 'add', 'table', vpn_table] + parts
+                    subprocess.run(route_cmd, capture_output=True, timeout=5)
+    
+    subprocess.run(
+        ['ip', '-4', 'rule', 'add', 'fwmark', fwmark_hex, 'lookup', vpn_table, 'priority', '1778'],
+        capture_output=True, timeout=5
+    )
+    subprocess.run(['ip', '-4', 'route', 'flush', 'cache'], capture_output=True, timeout=5)
+    
+    vpn_name = subprocess.run(
+        ['curl', '-s', f'localhost:79/rci/show/interface/{vpn_id}/description'],
+        capture_output=True, text=True, timeout=5
+    ).stdout.strip().strip('"')
+    
+    ipset_name = f"unblockvpn-{vpn_name}-{vpn_id}"
+    subprocess.run(
+        ['ipset', 'create', ipset_name, 'hash:net', '-exist'],
+        capture_output=True, timeout=5
+    )
+    
+    vpn_file = f"/opt/etc/unblock/vpn-{vpn_name}-{vpn_id}.txt"
+    os.makedirs('/opt/etc/unblock', exist_ok=True)
+    open(vpn_file, 'a').close()
+    os.chmod(vpn_file, 0o644)
+    
+    logger.info(f"VPN routes setup: {vpn_id} ({vpn_name}) {vpn_ip} via {vpn_type}")
+    return True
+
+
+def remove_vpn_routes(vpn_id: str) -> bool:
+    """Remove routing for VPN."""
+    vpn_table = get_vpn_table_name(vpn_id)
+    fwmark_id = get_vpn_table_id(vpn_table)
+    
+    subprocess.run(
+        ['ip', '-4', 'rule', 'del', 'from', 'all', 'table', vpn_table, 'priority', '1778'],
+        capture_output=True, timeout=5
+    )
+    
+    if fwmark_id:
+        subprocess.run(
+            ['ip', '-4', 'rule', 'del', 'fwmark', f"0x{fwmark_id}", 'lookup', vpn_table, 'priority', '1778'],
+            capture_output=True, timeout=5
+        )
+    
+    subprocess.run(['ip', '-4', 'route', 'flush', 'table', vpn_table], capture_output=True, timeout=5)
+    
+    logger.info(f"VPN routes removed: {vpn_id}")
+    return True
+
+
+def sync_vpn_interfaces() -> None:
+    """Sync all active VPN interfaces (call from S99unblock hook)."""
+    ensure_rt_tables()
+    
+    vpn_interfaces = get_vpn_interfaces()
+    logger.info(f"Syncing VPN interfaces: {vpn_interfaces}")
+    
+    for vpn_id in vpn_interfaces:
+        info = get_vpn_info(vpn_id)
+        if info:
+            setup_vpn_routes(vpn_id, info['ip'], info['type'])
 
 
 def apply_all_redirects() -> Tuple[bool, str]:

@@ -150,6 +150,21 @@ case "$1" in
     else
         log "  dnsmasq_watchdog.sh not found, skipping"
     fi
+
+    # Step 6: Sync VPN interfaces (routes + ipsets)
+    log "========================================"
+    log "Step 6: Syncing VPN interfaces..."
+    log "========================================"
+    if [ -x "/opt/bin/unblock.py" ]; then
+        if /opt/bin/unblock.py sync-vpn >> "$LOGFILE" 2>&1; then
+            log "  VPN sync completed"
+        else
+            log "  VPN sync failed, trying shell 100-unblock-vpn.sh..."
+            /opt/etc/ndm/netfilter.d/100-unblock-vpn.sh >> "$LOGFILE" 2>&1 || log "  VPN shell script not found or failed"
+        fi
+    else
+        log "  Python unblock.py not available, skipping VPN sync"
+    fi
     
     log "========================================"
     log "===== S99UNBLOCK START COMPLETE ====="
