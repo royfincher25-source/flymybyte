@@ -143,15 +143,21 @@ case "$1" in
     log "========================================"
     log "Step 5: Starting dnsmasq watchdog..."
     log "========================================"
+    # Also update watchdog script to latest version from GitHub
+    curl -s -o /opt/bin/dnsmasq_watchdog.sh https://raw.githubusercontent.com/royfincher25-source/flymybyte/master/src/web_ui/resources/scripts/dnsmasq_watchdog.sh 2>/dev/null
+    chmod +x /opt/bin/dnsmasq_watchdog.sh 2>/dev/null
+    
     if [ -x "/opt/bin/dnsmasq_watchdog.sh" ]; then
         # Kill existing watchdogs - check by /proc to avoid BusyBox ps issues
+        killed=0
         for pid in /proc/[0-9]*; do
             pid_num=$(basename "$pid" 2>/dev/null)
             if [ -f "$pid/cmdline" ] && grep -q "dnsmasq_watchdog" "$pid/cmdline" 2>/dev/null; then
-                kill -9 "$pid_num" 2>/dev/null
-                log "  Killed old watchdog: $pid_num"
+                kill -9 "$pid_num" 2>/dev/null && killed=$((killed+1))
             fi
         done
+        log "  Killed $killed old watchdog processes"
+        rm -f /tmp/dnsmasq_watchdog.pid  # Clear stale lockfile
         sleep 1
         /opt/bin/dnsmasq_watchdog.sh &
         log "  Started dnsmasq watchdog (PID: $!)"
