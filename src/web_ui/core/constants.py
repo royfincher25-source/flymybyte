@@ -81,6 +81,7 @@ DNS_OVERRIDE_FLAG = '/opt/etc/web_ui/.dns_override.flag'  # Постоянный
 
 DNSMASQ_CONFIG = '/opt/etc/dnsmasq.conf'
 DNSMASQ_AI_CONFIG = '/opt/etc/unblock-ai.dnsmasq'
+DNSMASQ_BYPASS_CONF = '/opt/etc/unblock.dnsmasq'
 DNSMASQ_AI_TEMPLATE = '/opt/etc/web_ui/resources/config/unblock-ai.dnsmasq.template'
 
 AI_DOMAINS_LIST = '/opt/etc/unblock/ai-domains.txt'
@@ -225,9 +226,11 @@ BACKUP_FILES = [
     f'{XRAY_DIR}',
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
+    '/opt/etc/proxy.json',      # Proxy config
     f'{UNBLOCK_DIR}',
     DNSMASQ_AI_CONFIG,
     AI_DOMAINS_LIST,
+    DNSMASQ_BYPASS_CONF,        # Bypass dnsmasq config (generated)
     DNSMASQ_CONFIG,
     CRONTAB_FILE,
     '/opt/bin',
