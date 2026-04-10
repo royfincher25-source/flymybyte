@@ -115,10 +115,25 @@ case "$1" in
     log "Step 4: Applying iptables redirect rules..."
     log "========================================"
     if [ "$IPSET_OK" = "true" ]; then
-        if /opt/etc/ndm/netfilter.d/100-redirect.sh >> "$LOGFILE" 2>&1; then
-            log "  100-redirect.sh completed successfully"
+        # Try Python first (new approach)
+        if [ -x "/opt/bin/unblock.py" ]; then
+            log "Trying Python unblock.py for redirects..."
+            if /opt/bin/unblock.py apply-redirects >> "$LOGFILE" 2>&1; then
+                log "  Python apply-redirects succeeded"
+            else
+                log "  Python apply-redirects failed, falling back to shell"
+                if /opt/etc/ndm/netfilter.d/100-redirect.sh >> "$LOGFILE" 2>&1; then
+                    log "  100-redirect.sh completed successfully"
+                else
+                    log_error "  100-redirect.sh failed (exit code: $?)"
+                fi
+            fi
         else
-            log_error "  100-redirect.sh failed (exit code: $?)"
+            if /opt/etc/ndm/netfilter.d/100-redirect.sh >> "$LOGFILE" 2>&1; then
+                log "  100-redirect.sh completed successfully"
+            else
+                log_error "  100-redirect.sh failed (exit code: $?)"
+            fi
         fi
     else
         log_error "SKIPPING 100-redirect.sh — ipsets not ready"

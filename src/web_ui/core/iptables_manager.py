@@ -345,6 +345,110 @@ def get_iptables_manager() -> IptablesManager:
     return get_iptables_manager._instance
 
 
+def ensure_base_ipsets() -> None:
+    """Ensure all required base ipsets exist."""
+    for ipset_name in ['unblocksh', 'unblockvless', 'unblocktroj']:
+        try:
+            subprocess.run(
+                ['ipset', 'create', ipset_name, 'hash:net', '-exist'],
+                capture_output=True, timeout=5
+            )
+            logger.debug(f"IPset ready: {ipset_name}")
+        except Exception as e:
+            logger.warning(f"Failed to ensure ipset {ipset_name}: {e}")
+
+
+def detect_local_ip() -> str:
+    """Detect local IP from br0 interface."""
+    try:
+        result = subprocess.run(
+            ['ip', '-4', 'addr', 'show', 'br0'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            import re
+            match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', result.stdout)
+            if match:
+                ip = match.group(1)
+                if ip.startswith(('192.168.', '10.', '172.')):
+                    logger.debug(f"Detected local IP: {ip}")
+                    return ip
+    except Exception as e:
+        logger.warning(f"Failed to detect local IP: {e}")
+    return "192.168.1.1"
+
+
+def is_service_running(pattern: str) -> bool:
+    """Check if process is running by pattern."""
+    try:
+        for pid_dir in os.listdir('/proc'):
+            if not pid_dir.isdigit():
+                continue
+            try:
+                with open(f'/proc/{pid_dir}/cmdline', 'rb') as f:
+                    if pattern.encode() in f.read():
+                        return True
+            except (FileNotFoundError, PermissionError):
+                continue
+    except Exception:
+        pass
+    return False
+
+
+def is_dnsmasq_running() -> bool:
+    """Check if dnsmasq process is running."""
+    return is_service_running('dnsmasq')
+
+
+def apply_all_redirects() -> Tuple[bool, str]:
+    """
+    Apply all redirect rules (replaces 100-redirect.sh).
+    
+    Returns:
+        Tuple[bool, str]: (success, message)
+    """
+    logger.info("[REDIRECT] Applying all redirect rules...")
+    
+    ensure_base_ipsets()
+    local_ip = detect_local_ip()
+    
+    errors = []
+    
+    # DNS redirect to dnsmasq:5353
+    if is_dnsmasq_running():
+        ok, msg = get_iptables_manager().add_dns_redirect(local_ip, 5353)
+        if ok:
+            logger.info("[REDIRECT] DNS redirect enabled")
+        else:
+            errors.append(f"DNS redirect: {msg}")
+    else:
+        logger.warning("[REDIRECT] dnsmasq not running, skipping DNS redirect")
+    
+    # VPN redirects
+    redirects = [
+        ('unblocksh', 1082),
+        ('unblockvless', 10810),
+        ('unblocktroj', 10829),
+    ]
+    
+    for ipset_name, port in redirects:
+        pattern = {'unblocksh': 'ss-redir', 'unblockvless': 'xray', 'unblocktroj': 'trojan'}.get(ipset_name, '')
+        
+        if pattern and not is_service_running(pattern):
+            logger.info(f"[REDIRECT] Service for {ipset_name} not running, skipping")
+            continue
+        
+        ok, msg = get_iptables_manager().add_vpn_redirect(ipset_name, port)
+        if ok:
+            logger.info(f"[REDIRECT] Added {ipset_name} -> {port}")
+        else:
+            errors.append(f"{ipset_name}: {msg}")
+    
+    if errors:
+        return False, f"Errors: {'; '.join(errors)}"
+    return True, "All redirects applied"
+
+
 # Convenience wrappers for backward compatibility with shell scripts
 def add_vpn_redirect(ipset_name: str, port: int) -> Tuple[bool, str]:
     return get_iptables_manager().add_vpn_redirect(ipset_name, port)

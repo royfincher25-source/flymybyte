@@ -71,6 +71,14 @@ def main():
         print(json.dumps(status, indent=2))
         sys.exit(0)
     
+    elif cmd == 'apply-redirects':
+        print(">>> Calling mgr.apply_redirects()...")
+        from core.iptables_manager import apply_all_redirects
+        ok, msg = apply_all_redirects()
+        print(f"<<< Result: ok={ok}, msg={msg}")
+        print(msg)
+        sys.exit(0 if ok else 1)
+    
     else:
         print(f"Unknown command: {cmd}")
         sys.exit(1)
