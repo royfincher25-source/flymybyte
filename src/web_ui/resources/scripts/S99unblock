@@ -144,12 +144,10 @@ case "$1" in
     log "Step 5: Starting dnsmasq watchdog..."
     log "========================================"
     if [ -x "/opt/bin/dnsmasq_watchdog.sh" ]; then
-        # Kill existing watchdogs (using pgrep/pkill or kill with ps)
-        pkill -f dnsmasq_watchdog.sh 2>/dev/null || (
-            for pid in $(ps | grep dnsmasq_watchdog | grep -v grep | awk '{print $1}'); do
-                kill -9 "$pid" 2>/dev/null
-            done
-        )
+        # Kill existing watchdogs using ps
+        for pid in $(ps | grep dnsmasq_watchdog | grep -v grep | awk '{print $1}'); do
+            kill -9 "$pid" 2>/dev/null
+        done
         sleep 1
         /opt/bin/dnsmasq_watchdog.sh &
         log "  Started dnsmasq watchdog (PID: $!)"
