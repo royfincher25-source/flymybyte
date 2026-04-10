@@ -37,33 +37,42 @@
 - ✅ **Объединены SS + Trojan в "Прокси"** (v2.8.0+)
 
 ### Остаётся выполнить:
-- ❌ Удаление shell скриптов (замена на Python менеджеры)
 - ❌ Объединение DNS-обхода AI с основным bypass
 
 ---
 
-## 🟡 ПРИОРИТЕТ 1: Удаление shell скриптов (в работе)
+## 🟢 ПРИОРИТЕТ 1: Удаление shell скриптов (ЗАВЕРШЕНО)
 
-**Статус:** 16+ shell скриптов в `resources/scripts/`
-**Почему:** Bash сложнее отлаживать, нет типизации, нет тестов
+**Статус:** ✅ Реализовано
+**Дата:** 10 апреля 2026
 
-### 1.1 Критические скрипты для замены:
-- [ ] `100-redirect.sh` → вызов `IptablesManager.add_vpn_redirect()`
-- [ ] `unblock_ipset.sh` → вызов `IptablesManager` методов
-- [ ] `unblock_dnsmasq.sh` → вызов `DnsmasqManager.generate_*()`
-- [ ] `unblock_update.sh` → вызов `DnsmasqManager` + `IptablesManager`
-- [ ] `refresh_ipset.sh` → вызов `refresh_ipset_from_file()` из `services.py`
+### Реализовано:
+- [x] `core/unblock_manager.py` — единый интерфейс для всех unblock операций
+- [x] `core/service_locator.py` — добавлен UnblockManager
+- [x] `routes_updates.py` — использует Python с shell fallback
+- [x] `S99unblock` — гибридный режим (Python + shell fallback)
+- [x] `unblock.py` — CLI wrapper для вызова из shell
 
-### 1.2 Создать:
-- [ ] `core/unblock_manager.py` — единый интерфейс для всех unblock операций
-- [ ] Обновить `S99unblock` init скрипт — вызывать Python вместо bash
-- [ ] Удалить старые shell скрипты после тестирования
+### Гибридный режим:
+```
+S99unblock start
+  ↓
+Попробовать /opt/bin/unblock.py update
+  ↓ (если успех)
+Готово
+  ↓ (если неудача)
+Fallback на shell скрипты
+```
 
-**Экономия:** 660+ строк bash кода, упрощение поддержки
+### Преимущества:
+- Python с type hints → проще отладка
+- Shell fallback → безопасность при проблемах
+- Единый API для управления bypass
+- Логирование в Python логах
 
 ---
 
-## 🟢 ПРИОРИТЕТ 2: Объединение DNS-обхода AI с основным bypass
+## 🟡 ПРИОРИТЕТ 2: Объединение DNS-обхода AI с основным bypass
 
 **Статус:** Отдельный класс `DNSSpoofing` в services.py, отдельные маршруты `/dns-spoofing/*`
 **Почему:** AI-домены могут обрабатываться тем же `DnsmasqManager`
