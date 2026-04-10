@@ -148,10 +148,12 @@ case "$1" in
     chmod +x /opt/bin/dnsmasq_watchdog.sh 2>/dev/null
     
     if [ -x "/opt/bin/dnsmasq_watchdog.sh" ]; then
-        # Kill existing watchdogs - check by /proc to avoid BusyBox ps issues
+        # Kill existing watchdogs - iterate numeric PIDs only
         killed=0
         for pid in /proc/[0-9]*; do
             pid_num=$(basename "$pid" 2>/dev/null)
+            # Skip non-numeric (self, thread-self, etc)
+            [ "$pid_num" -eq "$pid_num" ] 2>/dev/null || continue
             if [ -f "$pid/cmdline" ] && grep -q "dnsmasq_watchdog" "$pid/cmdline" 2>/dev/null; then
                 kill -9 "$pid_num" 2>/dev/null && killed=$((killed+1))
             fi
