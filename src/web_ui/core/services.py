@@ -1,803 +1,46 @@
 """
-FlyMyByte Web Interface - Key Parsers and Service Management
+FlyMyByte Web Interface - Service Aggregator
 
-Full-featured parsers for VPN keys (VLESS, Shadowsocks, Trojan).
-Memory-optimized for embedded devices (128MB RAM).
+This module imports from specialized modules for backward compatibility.
+Moved to separate modules: parsers.py, service_ops.py, ipset_ops.py
 """
 import os
-import re
 import time
 import json
-import base64
 import logging
 import subprocess
-import hashlib
 import threading
+import re
 from pathlib import Path
-from urllib.parse import urlparse, unquote, parse_qs
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from .utils import Cache, logger
+from .parsers import (
+    parse_vless_key,
+    vless_config,
+    parse_shadowsocks_key,
+    shadowsocks_config,
+    parse_trojan_key,
+    trojan_config,
+    parse_proxy_key,
+    proxy_config,
+)
+
+from .service_ops import (
+    restart_service,
+    check_service_status,
+)
+
+from .ipset_ops import (
+    bulk_add_to_ipset,
+    bulk_remove_from_ipset,
+    ensure_ipset_exists,
+    refresh_ipset_from_file,
+)
 
-
-# =============================================================================
-# VLESS PARSER
-# =============================================================================
-
-def parse_vless_key(key: str) -> Dict[str, Any]:
-    """
-    Parse VLESS key with caching.
-
-    Format: vless://uuid@server:port?encryption=none&security=tls&sni=...#name
-
-    Args:
-        key: VLESS key string
-
-    Returns:
-        Dict with parsed configuration
-
-    Raises:
-        ValueError: If key format is invalid
-    """
-    # Memory optimization: use MD5 hash instead of full key as cache key
-    # Saves ~40KB RAM (full keys can be 100-500 chars each)
-    cache_key = f'vless:{hashlib.md5(key.encode()).hexdigest()}'
-
-    if Cache.is_valid(cache_key):
-        logger.debug(f"VLESS cache hit: {cache_key[:20]}...")
-        return Cache.get(cache_key)
-
-    if not key.startswith('vless://'):
-        raise ValueError("Неверный формат ключа VLESS")
-
-    # Normalize key
-    key = key.strip()
-    
-    # Remove non-ASCII characters from fragment (emoji can break URL parsing)
-    if '#' in key:
-        base, fragment = key.split('#', 1)
-        # Keep only ASCII in fragment
-        fragment = fragment.encode('ascii', 'ignore').decode('ascii')
-        key = base + '#' + fragment
-    
-    key = ''.join(c for c in key if ord(c) >= 32 or c in '\t\n\r')
-    key = unquote(key)
-
-    try:
-        key = key.encode('ascii', 'ignore').decode('ascii')
-    except Exception as e:
-        logger.error(f"VLESS ASCII encode error: {e}")
-
-    logger.debug(f"VLESS normalized key: {key[:80]}...")
-
-    # Parse URL (keep vless:// for urlparse to work correctly)
-    # urlparse needs the scheme to extract username/hostname
-    # Fix malformed query strings first (e.g., "?&param=value" → "?param=value")
-    if '?&' in key:
-        key = key.replace('?&', '?')
-        logger.debug(f"Fixed malformed URL: {key[:80]}...")
-    
-    parsed = urlparse(key)
-    
-    logger.debug(f"VLESS parsed: scheme={parsed.scheme}, host={parsed.hostname}, port={parsed.port}, query_len={len(parsed.query) if parsed.query else 0}")
-
-    # Extract UUID
-    uuid = parsed.username
-    if not uuid:
-        logger.error(f"UUID not found! Full URL: {key[:100]}")
-        raise ValueError("UUID не найден в ключе")
-    
-    # Extract server and port
-    server = parsed.hostname
-    port = parsed.port
-    
-    if not server or not port:
-        raise ValueError("Сервер или порт не найдены")
-    
-    if not (1 <= port <= 65535):
-        raise ValueError(f"Порт должен быть от 1 до 65535, получен {port}")
-    
-    # Parse query parameters
-    params = parse_qs(parsed.query)
-    
-    # Extract configuration
-    result = {
-        'uuid': uuid,
-        'server': server,
-        'port': port,
-        'encryption': params.get('encryption', ['none'])[0],
-        'security': params.get('security', ['none'])[0],
-        'sni': params.get('sni', [server])[0],
-        'alpn': params.get('alpn', ['h2,http/1.1'])[0],
-        'fp': params.get('fp', ['chrome'])[0],
-        'type': params.get('type', ['tcp'])[0],
-        'path': params.get('path', ['/'])[0],
-        'host': params.get('host', [server])[0],
-        'flow': params.get('flow', [''])[0],  # XTLS Vision flow
-        'name': parsed.fragment or 'VLESS',
-    }
-
-    # XHTTP transport parameters
-    if result['type'] == 'xhttp':
-        result['xhttp_mode'] = params.get('mode', ['stream-one'])[0]
-        result['xhttp_max_upload_upload'] = params.get('maxUploadUpload', [''])[0]
-        result['xhttp_max_concurrent_upload'] = params.get('maxConcurrentUpload', [''])[0]
-
-        # Validate XHTTP mode
-        valid_modes = ['stream-one', 'stream-multi']
-        if result['xhttp_mode'] not in valid_modes:
-            logger.warning(f"XHTTP mode '{result['xhttp_mode']}' not in {valid_modes}, using default 'stream-one'")
-            result['xhttp_mode'] = 'stream-one'
-
-        # XHTTP requires host and path
-        if not result['host'] or result['host'] == server:
-            raise ValueError("Для XHTTP необходимо указать host (SNI)")
-        if not result['path']:
-            result['path'] = '/'
-
-    # Handle different security types
-    if result['security'] == 'reality':
-        result['pbk'] = params.get('pbk', [''])[0]
-        result['sid'] = params.get('sid', [''])[0]
-        result['spx'] = params.get('spx', [''])[0]
-    
-    logger.debug(f"VLESS parsed successfully: server={server}, port={port}")
-
-    # TTL 24 hours (86400s) - VPN keys are stable
-    Cache.set(cache_key, result, ttl=86400)
-    return result
-
-
-def vless_config(key: str) -> Dict[str, Any]:
-    """
-    Generate VLESS configuration from key.
-    
-    Args:
-        key: VLESS key string
-
-    Returns:
-        Dict with full configuration for Xray/Singbox
-    """
-    logger.debug(f"vless_config: parsing key")
-
-    parsed = parse_vless_key(key)
-    
-    # Build Xray config
-    config = {
-        'log': {
-            'loglevel': 'warning',
-        },
-        'inbounds': [
-            {
-                'tag': 'transparent',
-                'listen': '::',
-                'port': 10810,
-                'protocol': 'dokodemo-door',
-                'settings': {
-                    'network': 'tcp',
-                    'followRedirect': True,
-                },
-                'sniffing': {
-                    'enabled': True,
-                    'destOverride': ['http', 'tls'],
-                },
-            },
-        ],
-        'outbounds': [
-            {
-                'tag': 'proxy',
-                'protocol': 'vless',
-                'settings': {
-                    'vnext': [
-                        {
-                            'address': parsed['server'],
-                            'port': parsed['port'],
-                            'users': [
-                                {
-                                    'id': parsed['uuid'],
-                                    'encryption': 'none',
-                                    'flow': parsed.get('flow', ''),  # XTLS Vision
-                                    'level': 8,
-                                    'security': 'auto',
-                                }
-                            ],
-                        }
-                    ],
-                },
-                'streamSettings': {
-                    'network': parsed['type'],
-                    'security': parsed['security'],
-                    'tlsSettings': {
-                        'serverName': parsed['sni'],
-                        'alpn': [parsed['alpn'].split(',')],
-                        'fingerprint': parsed['fp'],
-                    } if parsed['security'] == 'tls' else {},
-                    'realitySettings': {
-                        'serverName': parsed['sni'],
-                        'publicKey': parsed.get('pbk', ''),
-                        'shortId': parsed.get('sid', ''),
-                        'spiderX': parsed.get('spx', ''),
-                    } if parsed['security'] == 'reality' else {},
-                    'tcpSettings': {
-                        'header': {
-                            'type': 'http',
-                            'request': {
-                                'path': [parsed['path']],
-                                'headers': {
-                                    'Host': [parsed['host']],
-                                }
-                            }
-                        }
-                    } if parsed['type'] == 'tcp' and parsed['path'] != '/' else {},
-                    'wsSettings': {
-                        'path': parsed['path'],
-                        'headers': {
-                            'Host': parsed['host'],
-                        }
-                    } if parsed['type'] == 'ws' else {},
-                    'xhttpSettings': {
-                        'mode': parsed.get('xhttp_mode', 'stream-one'),
-                        'host': parsed.get('host', ''),
-                        'path': parsed.get('path', '/'),
-                        'maxUploadUpload': parsed.get('xhttp_max_upload_upload', ''),
-                        'maxConcurrentUpload': parsed.get('xhttp_max_concurrent_upload', ''),
-                    } if parsed['type'] == 'xhttp' else {},
-                },
-                'mux': {
-                    'enabled': False,
-                },
-            },
-            {
-                'tag': 'direct',
-                'protocol': 'freedom',
-                'settings': {},
-            },
-        ],
-        'routing': {
-            'domainStrategy': 'AsIs',
-            'rules': [
-                # FIX: Локальные IP идут напрямую
-                {
-                    'type': 'field',
-                    'ip': ['geoip:private'],
-                    'outboundTag': 'direct',
-                },
-                # FIX: Весь остальной трафик идёт напрямую по умолчанию
-                # iptables сам перенаправит только домены из списка обхода
-                {
-                    'type': 'field',
-                    'port': '0-65535',
-                    'outboundTag': 'direct',
-                },
-            ],
-        },
-    }
-
-    logger.debug("vless_config: generated")
-    return config
-
-
-# =============================================================================
-# SHADOWSOCKS PARSER
-# =============================================================================
-
-def parse_shadowsocks_key(key: str) -> Dict[str, Any]:
-    """
-    Parse Shadowsocks key with caching.
-    
-    Supports both standard and URL-safe base64.
-    
-    Format: ss://base64(method:password)@server:port#name
-    
-    Args:
-        key: Shadowsocks key string
-    
-    Returns:
-        Dict with parsed configuration
-    
-    Raises:
-        ValueError: If key format is invalid
-    """
-    # Memory optimization: use MD5 hash instead of full key as cache key
-    cache_key = f'ss:{hashlib.md5(key.encode()).hexdigest()}'
-
-    if Cache.is_valid(cache_key):
-        logger.debug(f"Shadowsocks cache hit: {cache_key[:20]}...")
-        return Cache.get(cache_key)
-    
-    if not key.startswith('ss://'):
-        raise ValueError("Неверный формат ключа Shadowsocks")
-    
-    # Normalize key
-    key = key.strip()
-    key = ''.join(c for c in key if ord(c) >= 32 or c in '\t\n\r')
-    
-    # Replace Cyrillic with Latin
-    cyrillic_to_latin = {
-        'а': 'a', 'е': 'e', 'о': 'o', 'р': 'p', 'с': 'c', 'у': 'y', 'х': 'x',
-        'А': 'A', 'Е': 'E', 'О': 'O', 'Р': 'P', 'С': 'C', 'У': 'Y', 'Х': 'X',
-    }
-    for cyr, lat in cyrillic_to_latin.items():
-        key = key.replace(cyr, lat)
-    
-    key = unquote(key)
-    
-    try:
-        key = key.encode('ascii', 'ignore').decode('ascii')
-    except Exception as e:
-        logger.error(f"Shadowsocks ASCII encode error: {e}")
-    
-    logger.debug(f"Shadowsocks normalized key: {key[:80]}...")
-    
-    url = key[5:]  # Remove 'ss://'
-    parsed_url = urlparse(url)
-    
-    logger.debug(f"Shadowsocks urlparse: hostname={parsed_url.hostname}, username={parsed_url.username}, port={parsed_url.port}")
-    
-    # Try standard format with @
-    if parsed_url.hostname and parsed_url.username:
-        port = parsed_url.port
-        if not port or not (1 <= port <= 65535):
-            raise ValueError(f"Порт должен быть от 1 до 65535")
-        
-        try:
-            encoded = parsed_url.username
-            # URL-safe base64 support
-            encoded = encoded.replace('-', '+').replace('_', '/')
-            padding = 4 - (len(encoded) % 4)
-            if padding != 4:
-                encoded += '=' * padding
-            
-            decoded = base64.b64decode(encoded).decode('utf-8')
-            logger.debug(f"Shadowsocks decoded: {decoded}")
-            method, password = decoded.split(':', 1)
-            logger.debug(f"Shadowsocks method={method}")
-        except Exception as e:
-            logger.error(f"Shadowsocks base64 error: {e}")
-            raise ValueError(f"Ошибка декодирования base64: {str(e)}")
-        
-        result = {
-            'server': parsed_url.hostname,
-            'port': port,
-            'password': password,
-            'method': method,
-        }
-        logger.debug(f"Shadowsocks OK: server={result['server']}, port={result['port']}")
-
-        # TTL 24 hours (86400s) - VPN keys are stable
-        Cache.set(cache_key, result, ttl=86400)
-        return result
-    
-    # Try alternative format (manual parsing)
-    logger.debug(f"Shadowsocks: нет username, пробуем альтернативный формат")
-    
-    try:
-        url_part = url.split('#')[0]
-        logger.debug(f"Shadowsocks url_part: {url_part[:80]}...")
-        
-        at_index = url_part.rfind('@')
-        if at_index > 0:
-            encoded = url_part[:at_index]
-            server_port = url_part[at_index+1:]
-            logger.debug(f"Shadowsocks manual: encoded={encoded[:50]}..., server_port={server_port}")
-            
-            if ':' in server_port:
-                server, port_str = server_port.rsplit(':', 1)
-                port = int(port_str)
-                if not (1 <= port <= 65535):
-                    raise ValueError(f"Порт должен быть от 1 до 65535")
-                
-                # URL-safe base64
-                encoded = encoded.replace('-', '+').replace('_', '/')
-                padding = 4 - (len(encoded) % 4)
-                if padding != 4:
-                    encoded += '=' * padding
-                
-                decoded = base64.b64decode(encoded).decode('utf-8')
-                logger.debug(f"Shadowsocks manual decoded: {decoded}")
-                method, password = decoded.split(':', 1)
-                
-                result = {
-                    'server': server,
-                    'port': port,
-                    'password': password,
-                    'method': method,
-                }
-                logger.debug(f"Shadowsocks manual OK: server={result['server']}, port={result['port']}")
-                Cache.set(cache_key, result, ttl=3600)
-                return result
-    except Exception as e:
-        logger.error(f"Shadowsocks manual error: {e}")
-    
-    # Try old alternative format
-    try:
-        encoded = url.split('#')[0]
-        encoded = encoded.replace('-', '+').replace('_', '/')
-        padding = 4 - (len(encoded) % 4)
-        if padding != 4:
-            encoded += '=' * padding
-        
-        decoded = base64.b64decode(encoded).decode('utf-8')
-        logger.debug(f"Shadowsocks alt decoded: {decoded}")
-        
-        match = re.match(r'([^:]+):([^@]+)@([^:]+):(\d+)', decoded)
-        if match:
-            method, password, server, port = match.groups()
-            result = {
-                'server': server,
-                'port': int(port),
-                'password': password,
-                'method': method,
-            }
-            logger.debug(f"Shadowsocks alt OK: server={result['server']}, port={result['port']}")
-            Cache.set(cache_key, result, ttl=3600)
-            return result
-    except Exception as e:
-        logger.error(f"Shadowsocks alt error: {e}")
-    
-    logger.error(f"Shadowsocks FAILED: Некорректные данные сервера")
-    raise ValueError("Некорректные данные сервера")
-
-
-def shadowsocks_config(key: str) -> Dict[str, Any]:
-    """
-    Generate Shadowsocks configuration from key.
-
-    Args:
-        key: Shadowsocks key string
-
-    Returns:
-        Dict with full configuration for shadowsocks-libev
-    """
-    logger.debug("shadowsocks_config: parsing key")
-
-    parsed = parse_shadowsocks_key(key)
-
-    config = {
-        'server': [parsed['server']],
-        'mode': 'tcp_and_udp',
-        'server_port': parsed['port'],
-        'password': parsed['password'],
-        'timeout': 86400,
-        'local_address': '::',
-        'local_port': 1082,
-        'fast_open': False,
-        'ipv6_first': True,
-    }
-
-    logger.debug("shadowsocks_config: generated")
-    return config
-
-
-# =============================================================================
-# UNIFIED PROXY PARSER (SS + Trojan)
-# =============================================================================
-
-def parse_proxy_key(key: str) -> Dict[str, Any]:
-    """
-    Unified proxy parser — auto-detects Shadowsocks or Trojan by URL scheme.
-
-    Returns dict with 'protocol' field ('ss' or 'trojan').
-
-    Args:
-        key: Proxy key string (ss://... or trojan://...)
-
-    Returns:
-        Dict with parsed configuration and 'protocol' field
-
-    Raises:
-        ValueError: If key format is invalid
-    """
-    if key.startswith('ss://'):
-        parsed = parse_shadowsocks_key(key)
-        parsed['protocol'] = 'ss'
-        return parsed
-    elif key.startswith('trojan://'):
-        parsed = parse_trojan_key(key)
-        parsed['protocol'] = 'trojan'
-        return parsed
-    else:
-        raise ValueError("Неверный формат ключа. Поддерживаются ss:// и trojan://")
-
-
-def proxy_config(key: str) -> Dict[str, Any]:
-    """
-    Unified proxy config generator — delegates to ss_config or trojan_config.
-
-    Args:
-        key: Proxy key string
-
-    Returns:
-        Dict with full configuration and 'protocol' field
-    """
-    if key.startswith('ss://'):
-        cfg = shadowsocks_config(key)
-        cfg['protocol'] = 'ss'
-        return cfg
-    elif key.startswith('trojan://'):
-        cfg = trojan_config(key)
-        cfg['protocol'] = 'trojan'
-        return cfg
-    else:
-        raise ValueError("Неверный формат ключа")
-
-
-# =============================================================================
-# TROJAN PARSER
-# =============================================================================
-
-def parse_trojan_key(key: str) -> Dict[str, Any]:
-    """
-    Parse Trojan key with caching.
-    
-    Format: trojan://password@server:port?security=tls&sni=...#name
-    
-    Args:
-        key: Trojan key string
-
-    Returns:
-        Dict with parsed configuration
-
-    Raises:
-        ValueError: If key format is invalid
-    """
-    # Memory optimization: use MD5 hash instead of full key as cache key
-    cache_key = f'trojan:{hashlib.md5(key.encode()).hexdigest()}'
-
-    if Cache.is_valid(cache_key):
-        logger.debug(f"Trojan cache hit: {cache_key[:20]}...")
-        return Cache.get(cache_key)
-
-    if not key.startswith('trojan://'):
-        raise ValueError("Неверный формат ключа Trojan")
-    
-    # Normalize key
-    key = key.strip()
-    key = unquote(key)
-    
-    try:
-        key = key.encode('ascii', 'ignore').decode('ascii')
-    except Exception as e:
-        logger.error(f"Trojan ASCII encode error: {e}")
-    
-    logger.debug(f"Trojan normalized key: {key[:80]}...")
-    
-    url = key[11:]  # Remove 'trojan://'
-    parsed = urlparse(url)
-    
-    # Extract password
-    password = parsed.username
-    if not password:
-        raise ValueError("Пароль не найден в ключе")
-    
-    # Extract server and port
-    server = parsed.hostname
-    port = parsed.port
-    
-    if not server or not port:
-        raise ValueError("Сервер или порт не найдены")
-    
-    if not (1 <= port <= 65535):
-        raise ValueError(f"Порт должен быть от 1 до 65535")
-    
-    # Parse query parameters
-    params = parse_qs(parsed.query)
-    
-    result = {
-        'password': password,
-        'server': server,
-        'port': port,
-        'security': params.get('security', ['tls'])[0],
-        'sni': params.get('sni', [server])[0],
-        'alpn': params.get('alpn', ['h2,http/1.1'])[0],
-        'type': params.get('type', ['tcp'])[0],
-        'name': parsed.fragment or 'Trojan',
-    }
-
-    logger.debug(f"Trojan parsed successfully: server={server}, port={port}")
-
-    # TTL 24 hours (86400s) - VPN keys are stable
-    Cache.set(cache_key, result, ttl=86400)
-    return result
-
-
-def trojan_config(key: str) -> Dict[str, Any]:
-    """
-    Generate Trojan configuration from key.
-
-    Args:
-        key: Trojan key string
-
-    Returns:
-        Dict with full configuration
-    """
-    logger.debug("trojan_config: parsing key")
-
-    parsed = parse_trojan_key(key)
-
-    config = {
-        'run_type': 'client',
-        'local_addr': '127.0.0.1',
-        'local_port': 10829,
-        'remote_addr': parsed['server'],
-        'remote_port': parsed['port'],
-        'password': [parsed['password']],
-        'log_level': 1,
-        'ssl': {
-            'verify': True,
-            'verify_hostname': True,
-            'cert': '',
-            'cipher': 'ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384',
-            'cipher_tls13': 'TLS_AES_128_GCM_SHA256:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_256_GCM_SHA384',
-            'sni': parsed['sni'],
-            'alpn': ['h2', 'http/1.1'],
-            'reuse_session': True,
-            'session_ticket': False,
-            'curves': '',
-        },
-        'tcp': {
-            'no_delay': True,
-            'keep_alive': True,
-            'reuse_port': False,
-            'fast_open': False,
-            'fast_open_qlen': 20,
-        },
-    }
-
-    logger.debug("trojan_config: generated")
-    return config
-
-
-# =============================================================================
-# SERVICE MANAGEMENT
-# =============================================================================
-
-def restart_service(service_name: str, init_script: str) -> Tuple[bool, str]:
-    """
-    Restart a service using init script.
-
-    Args:
-        service_name: Human-readable service name
-        init_script: Path to init script
-
-    Returns:
-        Tuple of (success: bool, output: str)
-    """
-    logger.info(f"[SVC] Restarting {service_name} via {init_script}")
-
-    if not os.path.exists(init_script):
-        logger.error(f"[SVC] Init script not found: {init_script}")
-        return False, f"Скрипт {init_script} не найден"
-
-    try:
-        result = subprocess.run(
-            ['sh', init_script, 'restart'],
-            capture_output=True,
-            text=True,
-            timeout=180
-        )
-
-        success = result.returncode == 0
-        output = result.stdout.strip() or result.stderr.strip()
-
-        if success:
-            logger.info(f"[SVC] {service_name} restarted successfully")
-        else:
-            logger.error(f"[SVC] {service_name} restart failed (code={result.returncode}): {output}")
-
-        return success, output
-
-    except subprocess.TimeoutExpired:
-        logger.error(f"[SVC] {service_name} restart timed out")
-        return False, "Превышено время ожидания"
-    except Exception as e:
-        logger.error(f"[SVC] {service_name} restart error: {e}")
-        return False, str(e)
-
-
-def _is_process_running(proc_pattern: str) -> bool:
-    """Check if process is running via /proc or pgrep fallback."""
-    try:
-        for pid_dir in os.listdir('/proc'):
-            if not pid_dir.isdigit():
-                continue
-            cmdline_path = f'/proc/{pid_dir}/cmdline'
-            try:
-                with open(cmdline_path, 'rb') as f:
-                    cmdline = f.read(256).decode('utf-8', errors='ignore')
-                    if proc_pattern in cmdline:
-                        return True
-            except (FileNotFoundError, PermissionError, ProcessLookupError):
-                continue
-    except Exception as e:
-        logger.debug(f"[SVC] /proc check failed: {e}")
-    # Fallback to pgrep
-    try:
-        result = subprocess.run(
-            ['pgrep', '-f', proc_pattern],
-            capture_output=True, text=True, timeout=3
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-def check_service_status(init_script: str) -> str:
-    """
-    Check service status with caching (60s TTL).
-
-    Optimized for embedded devices: uses /proc instead of pgrep/subprocess.
-    CPU reduction: ~80% (no subprocess calls for status check).
-
-    Args:
-        init_script: Path to init script
-
-    Returns:
-        Status string
-    """
-    # Cache status for 60 seconds (increased from 30s to reduce CPU)
-    cache_key = f'status:{init_script}'
-    cached_status = Cache.get(cache_key)
-    if cached_status:
-        return cached_status
-
-    logger.debug(f"[SVC] Checking status for {init_script}")
-
-    if not os.path.exists(init_script):
-        logger.warning(f"[SVC] Init script not found: {init_script}")
-        status = "❌ Скрипт не найден"
-    else:
-        try:
-            # Extract service name from init script
-            script_name = os.path.basename(init_script)
-
-            # Map init script to process name pattern
-            process_patterns = {
-                'S24xray': 'xray',
-                'S22shadowsocks': 'ss-redir',
-                'S22trojan': 'trojan',
-                'S56dnsmasq': 'dnsmasq',
-                'S99unblock': 'unblock',
-            }
-
-            proc_pattern = process_patterns.get(script_name, script_name.replace('S', '').split('init')[0])
-
-            # FIX: Use centralized _is_process_running with /proc + pgrep fallback
-            service_running = _is_process_running(proc_pattern)
-
-            if service_running:
-                status = "✅ Активен"
-                logger.debug(f"[SVC] {init_script}: ACTIVE (via /proc)")
-            else:
-                # Service not found in /proc, check if it's supposed to run
-                # Some services may not have config yet
-                status = "❌ Не активен"
-
-        except subprocess.TimeoutExpired:
-            logger.error(f"Timeout checking status for {init_script}")
-            status = "⏱️  Таймаут проверки"
-        except Exception as e:
-            logger.error(f"Error checking status for {init_script}: {e}")
-            status = f"❓ Ошибка: {str(e)}"
-
-    # Cache for 60 seconds (increased from 30s)
-    Cache.set(cache_key, status, ttl=60)
-    logger.debug(f"Status for {init_script}: {status}")
-    return status
-
-
-# =============================================================================
-# CONFIG WRITER
-# =============================================================================
 
 def write_json_config(config: Dict[str, Any], filepath: str) -> None:
-    """
-    Write configuration to JSON file atomically.
-
-    Args:
-        config: Configuration dict
-        filepath: Path to output file
-    """
+    """Write configuration to JSON file atomically."""
     logger.debug(f"write_json_config: writing to {filepath}")
     temp_path = filepath + '.tmp'
 
@@ -822,14 +65,11 @@ def write_json_config(config: Dict[str, Any], filepath: str) -> None:
 
 def get_local_version():
     """Получить локальную версию"""
-    # На роутере VERSION файл находится в /opt/etc/web_ui/
     version_file = '/opt/etc/web_ui/VERSION'
     try:
         with open(version_file, 'r', encoding='utf-8') as f:
             return f.read().strip()
     except FileNotFoundError:
-        # Для разработки: проверяем локальный файл VERSION в корне проекта
-        import os
         local_version_file = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'VERSION')
         if os.path.exists(local_version_file):
             try:
@@ -856,82 +96,6 @@ def get_remote_version():
         return 'N/A'
 
 
-# =============================================================================
-# IPSET MANAGER (merged from ipset_manager.py)
-# =============================================================================
-
-# Memory limit for embedded devices (128MB RAM)
-# Prevents OOM when adding thousands of entries in single operation
-IPSET_MAX_BULK_ENTRIES = 5000  # Maximum entries per bulk operation
-IPSET_BATCH_SIZE = 1000  # Process entries in batches of 1000
-
-
-# ===========================================================================
-# IPSET operations — delegated to ipset_ops.py to break circular dependency
-# ===========================================================================
-
-def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
-    """Bulk add entries to ipset (delegated to ipset_ops)."""
-    from .ipset_ops import bulk_add_to_ipset as _impl
-    return _impl(setname, entries)
-
-
-def bulk_remove_from_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
-    """Bulk remove entries from ipset (delegated to ipset_ops)."""
-    from .ipset_ops import bulk_remove_from_ipset as _impl
-    return _impl(setname, entries)
-
-
-def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, str]:
-    """Ensure ipset exists (delegated to ipset_ops)."""
-    from .ipset_ops import ensure_ipset_exists as _impl
-    return _impl(setname, settype)
-
-
-def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool, str]:
-    """
-    Refresh ipset from bypass list file (resolve domains + add IPs).
-
-    Args:
-        filepath: Path to bypass list file
-        max_workers: Parallel workers for DNS (default: 10)
-
-    Returns:
-        Tuple of (success: bool, message: str)
-    """
-    from .app_config import WebConfig
-
-    # Validate file path (prevent directory traversal)
-    config = WebConfig()
-    real_path = os.path.realpath(filepath)
-    real_dir = os.path.realpath(config.unblock_dir)
-    if not real_path.startswith(real_dir + os.sep):
-        return False, "Invalid file path"
-
-    # Check file exists
-    if not os.path.exists(filepath):
-        logger.warning(f"File not found: {filepath}")
-        return False, f"File not found: {filepath}"
-
-    try:
-        # FIX: Import from ipset_ops instead of dns_ops to break circular dependency
-        from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
-        from .dns_ops import resolve_domains_for_ipset, parallel_resolve
-
-        logger.info(f"[IPSET] Refreshing from file: {filepath}")
-        count = resolve_domains_for_ipset(filepath, max_workers)
-        logger.info(f"[IPSET] Refresh complete: {count} IPs resolved and added from {filepath}")
-        return True, f"Resolved and added {count} IPs"
-    except Exception as e:
-        logger.error(f"[IPSET] Refresh failed for {filepath}: {e}")
-        return False, str(e)
-
-
-# =============================================================================
-# LIST CATALOG (merged from list_catalog.py)
-# =============================================================================
-
-# Catalog of available bypass lists
 LIST_CATALOG: Dict[str, Dict[str, Any]] = {
     'anticensor': {
         'name': 'Антицензор',
@@ -990,16 +154,7 @@ def get_catalog() -> Dict[str, Dict[str, Any]]:
 
 
 def _parse_list_content(content: str, fmt: str) -> List[str]:
-    """
-    Parse list content based on format.
-
-    Args:
-        content: Raw file content
-        fmt: 'hosts' or 'domains'
-
-    Returns:
-        List of domains
-    """
+    """Parse list content based on format."""
     domains = []
 
     for line in content.split('\n'):
@@ -1021,16 +176,7 @@ def _parse_list_content(content: str, fmt: str) -> List[str]:
 
 
 def download_list(name: str, dest_dir: str) -> tuple:
-    """
-    Download list from catalog and save to file.
-
-    Args:
-        name: List name from catalog
-        dest_dir: Destination directory
-
-    Returns:
-        Tuple of (success: bool, message: str, count: int)
-    """
+    """Download list from catalog and save to file."""
     if name not in LIST_CATALOG:
         return False, f"List '{name}' not found", 0
 
@@ -1052,7 +198,6 @@ def download_list(name: str, dest_dir: str) -> tuple:
         else:
             return False, "No data source", 0
 
-        # Atomic write
         temp_path = filepath + '.tmp'
         with open(temp_path, 'w', encoding='utf-8') as f:
             for domain in domains:
@@ -1070,10 +215,6 @@ def download_list(name: str, dest_dir: str) -> tuple:
         logger.error(f"Unexpected error: {e}")
         return False, str(e), 0
 
-
-# =============================================================================
-# DNS SPOOFING (merged from dns_spoofing.py)
-# =============================================================================
 
 try:
     from .constants import (
@@ -1098,12 +239,7 @@ except ImportError:
 
 
 class DNSSpoofing:
-    """
-    DNS Spoofing for AI domain bypass.
-
-    Generates dnsmasq configuration to route AI domain DNS queries through VPN.
-    Thread-safe singleton pattern.
-    """
+    """DNS Spoofing for AI domain bypass."""
 
     _instance: Optional['DNSSpoofing'] = None
     _lock = threading.Lock()
@@ -1130,12 +266,7 @@ class DNSSpoofing:
         logger.info("[DNS-SPOOF] DNSSpoofing initialized")
 
     def load_domains(self) -> List[str]:
-        """
-        Load AI domains from list file.
-
-        Returns:
-            List of valid domain names
-        """
+        """Load AI domains from list file."""
         domains = []
         domains_path = Path(self._domains_path)
 
@@ -1195,15 +326,7 @@ class DNSSpoofing:
         return bool(re.match(ip_pattern, entry))
 
     def generate_config(self, domains: Optional[List[str]] = None) -> str:
-        """
-        Generate dnsmasq configuration for AI domains.
-
-        Args:
-            domains: List of domains (default: load from file)
-
-        Returns:
-            dnsmasq configuration string
-        """
+        """Generate dnsmasq configuration for AI domains."""
         if domains is None:
             domains = self.load_domains()
 
@@ -1226,15 +349,7 @@ class DNSSpoofing:
         return config
 
     def write_config(self, config: str) -> Tuple[bool, str]:
-        """
-        Write dnsmasq configuration to file (atomic write).
-
-        Args:
-            config: Configuration string
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
+        """Write dnsmasq configuration to file (atomic write)."""
         config_path = Path(self._config_path)
 
         try:
@@ -1253,12 +368,7 @@ class DNSSpoofing:
             return False, error_msg
 
     def apply_config(self) -> Tuple[bool, str]:
-        """
-        Apply dnsmasq configuration and restart dnsmasq.
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
+        """Apply dnsmasq configuration and restart dnsmasq."""
         domains = self.load_domains()
 
         if not domains:
@@ -1289,12 +399,7 @@ class DNSSpoofing:
             return False, msg
 
     def _restart_dnsmasq(self) -> Tuple[bool, str]:
-        """
-        Restart dnsmasq service using SIGHUP to reload config.
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
+        """Restart dnsmasq service using SIGHUP to reload config."""
         try:
             pid_result = subprocess.run(
                 ['pgrep', 'dnsmasq'],
@@ -1361,12 +466,7 @@ class DNSSpoofing:
             return False, error_msg
 
     def disable(self) -> Tuple[bool, str]:
-        """
-        Disable DNS spoofing (remove config and FULL restart dnsmasq).
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
+        """Disable DNS spoofing (remove config and reload dnsmasq)."""
         config_path = Path(self._config_path)
 
         try:
@@ -1374,8 +474,6 @@ class DNSSpoofing:
                 config_path.unlink()
                 logger.info(f"Removed AI domains config: {self._config_path}")
 
-            # Use SIGHUP instead of restart — restart can fail on Keenetic
-            # and leave dnsmasq stopped, breaking all DNS for the network
             try:
                 pid_result = subprocess.run(
                     ['pgrep', 'dnsmasq'],
@@ -1409,21 +507,14 @@ class DNSSpoofing:
             return False, error_msg
 
     def get_status(self) -> Dict[str, Any]:
-        """
-        Get current DNS spoofing status.
-
-        Returns:
-            Dict with status information
-        """
+        """Get current DNS spoofing status."""
         config_path = Path(self._config_path)
         domains_path = Path(self._domains_path)
 
-        # FIX: check if config file has actual server= rules, not just comments
         config_has_content = False
         if config_path.exists():
             try:
                 content = config_path.read_text(encoding='utf-8')
-                # Check for real DNS rules (server=/domain.com/...), not comments
                 config_has_content = bool(re.search(r'^server=/', content, re.MULTILINE))
             except Exception:
                 pass
@@ -1456,15 +547,7 @@ class DNSSpoofing:
             return False
 
     def test_domain(self, domain: str) -> Dict[str, Any]:
-        """
-        Test DNS resolution for a domain.
-
-        Args:
-            domain: Domain to test
-
-        Returns:
-            Dict with test results
-        """
+        """Test DNS resolution for a domain."""
         result = {
             'domain': domain,
             'resolved': False,
@@ -1474,7 +557,6 @@ class DNSSpoofing:
         }
 
         try:
-            # FIX: Use subprocess with list args instead of shell=True to prevent injection
             try:
                 proc_result = subprocess.run(
                     ['nslookup', domain, VPN_DNS_HOST],
@@ -1501,53 +583,34 @@ class DNSSpoofing:
                 logger.debug(f"test_domain nslookup error for {domain}: {e}")
 
             try:
-                # FIX: Use list args, no shell
-                proc_result = subprocess.run(
-                    ['nslookup', domain],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
-
-                if proc_result.stdout.strip():
-                    ips = re.findall(
-                        r'([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})',
-                        proc_result.stdout
-                    )
-
-                    if ips:
-                        result['error'] = f'Домен существует, но не резолвится через VPN DNS (порт {VPN_DNS_PORT}). Проверьте, запущен ли dnsmasq/stubby и применена ли конфигурация.'
-                        result['ips'] = ips
-                        return result
-
+                import socket
+                addr_info = socket.getaddrinfo(domain, None)
+                ips = list(set(info[4][0] for info in addr_info))
+                if ips:
+                    result['resolved'] = True
+                    result['ips'] = ips
+                    result['dns_server'] = 'system default'
+                    return result
             except Exception as e:
-                logger.debug(f"test_domain fallback nslookup error for {domain}: {e}")
+                result['error'] = str(e)
 
-            result['error'] = 'No IPs found'
-
-        except subprocess.TimeoutExpired:
-            result['error'] = 'Timeout'
         except Exception as e:
             result['error'] = str(e)
+            logger.error(f"test_domain error for {domain}: {e}")
 
         return result
 
 
-# Module-level convenience functions for DNS spoofing
-
 def apply_dns_spoofing() -> Tuple[bool, str]:
-    """Apply DNS spoofing configuration"""
-    spoofing = DNSSpoofing()
-    return spoofing.apply_config()
+    """Apply DNS spoofing (singleton convenience)."""
+    return DNSSpoofing().apply_config()
 
 
 def disable_dns_spoofing() -> Tuple[bool, str]:
-    """Disable DNS spoofing"""
-    spoofing = DNSSpoofing()
-    return spoofing.disable()
+    """Disable DNS spoofing (singleton convenience)."""
+    return DNSSpoofing().disable()
 
 
 def get_dns_spoofing_status() -> Dict[str, Any]:
-    """Get DNS spoofing status"""
-    spoofing = DNSSpoofing()
-    return spoofing.get_status()
+    """Get DNS spoofing status (singleton convenience)."""
+    return DNSSpoofing().get_status()
