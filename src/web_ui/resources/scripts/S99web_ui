@@ -5,6 +5,25 @@ WEB_DIR="/opt/etc/web_ui"
 PIDFILE="/var/run/web_ui.pid"
 
 start() {
+    # FIX: Singleton protection — check if already running
+    if [ -f "$PIDFILE" ]; then
+        OLD_PID=$(cat "$PIDFILE")
+        if kill -0 "$OLD_PID" 2>/dev/null; then
+            # Check if port 8080 is actually in use
+            if netstat -tlnp 2>/dev/null | grep -q ":8080 "; then
+                echo "Web UI already running (PID $OLD_PID)"
+                return 0
+            fi
+        fi
+        rm -f "$PIDFILE"
+    fi
+    
+    # Also check for any python3 app.py processes
+    if pgrep -f "python.*app.py" > /dev/null 2>&1; then
+        echo "Web UI already running (process detected)"
+        return 0
+    fi
+    
     echo "Starting web UI..."
     cd "$WEB_DIR"
     python3 app.py > /opt/var/log/web_ui.log 2>&1 &
