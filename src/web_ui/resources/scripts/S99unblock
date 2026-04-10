@@ -19,6 +19,21 @@ case "$1" in
   start)
     log "Starting unblock ipset..."
 
+    # Step 0: Попробовать Python UnblockManager (новый подход)
+    PYTHON_OK=false
+    if [ -x "/opt/bin/unblock.py" ]; then
+        log "Trying Python unblock.py..."
+        if /opt/bin/unblock.py update >> "$LOGFILE" 2>&1; then
+            log "Python unblock.py completed successfully"
+            PYTHON_OK=true
+        else
+            log_error "Python unblock.py failed (exit code: $?), falling back to shell"
+            PYTHON_OK=false
+        fi
+    else
+        log "Python unblock.py not found, using shell scripts"
+    fi
+
     # Step 1: Ensure dnsmasq is running (needed for DNS resolution in ipset script)
     log "Ensuring dnsmasq is running..."
     if /opt/etc/init.d/S56dnsmasq restart >> "$LOGFILE" 2>&1; then
@@ -28,13 +43,19 @@ case "$1" in
     fi
     sleep 2
 
-    # Step 2: Populate ipsets
-    IPSET_OK=false
-    if /opt/bin/unblock_ipset.sh >> "$LOGFILE" 2>&1; then
-        log "unblock_ipset.sh completed successfully"
-        IPSET_OK=true
+    # Step 2: Populate ipsets (только если Python не сработал)
+    if [ "$PYTHON_OK" = "false" ]; then
+        if /opt/bin/unblock_ipset.sh >> "$LOGFILE" 2>&1; then
+            log "unblock_ipset.sh completed successfully"
+            IPSET_OK=true
+        else
+            log_error "unblock_ipset.sh failed (exit code: $?)"
+            IPSET_OK=false
+        fi
     else
-        log_error "unblock_ipset.sh failed (exit code: $?)"
+        # Python уже сделал update_all() который включает ipset
+        IPSET_OK=true
+        log "IPSet populated by Python"
     fi
 
     # Step 3: Verify ipsets have entries before applying redirect rules

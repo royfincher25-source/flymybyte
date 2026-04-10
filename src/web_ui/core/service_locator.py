@@ -59,6 +59,12 @@ def key():
     return KeyManager()
 
 
+def unblock():
+    """Get unblock manager."""
+    from .unblock_manager import get_unblock_manager
+    return get_unblock_manager()
+
+
 class ServiceLocator:
     """
     Unified service access point.
@@ -107,6 +113,11 @@ class ServiceLocator:
         return key()
     
     @staticmethod
+    def unblock():
+        """Get unblock manager."""
+        return unblock()
+    
+    @staticmethod
     def all_managers() -> Dict[str, Any]:
         """Get dict of all available managers."""
         return {
@@ -116,6 +127,7 @@ class ServiceLocator:
             'iptables': iptables(),
             'backup': backup(),
             'key': key(),
+            'unblock': unblock(),
         }
 
 
@@ -129,6 +141,7 @@ def get_service(name: str) -> Any:
         'backup': backup,
         'vpn': vpn,
         'key': key,
+        'unblock': unblock,
     }
     if name not in services:
         raise ValueError(f"Unknown service: {name}")

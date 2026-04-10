@@ -360,6 +360,25 @@ def _download_all_files_fallback(progress) -> tuple:
 
 def run_update_scripts(progress, start_step: int) -> bool:
     """Phase 1: Apply configs without restarting services (to avoid DNS disruption)."""
+    
+    # Попробовать Python UnblockManager сначала
+    try:
+        from core.service_locator import ServiceLocator
+        unblock_mgr = ServiceLocator.unblock()
+        
+        progress.update_progress("Обновление bypass (Python)", progress=start_step, total=start_step + 3)
+        ok, msg = unblock_mgr.update_all(timeout=SCRIPT_EXECUTION_TIMEOUT)
+        
+        if ok:
+            logger.info(f"[UPDATE] Python unblock completed: {msg}")
+            progress.update_progress("✅ Python bypass обновлён", progress=start_step + 1, total=start_step + 3)
+            return True
+        else:
+            logger.warning(f"[UPDATE] Python unblock failed, falling back to shell: {msg}")
+    except Exception as e:
+        logger.warning(f"[UPDATE] Python unblock error, falling back to shell: {e}")
+    
+    # Fallback: использовать shell скрипты
     scripts = [
         ('Запуск unblock_update.sh', [SCRIPT_UNBLOCK_UPDATE], SCRIPT_EXECUTION_TIMEOUT),
         ('Запуск unblock_dnsmasq.sh', [SCRIPT_UNBLOCK_DNSMASQ], SCRIPT_EXECUTION_TIMEOUT),
