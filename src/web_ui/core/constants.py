@@ -1,7 +1,18 @@
 """
 Constants — centralized configuration and paths.
 
-Only constants that are actually imported somewhere are kept here.
+Used by:
+- routes_updates.py: FILES_TO_UPDATE, UPDATE_BACKUP_FILES, GITHUB_*, WEB_UI_DIR
+- routes_bypass.py: UNBLOCK_DIR, DNSMASQ_BYPASS_CONF, MAX_ENTRIES_PER_REQUEST
+- routes_system.py: SERVICE_TOGGLE_CONFIG, INIT_SCRIPTS, DNSMASQ_CONFIG
+- routes_vpn.py: SERVICES, CONFIG_PATHS, INIT_SCRIPTS
+- core/vpn_manager.py: SERVICE_TOGGLE_CONFIG, INIT_SCRIPTS, PROC_NAME_MAP
+- core/services.py: DNSMASQ_AI_CONFIG, AI_DOMAINS_LIST, VPN_DNS_*, MAX_*, INIT_SCRIPTS
+- core/dns_ops.py: DNS_CHECK_INTERVAL, DNS_TIMEOUT, DEFAULT_DNS_SERVERS
+- core/app_config.py: DEFAULT_WEB_*, DEFAULT_ROUTER_IP, DEFAULT_UNBLOCK_DIR, UNBLOCK_DIR
+- core/backup_manager.py: BACKUP_DIR, BACKUP_FILES, INIT_SCRIPTS
+- core/dnsmasq_manager.py: DNSMASQ_*, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT
+- core/ipset_ops.py: IPSET_MAX_BULK_ENTRIES
 """
 
 # =============================================================================
