@@ -28,8 +28,6 @@ from core.constants import (
     FILE_DOWNLOAD_TIMEOUT,
     FILES_TO_UPDATE,
     SCRIPT_INSTALL,
-    SCRIPT_UNBLOCK_UPDATE,
-    SCRIPT_UNBLOCK_DNSMASQ,
     INIT_DIR,
     UPDATE_BACKUP_FILES,
 )
@@ -391,42 +389,16 @@ def run_update_scripts(progress, start_step: int) -> bool:
             logger.info("=" * 60)
             return True
         else:
-            logger.warning(f"[UPDATE] Python unblock failed, falling back to shell: {msg}")
-            logger.warning("[UPDATE] Will try shell scripts...")
+            logger.error(f"[UPDATE] Python unblock failed: {msg}")
+            logger.error("[UPDATE] Update failed - no shell fallback (Phase 5)")
+            progress.update_progress(f"❌ Ошибка: {msg}", progress=start_step + 1, total=start_step + 3)
+            return False
     except Exception as e:
-        logger.error(f"[UPDATE] Python unblock exception, falling back to shell: {e}")
+        logger.error(f"[UPDATE] Python unblock exception: {e}")
         import traceback
         logger.error(traceback.format_exc())
-    
-    # Fallback: использовать shell скрипты
-    logger.info("[UPDATE] ===== RUNNING SHELL SCRIPTS (FALLBACK) =====")
-    scripts = [
-        ('Запуск unblock_update.sh', [SCRIPT_UNBLOCK_UPDATE], SCRIPT_EXECUTION_TIMEOUT),
-        ('Запуск unblock_dnsmasq.sh', [SCRIPT_UNBLOCK_DNSMASQ], SCRIPT_EXECUTION_TIMEOUT),
-        ('Генерация AI DNS config', ['sh', f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh'], SCRIPT_EXECUTION_TIMEOUT),
-    ]
-
-    for i, (msg, cmd, timeout) in enumerate(scripts):
-        logger.info(f"[UPDATE] Running: {msg} - {cmd}")
-        progress.update_progress(msg, file=os.path.basename(cmd[0]) if cmd else '', progress=start_step + i, total=start_step + len(scripts))
-        if not os.path.exists(cmd[0]):
-            logger.warning(f"[UPDATE] Script not found: {cmd[0]}, skipping")
-            continue
-        try:
-            result = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
-            logger.info(f"[UPDATE] Script exit code: {result.returncode}")
-            if result.returncode != 0:
-                logger.warning(f"[UPDATE] {msg} failed with code {result.returncode}")
-                if result.stderr:
-                    logger.warning(f"[UPDATE] stderr: {result.stderr[:200]}")
-            else:
-                logger.info(f"[UPDATE] {msg} completed successfully")
-        except (subprocess.TimeoutExpired, Exception) as e:
-            logger.warning(f"[UPDATE] {msg} error: {e}")
-    
-    logger.info("[UPDATE] ===== RUN_UPDATE_SCRIPTS COMPLETE (shell fallback) =====")
-    logger.info("=" * 60)
-    return True
+        progress.update_progress(f"❌ Исключение: {e}", progress=start_step + 1, total=start_step + 3)
+        return False
 
 
 def restart_services(progress, start_step: int) -> bool:

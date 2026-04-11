@@ -59,25 +59,23 @@ class UnblockManager:
         flush_ok, flush_msg = self._flush_ipsets()
         logger.info(f"[UNBLOCK] Flush result: {flush_ok} - {flush_msg}")
         
-        # Step 2: Update dnsmasq
-        logger.info("[UNBLOCK] Step 2: Updating dnsmasq (Python)...")
+        # Step 2: Update dnsmasq (Python only - Phase 5)
+        logger.info("[UNBLOCK] Step 2: Updating dnsmasq...")
         ok, msg = self._update_dnsmasq()
         logger.info(f"[UNBLOCK] dnsmasq update result: {ok} - {msg}")
         
         if not ok:
-            logger.warning("[UNBLOCK] Python dnsmasq failed, trying shell fallback...")
-            ok, msg = self._fallback_dnsmasq()
-            logger.info(f"[UNBLOCK] Shell dnsmasq fallback result: {ok} - {msg}")
+            logger.error("[UNBLOCK] dnsmasq update failed")
+            return False, f"dnsmasq failed: {msg}"
         
-        # Step 3: Update ipsets
-        logger.info("[UNBLOCK] Step 3: Updating ipsets (Python)...")
+        # Step 3: Update ipsets (Python only - Phase 5)
+        logger.info("[UNBLOCK] Step 3: Updating ipsets...")
         ok2, msg2 = self._update_ipsets()
         logger.info(f"[UNBLOCK] ipset update result: {ok2} - {msg2}")
         
         if not ok2:
-            logger.warning("[UNBLOCK] Python ipset failed, trying shell fallback...")
-            ok2, msg2 = self._fallback_ipset()
-            logger.info(f"[UNBLOCK] Shell ipset fallback result: {ok2} - {msg2}")
+            logger.error("[UNBLOCK] ipset update failed")
+            return False, f"ipset failed: {msg2}"
         
         # Логируем конечное состояние
         status_after = self.get_status()
@@ -270,74 +268,6 @@ class UnblockManager:
         msg = f"Flushed: {', '.join(flushed)}"
         logger.info(f"[UNBLOCK] Flush result: {msg}")
         return True, msg
-    
-    def _fallback_dnsmasq(self) -> Tuple[bool, str]:
-        """Fallback: вызвать shell скрипт для dnsmasq."""
-        logger.info("[UNBLOCK] ===== FALLBACK: Calling shell dnsmasq script =====")
-        script = UNBLOCK_SCRIPTS['dnsmasq']
-        
-        if not os.path.exists(script):
-            logger.error(f"[UNBLOCK] Shell script not found: {script}")
-            return False, f"Shell script not found: {script}"
-        
-        logger.info(f"[UNBLOCK] Executing: sh {script}")
-        try:
-            result = subprocess.run(
-                ['sh', script],
-                capture_output=True, text=True, timeout=120
-            )
-            logger.info(f"[UNBLOCK] Shell exit code: {result.returncode}")
-            if result.stdout:
-                logger.info(f"[UNBLOCK] Shell stdout: {result.stdout[:500]}")
-            if result.stderr:
-                logger.warning(f"[UNBLOCK] Shell stderr: {result.stderr[:500]}")
-            
-            if result.returncode == 0:
-                logger.info("[UNBLOCK] Shell dnsmasq script completed successfully")
-                return True, "Shell dnsmasq script completed"
-            else:
-                logger.error(f"[UNBLOCK] Shell failed with code {result.returncode}")
-                return False, result.stderr[:200]
-        except subprocess.TimeoutExpired:
-            logger.error("[UNBLOCK] Shell dnsmasq script timed out")
-            return False, "Timeout"
-        except Exception as e:
-            logger.error(f"[UNBLOCK] Exception running shell: {e}")
-            return False, str(e)
-    
-    def _fallback_ipset(self) -> Tuple[bool, str]:
-        """Fallback: вызвать shell скрипт для ipset."""
-        logger.info("[UNBLOCK] ===== FALLBACK: Calling shell ipset script =====")
-        script = UNBLOCK_SCRIPTS['ipset']
-        
-        if not os.path.exists(script):
-            logger.error(f"[UNBLOCK] Shell script not found: {script}")
-            return False, f"Shell script not found: {script}"
-        
-        logger.info(f"[UNBLOCK] Executing: sh {script}")
-        try:
-            result = subprocess.run(
-                ['sh', script],
-                capture_output=True, text=True, timeout=600
-            )
-            logger.info(f"[UNBLOCK] Shell exit code: {result.returncode}")
-            if result.stdout:
-                logger.info(f"[UNBLOCK] Shell stdout: {result.stdout[:500]}")
-            if result.stderr:
-                logger.warning(f"[UNBLOCK] Shell stderr: {result.stderr[:500]}")
-            
-            if result.returncode == 0:
-                logger.info("[UNBLOCK] Shell ipset script completed successfully")
-                return True, "Shell ipset script completed"
-            else:
-                logger.error(f"[UNBLOCK] Shell failed with code {result.returncode}")
-                return False, result.stderr[:200]
-        except subprocess.TimeoutExpired:
-            logger.error("[UNBLOCK] Shell ipset script timed out")
-            return False, "Timeout"
-        except Exception as e:
-            logger.error(f"[UNBLOCK] Exception running shell: {e}")
-            return False, str(e)
 
 
 _instance: Optional[UnblockManager] = None
