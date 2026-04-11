@@ -260,7 +260,7 @@ class VPNManager:
 
         # Check port listening with retry
         logger.info(f"[VPN]   Waiting for port {self.port} to be listening...")
-        if not self._wait_for_port(self.port, attempts=5, interval=1):
+        if not self._wait_for_port(self.port, attempts=10, interval=1):
             logger.error(
                 f"[VPN]   Port {self.port} not listening after retries, "
                 f"skipping iptables rules for {self.service_name}"
