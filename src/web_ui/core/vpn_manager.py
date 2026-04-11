@@ -259,8 +259,9 @@ class VPNManager:
                 logger.debug(f"[VPN]   ipset create error (may already exist): {e}")
 
         # Check port listening with retry
-        logger.info(f"[VPN]   Waiting for port {self.port} to be listening...")
-        if not self._wait_for_port(self.port, attempts=10, interval=1):
+        # Xray на MIPS-роутере может запускаться медленно — даём 20 секунд
+        logger.info(f"[VPN]   Waiting for port {self.port} to be listening (up to 20s)...")
+        if not self._wait_for_port(self.port, attempts=20, interval=1):
             logger.error(
                 f"[VPN]   Port {self.port} not listening after retries, "
                 f"skipping iptables rules for {self.service_name}"
