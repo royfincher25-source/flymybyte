@@ -10,13 +10,8 @@ import time
 import re
 from typing import Tuple, Optional
 
-from .constants import (
-    SERVICE_TOGGLE_CONFIG,
-    INIT_SCRIPTS,
-    CONFIG_PATHS,
-    SERVICES,
-    PROC_NAME_MAP,
-)
+from .constants import SERVICE_TOGGLE_CONFIG, PROC_NAME_MAP
+from .app_config import INIT_SCRIPTS, CONFIG_PATHS, SERVICES
 from .config import TIMEOUT_SERVICE_RESTART
 from .services import restart_service, check_service_status, refresh_ipset_from_file
 from .utils import Cache

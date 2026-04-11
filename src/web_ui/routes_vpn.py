@@ -11,7 +11,7 @@ from core.decorators import login_required, csrf_required
 
 logger = logging.getLogger(__name__)
 
-from core.constants import SERVICES, CONFIG_PATHS, INIT_SCRIPTS
+from core.app_config import SERVICES, CONFIG_PATHS, INIT_SCRIPTS
 from core.vpn_manager import VPNManager
 from core.key_manager import KeyManager
 

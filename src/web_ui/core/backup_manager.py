@@ -12,7 +12,8 @@ import time
 from datetime import datetime
 from typing import List, Dict, Tuple, Optional
 
-from .constants import BACKUP_DIR, BACKUP_FILES, INIT_SCRIPTS
+from .constants import BACKUP_DIR, BACKUP_FILES
+from .app_config import INIT_SCRIPTS
 from .config import TIMEOUT_BACKUP_RESTART
 from .exceptions import BackupError
 
