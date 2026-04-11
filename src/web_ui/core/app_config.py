@@ -2,6 +2,7 @@
 FlyMyByte Web Interface - Application Configuration
 
 Singleton WebConfig class for managing application settings.
+Includes SERVICES, INIT_SCRIPTS, CONFIG_PATHS moved from constants.py
 """
 import os
 import re
@@ -17,6 +18,13 @@ from .constants import (
     DEFAULT_UNBLOCK_DIR,
     MIN_PORT,
     MAX_PORT,
+    INIT_DIR,
+    XRAY_DIR,
+    TROJAN_CONFIG_DIR,
+    SHADOWSOCKS_CONFIG,
+    WEB_UI_DIR,
+    DNSMASQ_CONFIG,
+    CRONTAB_FILE,
 )
 
 WEB_ROOT = Path(__file__).parent.parent
@@ -132,3 +140,45 @@ class WebConfig:
             return True
         pattern = r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$'
         return bool(re.match(pattern, host))
+
+
+SERVICES = {
+    'vless': {
+        'name': 'VLESS',
+        'init': f'{INIT_DIR}/S24xray',
+        'config': f'{XRAY_DIR}/vless.json',
+    },
+    'proxy': {
+        'name': 'Прокси',
+        'init': f'{INIT_DIR}/S22proxy',
+        'config': '/opt/etc/proxy.json',
+    },
+    'shadowsocks': {
+        'name': 'Shadowsocks',
+        'init': f'{INIT_DIR}/S22shadowsocks',
+        'config': SHADOWSOCKS_CONFIG,
+    },
+    'trojan': {
+        'name': 'Trojan',
+        'init': f'{INIT_DIR}/S22trojan',
+        'config': f'{INIT_DIR}/trojan.json',
+    },
+}
+
+INIT_SCRIPTS = {
+    'vless': SERVICES['vless']['init'],
+    'proxy': SERVICES['proxy']['init'],
+    'shadowsocks': SERVICES['shadowsocks']['init'],
+    'trojan': SERVICES['trojan']['init'],
+    'unblock': f'{INIT_DIR}/S99unblock',
+    'dnsmasq': f'{INIT_DIR}/S56dnsmasq',
+    'web_ui': f'{INIT_DIR}/S99web_ui',
+}
+
+CONFIG_PATHS = {
+    'vless': SERVICES['vless']['config'],
+    'proxy': SERVICES['proxy']['config'],
+    'shadowsocks': SERVICES['shadowsocks']['config'],
+    'trojan': SERVICES['trojan']['config'],
+    'dnsmasq': DNSMASQ_CONFIG,
+}
