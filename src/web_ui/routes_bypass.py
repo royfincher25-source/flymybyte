@@ -46,6 +46,7 @@ from core.services import (
     get_dns_spoofing_status, get_catalog, download_list,
 )
 from core.services import refresh_ipset_from_file
+from core.handlers import redirect_with_message
 
 
 bp = Blueprint('bypass', __name__, template_folder='templates', static_folder='static')
@@ -221,8 +222,7 @@ def view_bypass(filename: str):
     try:
         filepath = _safe_path(config.unblock_dir, filename)
     except ValueError as e:
-        flash(str(e), 'danger')
-        return redirect(url_for('bypass.bypass'))
+        return redirect_with_message(str(e), 'danger', 'bypass.bypass')
     filename = os.path.splitext(os.path.basename(filepath))[0]
     entries = load_bypass_list(filepath)
     return render_template('bypass_view.html', filename=filename, entries=entries, filepath=filepath)
@@ -235,24 +235,20 @@ def add_to_bypass(filename: str):
     config = WebConfig()
     filename = secure_filename(filename)
     if not filename:
-        flash('Неверное имя файла', 'danger')
-        return redirect(url_for('bypass.bypass'))
+        return redirect_with_message('Неверное имя файла', 'danger', 'bypass.bypass')
     filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
     logger.info(f"[ROUTES] /bypass/{filename}/add - filepath={filepath}")
     if request.method == 'POST':
         entries_text = request.form.get('entries', '')
         if len(entries_text) > MAX_TOTAL_INPUT_SIZE:
-            flash(f'Превышен лимит размера ввода (макс. {MAX_TOTAL_INPUT_SIZE // 1024}KB)', 'danger')
-            return redirect(url_for('bypass.bypass'))
+            return redirect_with_message(f'Превышен лимит ({MAX_TOTAL_INPUT_SIZE // 1024}KB)', 'danger', 'bypass.bypass')
         new_entries = [e.strip() for e in entries_text.split('\n') if e.strip()]
         logger.info(f"[ROUTES] Adding {len(new_entries)} entries to {filepath}")
         if len(new_entries) > MAX_ENTRIES_PER_REQUEST:
-            flash(f'Превышено количество записей (макс. {MAX_ENTRIES_PER_REQUEST})', 'danger')
-            return redirect(url_for('bypass.bypass'))
+            return redirect_with_message(f'Превышено записей ({MAX_ENTRIES_PER_REQUEST})', 'danger', 'bypass.bypass')
         for entry in new_entries:
             if len(entry) > MAX_ENTRY_LENGTH:
-                flash(f'Запись слишком длинная (макс. {MAX_ENTRY_LENGTH} симв.): {escape(entry[:50])}...', 'danger')
-                return redirect(url_for('bypass.bypass'))
+                return redirect_with_message(f'Запись слишком длинная ({MAX_ENTRY_LENGTH})', 'danger', 'bypass.bypass')
         current_list = load_bypass_list(filepath)
         added_count = 0
         invalid_entries = []
