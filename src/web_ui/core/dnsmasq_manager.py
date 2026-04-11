@@ -197,6 +197,7 @@ class DnsmasqManager:
         Исправляет:
         - ipset=/onion/unblocktor (удалён в v2.7.0)
         - server=/onion/... (Tor удалён)
+        - server=127.0.0.1#40500 (VPN DNS — ломает интернет если VPN не работает)
         """
         config_path = DNSMASQ_CONFIG
         if not os.path.exists(config_path):
@@ -212,6 +213,7 @@ class DnsmasqManager:
                 'ipset=/onion/unblock4-tor',
                 'ipset=/onion/unblock6-tor',
                 'conf-file=/opt/etc/unblock-tor.dnsmasq',
+                'server=127.0.0.1#40500',  # FIX: VPN DNS который ломает интернет
             ]
 
             cleaned = []

@@ -337,21 +337,25 @@ def service_restart_all():
                 logger.warning(f"[ROUTES] {name}: init script not found at {init_script}")
                 continue
             logger.info(f"[ROUTES] Restarting {name} via {init_script}")
-            result = subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=180)
+            # FIX: Уменьшен timeout до 30 сек — если сервис не перезапускается, не блокируем
+            result = subprocess.run(['sh', init_script, 'restart'], capture_output=True, text=True, timeout=30)
             status = '✅' if result.returncode == 0 else '❌'
             results.append(f"{status} {name}")
             logger.info(f"[ROUTES] {name}: {'OK' if result.returncode == 0 else 'FAILED'} (code={result.returncode})")
+        except subprocess.TimeoutExpired:
+            results.append(f"⏱️ {name} (таймаут)")
+            logger.error(f"[ROUTES] {name}: restart timed out after 30s")
         except Exception as e:
             results.append(f"❌ {name}: {str(e)}")
             logger.error(f"[ROUTES] service_restart_all Exception for {name}: {e}")
     flash('Перезапуск сервисов: ' + ', '.join(results), 'success')
-    
+
     # FIX: После перезапуска VPN сервисов нужно обновить ipsets
     try:
         logger.info("[ROUTES] Updating ipsets after VPN restart...")
         result = subprocess.run(
             ['sh', INIT_SCRIPTS['unblock'], 'start'],
-            capture_output=True, text=True, timeout=120
+            capture_output=True, text=True, timeout=60
         )
         if result.returncode == 0:
             results.append('✅ ipset обновлён')
@@ -360,7 +364,7 @@ def service_restart_all():
             logger.warning(f"[ROUTES] ipset update failed: {result.stderr}")
     except Exception as e:
         logger.warning(f"[ROUTES] ipset update error: {e}")
-    
+
     return redirect(url_for('system.service'))
 
 

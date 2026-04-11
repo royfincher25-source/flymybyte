@@ -3,9 +3,11 @@ FlyMyByte Web Interface - VPN Routes
 
 Blueprint for VPN key management: /keys/*
 Refactored to use VPNManager and KeyManager.
+DETAILED LOGGING added for debugging (2026-04-11).
 """
 import logging
 import os
+import time
 from flask import Blueprint, render_template, redirect, url_for, request, flash
 from core.decorators import login_required, csrf_required
 
@@ -22,13 +24,14 @@ bp = Blueprint('vpn', __name__, template_folder='templates', static_folder='stat
 
 def shutdown_executor():
     """Placeholder for VPN executor shutdown."""
-    logger.info("VPN executor shutdown requested")
+    logger.info("[VPN] VPN executor shutdown requested")
 
 
 @bp.route('/keys')
 @login_required
 def keys():
     """Show all VPN services with their status."""
+    logger.info("[VPN] >>> GET /keys - rendering services page")
     services = {}
     for svc_id, svc_info in SERVICES.items():
         mgr = VPNManager(svc_id)
@@ -39,6 +42,8 @@ def keys():
             'status': mgr.get_status(),
             'config_exists': mgr.is_configured(),
         }
+        logger.debug(f"[VPN]   {svc_id}: status={services[svc_id]['status']}")
+    logger.info("[VPN] <<< GET /keys - done")
     return render_template('keys.html', services=services)
 
 
@@ -79,18 +84,21 @@ def key_config(service: str):
 @csrf_required
 def key_toggle(service: str):
     """Toggle service on/off."""
+    logger.info(f"[VPN] >>> POST /keys/{service}/toggle - called from {request.remote_addr}")
     if service not in SERVICES:
+        logger.warning(f"[VPN] <<< TOGGLE {service}: invalid service")
         return redirect_with_message('Invalid service', 'danger', 'vpn.keys')
-    
+
     mgr = VPNManager(service)
-    
-    if not mgr.is_configured():
-        return redirect_with_message(f'Configure key first for {mgr.name}', 'warning', 'vpn.key_config', service=service)
-    
+    logger.info(f"[VPN]   Calling mgr.toggle() for {service}...")
+    t0 = time.time()
     success, msg = mgr.toggle()
-    
+    elapsed = time.time() - t0
+    logger.info(f"[VPN]   toggle() returned: success={success}, msg='{msg}', elapsed={elapsed:.1f}s")
+
     msg_prefix = '✅' if success else '❌'
     category = 'success' if success else 'danger'
+    logger.info(f"[VPN] <<< TOGGLE {service}: {msg_prefix} {msg}")
     return redirect_with_message(f'{msg_prefix} {msg}', category, 'vpn.keys')
 
 
@@ -99,12 +107,19 @@ def key_toggle(service: str):
 @csrf_required
 def key_disable(service: str):
     """Disable (stop) a VPN service."""
+    logger.info(f"[VPN] >>> POST /keys/{service}/disable - called from {request.remote_addr}")
     if service not in SERVICES:
+        logger.warning(f"[VPN] <<< DISABLE {service}: invalid service")
         return redirect_with_message('Invalid service', 'danger', 'vpn.keys')
-    
+
     mgr = VPNManager(service)
+    logger.info(f"[VPN]   Calling mgr.stop() for {service}...")
+    t0 = time.time()
     success, msg = mgr.stop()
-    
+    elapsed = time.time() - t0
+    logger.info(f"[VPN]   stop() returned: success={success}, msg='{msg}', elapsed={elapsed:.1f}s")
+
     msg_prefix = '✅' if success else '⚠️'
     category = 'success' if success else 'warning'
+    logger.info(f"[VPN] <<< DISABLE {service}: {msg_prefix} {msg}")
     return redirect_with_message(f'{msg_prefix} {msg}', category, 'vpn.keys')
