@@ -2,7 +2,7 @@
 FlyMyByte — Unified Unblock Manager
 
 Единый интерфейс для управления bypass (dnsmasq + ipset).
-Гибридный режим: Python с shell fallback.
+Python-only режим (Phase 5).
 
 Usage:
     from core.unblock_manager import get_unblock_manager
@@ -24,11 +24,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_THREAD_COUNT = 4
 IPSET_NAMES = ['unblocksh', 'unblockvless', 'unblocktroj']
-UNBLOCK_SCRIPTS = {
-    'dnsmasq': '/opt/bin/unblock_dnsmasq.sh',
-    'ipset': '/opt/bin/unblock_ipset.sh',
-    'update': '/opt/bin/unblock_update.sh',
-}
 
 
 class UnblockManager:
