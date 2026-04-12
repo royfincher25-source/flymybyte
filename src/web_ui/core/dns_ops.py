@@ -461,8 +461,8 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ips
     # IPv6 CIDR not supported by Keenetic, skip it
     cidrs = [e for e in entries if is_cidr(e)]
     cidr_entries = [c for c in cidrs if not c.startswith('2001:') and not c.startswith('fe80:')]
-    # Keep domains only (IPs/CIDR will be resolved by DNS)
-    domains = [e for e in entries if not is_ip_address(e)]
+    # Keep domains only (IPs/CIDR added directly without resolving)
+    domains = [e for e in entries if not is_ip_address(e) and not is_cidr(e)]
 
     # Auto-detect ipset name once at the beginning
     if ipset_name is None:
@@ -479,6 +479,7 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ips
         logger.info(f"No domains to resolve in {filepath}")
         return 0
 
+    MAX_RESOLVED_IPS = 1000  # Limit to prevent CPU overload
     BATCH_SIZE = 500
     total_ips_added = 0
 
@@ -489,6 +490,16 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ips
         batch_ips = set()
         for domain, ips in resolved.items():
             batch_ips.update(ips)
+
+        # Limit resolved IPs to prevent overload
+        if total_ips_added + len(batch_ips) > MAX_RESOLVED_IPS:
+            allowed = MAX_RESOLVED_IPS - total_ips_added
+            if allowed > 0:
+                batch_ips = set(list(batch_ips)[:allowed])
+                logger.warning(f"IP limit reached ({MAX_RESOLVED_IPS}), truncating batch to {allowed}")
+            else:
+                logger.warning(f"IP limit reached ({MAX_RESOLVED_IPS}), skipping remaining domains")
+                break
 
         if batch_ips:
             ensure_ipset_exists(ipset_name)

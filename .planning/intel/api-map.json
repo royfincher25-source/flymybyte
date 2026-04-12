@@ -1,0 +1,308 @@
+{
+  "_meta": {
+    "updated_at": "2026-04-12T18:35:36.596Z",
+    "version": 3
+  },
+  "entries": {
+    "GET /": {
+      "method": "GET",
+      "path": "/",
+      "file": "src/web_ui/routes_core.py",
+      "description": "Main index page"
+    },
+    "GET /login": {
+      "method": "GET",
+      "path": "/login",
+      "file": "src/web_ui/routes_core.py",
+      "description": "Login page"
+    },
+    "POST /login": {
+      "method": "POST",
+      "path": "/login",
+      "file": "src/web_ui/routes_core.py",
+      "description": "Login form submission"
+    },
+    "GET /logout": {
+      "method": "GET",
+      "path": "/logout",
+      "file": "src/web_ui/routes_core.py",
+      "description": "Logout action"
+    },
+    "GET /status": {
+      "method": "GET",
+      "path": "/status",
+      "file": "src/web_ui/routes_core.py",
+      "description": "Status page"
+    },
+    "GET /keys": {
+      "method": "GET",
+      "path": "/keys",
+      "file": "src/web_ui/routes_vpn.py",
+      "description": "List all VPN services"
+    },
+    "GET /keys/<service>": {
+      "method": "GET",
+      "path": "/keys/<service>",
+      "file": "src/web_ui/routes_vpn.py",
+      "description": "Configure VPN key for service"
+    },
+    "POST /keys/<service>": {
+      "method": "POST",
+      "path": "/keys/<service>",
+      "file": "src/web_ui/routes_vpn.py",
+      "description": "Save VPN key for service"
+    },
+    "POST /keys/<service>/toggle": {
+      "method": "POST",
+      "path": "/keys/<service>/toggle",
+      "file": "src/web_ui/routes_vpn.py",
+      "description": "Toggle service on/off"
+    },
+    "POST /keys/<service>/disable": {
+      "method": "POST",
+      "path": "/keys/<service>/disable",
+      "file": "src/web_ui/routes_vpn.py",
+      "description": "Disable VPN service"
+    },
+    "GET /bypass": {
+      "method": "GET",
+      "path": "/bypass",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Bypass lists management"
+    },
+    "GET /bypass/view/": {
+      "method": "GET",
+      "path": "/bypass/view/",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "View bypass list entries"
+    },
+    "POST /bypass//add": {
+      "method": "POST",
+      "path": "/bypass//add",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Add entries to bypass list"
+    },
+    "POST /bypass//remove": {
+      "method": "POST",
+      "path": "/bypass//remove",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Remove entries from bypass list"
+    },
+    "POST /bypass//refresh": {
+      "method": "POST",
+      "path": "/bypass//refresh",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Refresh ipset from bypass file"
+    },
+    "GET /bypass/catalog": {
+      "method": "GET",
+      "path": "/bypass/catalog",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Bypass catalog list"
+    },
+    "POST /bypass/catalog/<name>": {
+      "method": "POST",
+      "path": "/bypass/catalog/<name>",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Download list from catalog"
+    },
+    "GET /dns-spoofing": {
+      "method": "GET",
+      "path": "/dns-spoofing",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "DNS AI bypass page"
+    },
+    "GET /dns-spoofing/status": {
+      "method": "GET",
+      "path": "/dns-spoofing/status",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "DNS spoofing status"
+    },
+    "POST /dns-spoofing/apply": {
+      "method": "POST",
+      "path": "/dns-spoofing/apply",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Apply DNS AI bypass"
+    },
+    "POST /dns-spoofing/disable": {
+      "method": "POST",
+      "path": "/dns-spoofing/disable",
+      "file": "src/web_ui/routes_bypass.py",
+      "description": "Disable DNS AI bypass"
+    },
+    "GET /stats": {
+      "method": "GET",
+      "path": "/stats",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Statistics dashboard"
+    },
+    "GET /service": {
+      "method": "GET",
+      "path": "/service",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Service management page"
+    },
+    "POST /service/restart-unblock": {
+      "method": "POST",
+      "path": "/service/restart-unblock",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Restart unblock service"
+    },
+    "POST /service/restart-unblock-async": {
+      "method": "POST",
+      "path": "/service/restart-unblock-async",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Async restart unblock"
+    },
+    "GET /service/restart-unblock-status": {
+      "method": "GET",
+      "path": "/service/restart-unblock-status",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Check async restart status"
+    },
+    "POST /service/restart-router": {
+      "method": "POST",
+      "path": "/service/restart-router",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Reboot router"
+    },
+    "POST /service/restart-all": {
+      "method": "POST",
+      "path": "/service/restart-all",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Restart all VPN services"
+    },
+    "POST /service/restart-webui": {
+      "method": "POST",
+      "path": "/service/restart-webui",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Restart web UI"
+    },
+    "POST /service/restore-dns": {
+      "method": "POST",
+      "path": "/service/restore-dns",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Restore DNS configuration"
+    },
+    "POST /service/dns-override/<action>": {
+      "method": "POST",
+      "path": "/service/dns-override/<action>",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Enable/disable DNS override"
+    },
+    "GET /service/backup": {
+      "method": "GET",
+      "path": "/service/backup",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Backup management page"
+    },
+    "POST /service/backup": {
+      "method": "POST",
+      "path": "/service/backup",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Create/restore/delete backup"
+    },
+    "GET /api/restore/status": {
+      "method": "GET",
+      "path": "/api/restore/status",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Get async restore status"
+    },
+    "POST /service/emergency-restore": {
+      "method": "POST",
+      "path": "/service/emergency-restore",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Emergency restore"
+    },
+    "GET /service/dns-monitor": {
+      "method": "GET",
+      "path": "/service/dns-monitor",
+      "file": "src/web_ui/routes_system.py",
+      "description": "DNS monitor status page"
+    },
+    "POST /service/dns-monitor/start": {
+      "method": "POST",
+      "path": "/service/dns-monitor/start",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Start DNS monitor"
+    },
+    "POST /service/dns-monitor/stop": {
+      "method": "POST",
+      "path": "/service/dns-monitor/stop",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Stop DNS monitor"
+    },
+    "GET /api/system/stats": {
+      "method": "GET",
+      "path": "/api/system/stats",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Get system stats"
+    },
+    "POST /api/system/memory-manager/<action>": {
+      "method": "POST",
+      "path": "/api/system/memory-manager/<action>",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Memory manager actions"
+    },
+    "POST /api/system/optimize": {
+      "method": "POST",
+      "path": "/api/system/optimize",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Manual optimization"
+    },
+    "GET /logs": {
+      "method": "GET",
+      "path": "/logs",
+      "file": "src/web_ui/routes_system.py",
+      "description": "View logs"
+    },
+    "POST /logs/clear": {
+      "method": "POST",
+      "path": "/logs/clear",
+      "file": "src/web_ui/routes_system.py",
+      "description": "Clear logs"
+    },
+    "GET /service/updates": {
+      "method": "GET",
+      "path": "/service/updates",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Updates page"
+    },
+    "POST /service/updates/run": {
+      "method": "POST",
+      "path": "/service/updates/run",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Run update process"
+    },
+    "GET /api/update/progress": {
+      "method": "GET",
+      "path": "/api/update/progress",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Get update progress"
+    },
+    "GET /install": {
+      "method": "GET",
+      "path": "/install",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Install page"
+    },
+    "POST /install": {
+      "method": "POST",
+      "path": "/install",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Install flymybyte"
+    },
+    "GET /remove": {
+      "method": "GET",
+      "path": "/remove",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Remove page"
+    },
+    "POST /remove": {
+      "method": "POST",
+      "path": "/remove",
+      "file": "src/web_ui/routes_updates.py",
+      "description": "Remove flymybyte"
+    }
+  }
+}

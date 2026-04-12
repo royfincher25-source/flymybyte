@@ -1,0 +1,325 @@
+{
+  "_meta": {
+    "updated_at": "2026-04-12T18:35:27.903Z",
+    "version": 3
+  },
+  "entries": {
+    "src/web_ui/app.py": {
+      "exports": [
+        "create_app"
+      ],
+      "imports": [
+        "flask",
+        "core.utils",
+        "routes_core",
+        "routes_system",
+        "routes_vpn",
+        "routes_bypass",
+        "routes_updates",
+        "core.services",
+        "core.dns_ops",
+        "core.dnsmasq_manager"
+      ],
+      "type": "entry-point"
+    },
+    "src/web_ui/routes_core.py": {
+      "exports": [
+        "bp",
+        "login_required"
+      ],
+      "imports": [
+        "flask",
+        "core.decorators"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/routes_vpn.py": {
+      "exports": [
+        "bp",
+        "shutdown_executor"
+      ],
+      "imports": [
+        "flask",
+        "core.decorators",
+        "core.app_config",
+        "core.vpn_manager",
+        "core.key_manager",
+        "core.handlers"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/routes_bypass.py": {
+      "exports": [
+        "bp"
+      ],
+      "imports": [
+        "flask",
+        "markupsafe",
+        "werkzeug",
+        "core.decorators",
+        "core.constants",
+        "core.utils",
+        "core.app_config",
+        "core.dnsmasq_manager",
+        "core.services",
+        "core.handlers"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/routes_system.py": {
+      "exports": [
+        "bp",
+        "schedule_webui_restart"
+      ],
+      "imports": [
+        "flask",
+        "core.decorators",
+        "core.constants",
+        "core.app_config",
+        "core.services",
+        "core.backup_manager",
+        "core.dns_ops",
+        "core.emergency_restore",
+        "core.iptables_manager"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/routes_updates.py": {
+      "exports": [
+        "bp"
+      ],
+      "imports": [
+        "flask",
+        "requests",
+        "concurrent.futures",
+        "core.decorators",
+        "core.constants",
+        "core.services",
+        "core.update_progress",
+        "core.service_locator"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/__init__.py": {
+      "exports": [
+        "WebConfig",
+        "Cache",
+        "MemoryManager",
+        "DNSMonitor",
+        "DNSSpoofing",
+        "get_local_version",
+        "get_remote_version"
+      ],
+      "imports": [
+        "core.app_config",
+        "core.utils",
+        "core.services",
+        "core.dns_ops"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/services.py": {
+      "exports": [
+        "refresh_ipset_from_file",
+        "write_json_config",
+        "get_local_version",
+        "get_remote_version",
+        "get_catalog",
+        "download_list",
+        "check_service_status",
+        "restart_service"
+      ],
+      "imports": [
+        "core.parsers",
+        "core.service_ops",
+        "core.ipset_ops",
+        "core.dns_ops",
+        "core.app_config"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/constants.py": {
+      "exports": [],
+      "type": "config"
+    },
+    "src/web_ui/core/app_config.py": {
+      "exports": [
+        "WebConfig",
+        "SERVICES",
+        "CONFIG_PATHS",
+        "INIT_SCRIPTS"
+      ],
+      "imports": [
+        "core.constants"
+      ],
+      "type": "config"
+    },
+    "src/web_ui/core/utils.py": {
+      "exports": [
+        "Cache",
+        "MemoryManager",
+        "setup_logging",
+        "load_bypass_list",
+        "save_bypass_list",
+        "validate_bypass_entry",
+        "is_ip_address",
+        "run_unblock_update",
+        "get_memory_stats",
+        "get_cpu_stats"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/web_ui/core/parsers.py": {
+      "exports": [
+        "parse_vless_key",
+        "parse_shadowsocks_key",
+        "parse_trojan_key",
+        "parse_proxy_key",
+        "vless_config",
+        "shadowsocks_config",
+        "trojan_config",
+        "proxy_config"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/web_ui/core/service_ops.py": {
+      "exports": [
+        "restart_service",
+        "check_service_status"
+      ],
+      "imports": [
+        "subprocess"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/ipset_ops.py": {
+      "exports": [
+        "bulk_add_to_ipset",
+        "bulk_remove_from_ipset",
+        "ensure_ipset_exists"
+      ],
+      "imports": [
+        "subprocess",
+        "concurrent.futures"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/dns_ops.py": {
+      "exports": [
+        "DNSMonitor",
+        "check_dns_server",
+        "get_dns_monitor",
+        "resolve_domains_for_ipset"
+      ],
+      "imports": [
+        "subprocess",
+        "threading"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/vpn_manager.py": {
+      "exports": [
+        "VPNManager"
+      ],
+      "imports": [
+        "core.app_config",
+        "core.parsers",
+        "core.service_ops",
+        "core.iptables_manager"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/key_manager.py": {
+      "exports": [
+        "KeyManager"
+      ],
+      "imports": [
+        "core.parsers",
+        "core.service_ops"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/dnsmasq_manager.py": {
+      "exports": [
+        "DnsmasqManager",
+        "get_dnsmasq_manager"
+      ],
+      "imports": [
+        "core.constants",
+        "core.dns_ops"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/iptables_manager.py": {
+      "exports": [
+        "get_iptables_manager",
+        "IptablesManager"
+      ],
+      "imports": [
+        "subprocess"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/backup_manager.py": {
+      "exports": [
+        "get_backup_manager",
+        "BackupManager"
+      ],
+      "imports": [
+        "tarfile",
+        "shutil",
+        "subprocess"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/emergency_restore.py": {
+      "exports": [
+        "emergency_restore"
+      ],
+      "imports": [
+        "subprocess",
+        "core.iptables_manager",
+        "core.dnsmasq_manager"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/decorators.py": {
+      "exports": [
+        "login_required",
+        "csrf_required",
+        "validate_csrf_token",
+        "get_csrf_token"
+      ],
+      "imports": [
+        "flask"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/update_progress.py": {
+      "exports": [
+        "get_progress_instance",
+        "UpdateProgress"
+      ],
+      "imports": [],
+      "type": "module"
+    },
+    "src/web_ui/core/handlers.py": {
+      "exports": [
+        "redirect_with_message"
+      ],
+      "imports": [
+        "flask"
+      ],
+      "type": "module"
+    },
+    "src/web_ui/core/service_locator.py": {
+      "exports": [
+        "ServiceLocator"
+      ],
+      "imports": [],
+      "type": "module"
+    }
+  }
+}

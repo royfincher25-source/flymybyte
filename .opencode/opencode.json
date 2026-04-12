@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "read": {
+      "H:/disk_e/dell/FlyMyByte/.opencode/get-shit-done/*": "allow"
+    },
+    "external_directory": {
+      "H:/disk_e/dell/FlyMyByte/.opencode/get-shit-done/*": "allow"
+    }
+  }
+}

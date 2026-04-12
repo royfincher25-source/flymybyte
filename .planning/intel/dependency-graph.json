@@ -1,0 +1,62 @@
+{
+  "_meta": {
+    "updated_at": "2026-04-12T18:35:32.604Z",
+    "version": 2
+  },
+  "entries": {
+    "Flask": {
+      "version": "3.0.0",
+      "type": "production",
+      "used_by": [
+        "src/web_ui/app.py",
+        "src/web_ui/routes_core.py",
+        "src/web_ui/routes_vpn.py",
+        "src/web_ui/routes_bypass.py",
+        "src/web_ui/routes_system.py",
+        "src/web_ui/routes_updates.py"
+      ],
+      "invocation": "require"
+    },
+    "Jinja2": {
+      "version": "3.1.2",
+      "type": "production",
+      "used_by": [
+        "src/web_ui/app.py"
+      ],
+      "invocation": "require"
+    },
+    "Werkzeug": {
+      "version": "3.0.0",
+      "type": "production",
+      "used_by": [
+        "src/web_ui/app.py"
+      ],
+      "invocation": "require"
+    },
+    "requests": {
+      "version": ">=2.31.0",
+      "type": "production",
+      "used_by": [
+        "src/web_ui/routes_updates.py",
+        "src/web_ui/core/services.py"
+      ],
+      "invocation": "require"
+    },
+    "waitress": {
+      "version": "2.1.2",
+      "type": "production",
+      "used_by": [
+        "src/web_ui/app.py"
+      ],
+      "invocation": "require"
+    },
+    "markupsafe": {
+      "version": "implicit",
+      "type": "production",
+      "used_by": [
+        "src/web_ui/routes_bypass.py"
+      ],
+      "invocation": "require"
+    }
+  }
+}
