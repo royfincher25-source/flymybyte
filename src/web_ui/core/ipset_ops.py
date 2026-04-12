@@ -75,13 +75,17 @@ def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
 
     cmd_text = "\n".join(commands)
     try:
-        # FIX: Flush set before restore to avoid "already added" errors
-        subprocess.run(
-            ['ipset', 'flush', setname],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
+        # FIX: Flush set before restore only if adding domains (not CIDR)
+        # CIDR entries are added first, then flush would clear them!
+        # Only flush if this looks like domain-resolved entries (single IPs, not CIDR)
+        should_flush = any('/' not in cmd for cmd in commands)
+        if should_flush:
+            subprocess.run(
+                ['ipset', 'flush', setname],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
 
         result = subprocess.run(
             ['ipset', 'restore', '-exist'],

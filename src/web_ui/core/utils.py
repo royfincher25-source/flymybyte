@@ -145,7 +145,8 @@ class Cache:
 # =============================================================================
 
 def validate_bypass_entry(entry: str) -> bool:
-    """Validate bypass list entry (domain, IP, or comment)."""
+    """Validate bypass list entry (domain, IP, CIDR, or comment)."""
+    import re
     entry = entry.strip()
     if not entry:
         return False
@@ -153,6 +154,11 @@ def validate_bypass_entry(entry: str) -> bool:
         return True
     if len(entry) > 253:
         return False
+    
+    # Check for CIDR notation ( IPv4 or IPv6 )
+    if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry) or re.match(r'^[a-fA-F0-9:]+/\d+$', entry):
+        return True
+    
     parts = entry.split('.')
     if len(parts) == 4:
         try:
@@ -167,8 +173,16 @@ def validate_bypass_entry(entry: str) -> bool:
 
 
 def is_ip_address(entry: str) -> bool:
-    """Check if entry is an IP address (IPv4 or IPv6)."""
+    """Check if entry is an IP address (IPv4/IPv6) or CIDR."""
+    import re
     entry = entry.strip()
+    
+    # Check for IPv4/IPv6 CIDR (e.g., 192.168.0.0/24, 2001:db8::/32)
+    if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry):
+        return True
+    if re.match(r'^[a-fA-F0-9:]+/\d+$', entry):
+        return True
+    
     parts = entry.split('.')
     if len(parts) == 4:
         try:
@@ -178,6 +192,11 @@ def is_ip_address(entry: str) -> bool:
     if ':' in entry:
         return True
     return False
+
+
+def is_cidr(entry: str) -> bool:
+    """Check if entry is CIDR notation (IPv4 or IPv6)."""
+    return is_ip_address(entry) and '/' in entry
 
 
 # =============================================================================

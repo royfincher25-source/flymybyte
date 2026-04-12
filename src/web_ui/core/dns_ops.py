@@ -25,7 +25,7 @@ from .constants import (
     DNS_FAILURE_THRESHOLD,
     IPSET_MAP,
 )
-from .utils import is_ip_address
+from .utils import is_ip_address, is_cidr
 
 logger = logging.getLogger(__name__)
 
@@ -456,16 +456,26 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ips
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
     entries = load_bypass_list(filepath)
-    domains = [e for e in entries if not is_ip_address(e)]
+    
+    # Separate CIDR entries (add directly without resolving)
+    cidr_entries = [e for e in entries if is_cidr(e)]
+    # Filter out IPs and CIDR, keep only domains
+    domains = [e for e in entries if not is_ip_address(e) and not is_cidr(e)]
+
+    # Auto-detect ipset name once at the beginning
+    if ipset_name is None:
+        filename = Path(filepath).stem
+        ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
+
+    # Add CIDR directly to ipset
+    if cidr_entries:
+        ensure_ipset_exists(ipset_name)
+        cidr_ok, cidr_msg = bulk_add_to_ipset(ipset_name, cidr_entries)
+        logger.info(f"Added {len(cidr_entries)} CIDR entries to {ipset_name}: {cidr_msg}")
 
     if not domains:
         logger.info(f"No domains to resolve in {filepath}")
         return 0
-
-    # Auto-detect ipset name from filepath
-    if ipset_name is None:
-        filename = Path(filepath).stem  # e.g. "vless" from "vless.txt"
-        ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
 
     BATCH_SIZE = 500
     total_ips_added = 0
