@@ -267,6 +267,14 @@ def add_to_bypass(filename: str):
                     invalid_entries.append(entry)
         save_bypass_list(filepath, current_list)
         logger.info(f"[ROUTES] Saved {added_count} new entries (IPs: {len(ip_entries)}, domains: {len(domain_entries)}, invalid: {len(invalid_entries)})")
+        
+        # Show added entries in flash message
+        added_preview = domain_entries + ip_entries
+        if len(added_preview) > 10:
+            added_text = ', '.join(added_preview[:10]) + f'... +{len(added_preview) - 10}'
+        else:
+            added_text = ', '.join(added_preview) if added_preview else ''
+
         if added_count > 0:
             # FIX: Refresh ipset immediately after adding domains
             try:
@@ -284,17 +292,17 @@ def add_to_bypass(filename: str):
                 ok, msg = dns_mgr.generate_all()
                 if ok:
                     dns_mgr.restart_dnsmasq_with_retry()
-                    flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
+                    flash(f'✅ Добавлено: {added_count} | {added_text}', 'success')
                 else:
-                    flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {msg}', 'warning')
+                    flash(f'⚠️ Добавлено {added_count}: {added_text}, ошибка: {msg}', 'warning')
             except Exception as e:
                 logger.error(f"[ROUTES] DnsmasqManager error: {e}")
                 # Fallback to old method
                 success, output = run_unblock_update()
                 if success:
-                    flash(f'✅ Успешно добавлено: {added_count} шт. Изменения применены', 'success')
+                    flash(f'✅ Добавлено: {added_count} | {added_text}', 'success')
                 else:
-                    flash(f'⚠️ Добавлено {added_count} записей, но ошибка при применении: {output}', 'warning')
+                    flash(f'⚠️ Добавлено {added_count}: {added_text}, ошибка: {output}', 'warning')
         elif invalid_entries:
             escaped_invalid = [escape(e) for e in invalid_entries[:5]]
             flash(f'⚠️ Все записи уже в списке или невалидны. Нераспознанные: {", ".join(escaped_invalid)}', 'warning')
@@ -323,16 +331,25 @@ def remove_from_bypass(filename: str):
         to_remove = [e.strip() for e in entries_text.split('\n') if e.strip()]
         current_list = load_bypass_list(filepath)
         original_count = len(current_list)
+        removed_entries = [item for item in current_list if item in to_remove]
         current_list = [item for item in current_list if item not in to_remove]
         removed_count = original_count - len(current_list)
+        
+        # Show removed entries in flash message
+        if len(removed_entries) > 10:
+            removed_text = ', '.join(removed_entries[:10]) + f'... +{len(removed_entries) - 10}'
+        else:
+            removed_text = ', '.join(removed_entries) if removed_entries else ''
+        
         logger.info(f"[ROUTES] Removing {removed_count} entries from {filepath} (was {original_count}, now {len(current_list)})")
         save_bypass_list(filepath, current_list)
+        
         if removed_count > 0:
             success, output = run_unblock_update()
             if success:
-                flash(f'✅ Успешно удалено: {removed_count} шт. Изменения применены', 'success')
+                flash(f'❌ Удалено: {removed_count} | {removed_text}', 'success')
             else:
-                flash(f'⚠️ Удалено {removed_count} записей, но ошибка при применении: {output}', 'warning')
+                flash(f'⚠️ Удалено {removed_count}: {removed_text}, ошибка: {output}', 'warning')
         else:
             flash('ℹ️ Ни одна запись не найдена в списке', 'info')
         return redirect(url_for('bypass.view_bypass', filename=filename))
