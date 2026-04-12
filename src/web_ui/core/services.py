@@ -59,13 +59,17 @@ def refresh_ipset_from_file(filepath: str, max_workers: int = 10, ipset_name: st
         filename = os.path.basename(filepath).replace('.txt', '')
         ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
     
-    # Flush before refresh to avoid accumulation
+    # Flush before refresh - needed to avoid accumulation
+    # Note: If flush fails due to iptables references, entries will accumulate
+    # This is a known limitation - flush works on router reboot or manual clear
     try:
-        import subprocess
-        subprocess.run(['ipset', '-F', ipset_name], capture_output=True, timeout=5)
-        logger.info(f"[IPSET] Flushed {ipset_name} before refresh")
+        result = subprocess.run(['ipset', '-F', ipset_name], capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            logger.info(f"[IPSET] Flushed {ipset_name} before refresh")
+        else:
+            logger.warning(f"[IPSET] Flush returned non-zero: {result.stderr[:100]}")
     except Exception as e:
-        logger.warning(f"[IPSET] Flush failed for {ipset_name}: {e}")
+        logger.warning(f"[IPSET] Flush exception: {e}")
 
     try:
         logger.info(f"[IPSET] Refreshing from file: {filepath}")
