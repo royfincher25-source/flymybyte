@@ -137,7 +137,7 @@ def refresh_ipset_from_file(filepath: str, ipset_name: str = None) -> Tuple[bool
                 # Create
                 logger.info(f"[IPSET] Recreating {ipset_name}...")
                 create_result = subprocess.run(
-                    ['ipset', 'create', ipset_name, 'hash:ip', 'maxelem', '1048576'],
+                    ['ipset', 'create', ipset_name, 'hash:ip', 'maxelem', '1048576', 'timeout', '300'],
                     capture_output=True, text=True, timeout=10
                 )
                 if create_result.returncode == 0:
