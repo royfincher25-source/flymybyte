@@ -9,7 +9,7 @@ import logging
 import subprocess
 from typing import List, Tuple
 
-from .constants import IPSET_MAX_BULK_ENTRIES
+from .constants import IPSET_MAX_BULK_ENTRIES, IPSET_MAX_ENTRIES
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,25 @@ logger = logging.getLogger(__name__)
 # ===========================================================================
 # Sanitization helpers
 # ===========================================================================
+
+def _count_ipset_entries(setname: str) -> int:
+    """Count entries in an ipset by counting lines starting with digits.
+    Returns -1 if unable to count (ipset doesn't exist or error)."""
+    import re
+    try:
+        result = subprocess.run(
+            ['ipset', '-L', setname],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            return len([
+                line for line in result.stdout.splitlines()
+                if re.match(r'^[0-9]', line)
+            ])
+        return -1
+    except Exception:
+        return -1
+
 
 def _sanitize_for_ipset(entry: str) -> str:
     """Sanitize ipset entry (strip whitespace, reject null bytes)."""
@@ -53,6 +72,15 @@ def bulk_add_to_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]:
     if len(entries) > IPSET_MAX_BULK_ENTRIES:
         logger.error(f"[IPSET] {setname}: too many entries ({len(entries)} > {IPSET_MAX_BULK_ENTRIES})")
         return False, f"Too many entries (max {IPSET_MAX_BULK_ENTRIES})"
+
+    # Check current ipset size before adding (protection against bloat)
+    current_count = _count_ipset_entries(setname)
+    if current_count >= 0 and current_count + len(entries) > IPSET_MAX_ENTRIES:
+        logger.error(
+            f"[IPSET] {setname}: would exceed max entries "
+            f"(current={current_count}, adding={len(entries)}, max={IPSET_MAX_ENTRIES})"
+        )
+        return False, f"Would exceed max entries (current={current_count}, max={IPSET_MAX_ENTRIES})"
 
     commands = []
     skipped = 0

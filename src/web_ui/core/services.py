@@ -38,8 +38,17 @@ from .ipset_ops import (
 )
 
 
-def refresh_ipset_from_file(filepath: str, max_workers: int = 10, ipset_name: str = None) -> Tuple[bool, str]:
-    """Refresh ipset from bypass list file (resolve domains + add IPs)."""
+def refresh_ipset_from_file(filepath: str, ipset_name: str = None) -> Tuple[bool, str]:
+    """Refresh ipset from bypass list file (CIDR + IP напрямую, домены через dnsmasq).
+
+    Гарантированный flush перед добавлением:
+    1. Подсчёт текущих записей
+    2. Flush (ipset -F)
+    3. Если flush неудачен — recreate (destroy + create)
+    4. Проверка flush (0 записей)
+    5. Загрузка CIDR/IP из файла (домены обрабатываются dnsmasq через ipset= rules)
+    6. Логирование счётчиков до/после
+    """
     from .app_config import WebConfig
     from .dns_ops import resolve_domains_for_ipset
     from .constants import IPSET_MAP
@@ -54,28 +63,121 @@ def refresh_ipset_from_file(filepath: str, max_workers: int = 10, ipset_name: st
         logger.warning(f"File not found: {filepath}")
         return False, f"File not found: {filepath}"
 
-    # Auto-detect ipset name and flush before adding
+    # Auto-detect ipset name
     if ipset_name is None:
         filename = os.path.basename(filepath).replace('.txt', '')
         ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
-    
-    # Flush before refresh - needed to avoid accumulation
-    # Note: If flush fails due to iptables references, entries will accumulate
-    # This is a known limitation - flush works on router reboot or manual clear
-    try:
-        result = subprocess.run(['ipset', '-F', ipset_name], capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            logger.info(f"[IPSET] Flushed {ipset_name} before refresh")
-        else:
-            logger.warning(f"[IPSET] Flush returned non-zero: {result.stderr[:100]}")
-    except Exception as e:
-        logger.warning(f"[IPSET] Flush exception: {e}")
 
+    # --- Step 1: Count entries BEFORE flush ---
+    def count_ipset_entries(name: str) -> int:
+        """Count entries in an ipset by counting lines starting with digits."""
+        try:
+            result = subprocess.run(
+                ['ipset', '-L', name],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                return len([
+                    line for line in result.stdout.splitlines()
+                    if re.match(r'^[0-9]', line)
+                ])
+            return -1
+        except Exception as e:
+            logger.warning(f"[IPSET] count_ipset_entries exception for {name}: {e}")
+            return -1
+
+    entries_before = count_ipset_entries(ipset_name)
+    logger.info(f"[IPSET] Refresh: {ipset_name} has {entries_before} entries before flush")
+
+    # --- Step 2: Flush ipset ---
+    flush_ok = False
     try:
-        logger.info(f"[IPSET] Refreshing from file: {filepath}")
-        count = resolve_domains_for_ipset(filepath, max_workers, ipset_name)
-        logger.info(f"[IPSET] Refresh complete: {count} IPs resolved and added from {filepath}")
-        return True, f"Resolved and added {count} IPs"
+        logger.info(f"[IPSET] Flushing {ipset_name}...")
+        result = subprocess.run(
+            ['ipset', '-F', ipset_name],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode == 0:
+            logger.info(f"[IPSET] Flush succeeded for {ipset_name}")
+            flush_ok = True
+        else:
+            logger.warning(f"[IPSET] Flush failed for {ipset_name}: {result.stderr.strip()[:150]}")
+    except subprocess.TimeoutExpired:
+        logger.warning(f"[IPSET] Flush timeout for {ipset_name}")
+    except Exception as e:
+        logger.warning(f"[IPSET] Flush exception for {ipset_name}: {e}")
+
+    # --- Step 3: If flush failed — recreate ipset ---
+    if not flush_ok:
+        logger.warning(f"[IPSET] Flush failed, attempting recreate for {ipset_name}")
+        try:
+            # Destroy
+            logger.info(f"[IPSET] Destroying {ipset_name}...")
+            destroy_result = subprocess.run(
+                ['ipset', 'destroy', ipset_name],
+                capture_output=True, text=True, timeout=10
+            )
+            if destroy_result.returncode != 0:
+                logger.warning(
+                    f"[IPSET] Destroy failed for {ipset_name}: "
+                    f"{destroy_result.stderr.strip()[:150]}"
+                )
+                # Destroy may fail if referenced by iptables; try flush again
+                logger.info(f"[IPSET] Retrying flush after destroy failure...")
+                retry = subprocess.run(
+                    ['ipset', '-F', ipset_name],
+                    capture_output=True, text=True, timeout=10
+                )
+                if retry.returncode == 0:
+                    flush_ok = True
+                    logger.info(f"[IPSET] Retry flush succeeded for {ipset_name}")
+                else:
+                    logger.error(f"[IPSET] Retry flush also failed: {retry.stderr.strip()[:150]}")
+            else:
+                # Create
+                logger.info(f"[IPSET] Recreating {ipset_name}...")
+                create_result = subprocess.run(
+                    ['ipset', 'create', ipset_name, 'hash:ip', 'maxelem', '1048576'],
+                    capture_output=True, text=True, timeout=10
+                )
+                if create_result.returncode == 0:
+                    flush_ok = True
+                    logger.info(f"[IPSET] Recreate succeeded for {ipset_name}")
+                else:
+                    logger.error(
+                        f"[IPSET] Create failed for {ipset_name}: "
+                        f"{create_result.stderr.strip()[:150]}"
+                    )
+        except subprocess.TimeoutExpired:
+            logger.warning(f"[IPSET] Recreate timeout for {ipset_name}")
+        except Exception as e:
+            logger.error(f"[IPSET] Recreate exception for {ipset_name}: {e}")
+
+    # --- Step 4: Verify flush ---
+    entries_after_flush = count_ipset_entries(ipset_name)
+    if entries_after_flush == 0:
+        logger.info(f"[IPSET] Verified: {ipset_name} is empty after flush")
+    elif entries_after_flush > 0:
+        logger.warning(
+            f"[IPSET] Warning: {ipset_name} still has {entries_after_flush} entries after flush — "
+            f"entries will accumulate (known limitation: ipset may be referenced by iptables)"
+        )
+    else:
+        logger.warning(f"[IPSET] Could not verify flush result for {ipset_name}")
+
+    # --- Step 5: Add CIDR/IP from file to ipset (domains handled by dnsmasq) ---
+    try:
+        logger.info(f"[IPSET] Loading entries from file: {filepath}")
+        count = resolve_domains_for_ipset(filepath, ipset_name)
+
+        # --- Step 6: Count entries AFTER refresh ---
+        entries_final = count_ipset_entries(ipset_name)
+        logger.info(
+            f"[IPSET] Refresh complete: было {entries_before}, стало {entries_final} записей "
+            f"({count} IPs resolved from {filepath})"
+        )
+
+        return True, f"Refresh: было {entries_before}, стало {entries_final} записей ({count} resolved)"
     except Exception as e:
         logger.error(f"[IPSET] Refresh failed for {filepath}: {e}")
         return False, str(e)

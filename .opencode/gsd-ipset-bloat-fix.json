@@ -1,0 +1,68 @@
+{
+  "title": "Fix ipset bloat: 24064 entries in unblockvless",
+  "status": "completed",
+  "created": "2026-04-13",
+  "updated": "2026-04-13",
+  "problem": "ipset unblockvless содержит 24064 записей, что критически много для роутера с 128MB RAM. Причина: resolve_domains_for_ipset() резолвит каждый домен через socket.getaddrinfo() и добавляет ВСЕ IP (CDN даёт 10-30 IP на домен). IP накапливаются, т.к. flush не происходит перед добавлением.",
+  "root_cause": "1. resolve_domains_for_ipset() в dns_ops.py резолвит домены в IP (дублирует dnsmasq)\n2. bulk_add_to_ipset() не делает flush перед добавлением\n3. Нет лимита на количество IP в ipset\n4. DNsmasq уже настроен на ipset=/domain/ipset_name — ручной резолв не нужен",
+  "approach": "Вариант B: Отказаться от ручного резолва доменов. Положиться на dnsmasq для доменов. В ipset только CIDR и статические IP.",
+  "files_to_change": [
+    "src/web_ui/core/dns_ops.py",
+    "src/web_ui/core/ipset_ops.py",
+    "src/web_ui/core/services.py",
+    "src/web_ui/core/constants.py",
+    "src/web_ui/routes_system.py"
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Отключить ручной резолв доменов в resolve_domains_for_ipset()",
+      "file": "src/web_ui/core/dns_ops.py",
+      "action": "Убрать parallel_resolve() для доменов. Оставить только CIDR и IP. Домены пропускаются — dnsmasq сам добавит их при DNS-запросах через ipset=/domain/ipset_name.",
+      "acceptance": "resolve_domains_for_ipset() добавляет только CIDR и IP, домены логируются как skipped",
+      "priority": "critical"
+    },
+    {
+      "id": 2,
+      "title": "Добавить flush ipset перед refresh",
+      "file": "src/web_ui/core/services.py",
+      "action": "В refresh_ipset_from_file() добавить надёжный flush ipset_name ПЕРЕД добавлением новых записей. Если flush не работает (iptables ссылки), логировать warning и продолжить.",
+      "acceptance": "При каждом refresh_ipset_from_file() ipset очищается перед добавлением",
+      "priority": "critical"
+    },
+    {
+      "id": 3,
+      "title": "Добавить IPSET_MAX_ENTRIES константу",
+      "file": "src/web_ui/core/constants.py",
+      "action": "Добавить константу IPSET_MAX_ENTRIES = 5000 (защита от переполнения). Использовать в bulk_add_to_ipset() для проверки.",
+      "acceptance": "bulk_add_to_ipset() отказывает если len(entries) > IPSET_MAX_ENTRIES",
+      "priority": "high"
+    },
+    {
+      "id": 4,
+      "title": "Добавить мониторинг размера ipset в /stats",
+      "file": "src/web_ui/routes_system.py",
+      "action": "В endpoint /stats добавить размер каждого ipset (ipset -L name | grep -c). Показывать warning если > 1000.",
+      "acceptance": "В статусе отображается размер каждого ipset с цветовой индикацией (зелёный < 500, жёлтый < 1000, красный > 1000)",
+      "priority": "medium"
+    },
+    {
+      "id": 5,
+      "title": "Удалить мёртвый код резолва из dns_ops.py",
+      "file": "src/web_ui/core/dns_ops.py",
+      "action": "Убрать функции parallel_resolve() и resolve_single() если они не используются в других местах.",
+      "acceptance": "Нет неиспользуемого кода, dns_ops.py содержит только dnsmasq-операции",
+      "priority": "low"
+    }
+  ],
+  "verification": {
+    "tests": "Запустить tests/ если есть, проверить что resolve_domains_for_ipset() не резолвит домены",
+    "manual": "1. ipset -L unblockvless | grep -c — должно стать < 500\n2. Веб-интерфейс /stats показывает размер ipset\n3. Добавление доменов в bypass работает через dnsmasq"
+  },
+  "risks": [
+    "Если dnsmasq не настроен правильно, домены не попадут в ipset",
+    "После обновления нужно вручную очистить ipset или ждать следующего refresh",
+    "Старые версии web_ui продолжат накапливать IP"
+  ],
+  "rollback": "Вернуть resolve_domains_for_ipset() к исходной версии (с parallel_resolve)"
+}

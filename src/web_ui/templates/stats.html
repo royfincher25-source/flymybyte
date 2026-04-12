@@ -168,6 +168,69 @@
     </div>
 </div>
 
+<!-- Размер ipset -->
+<div class="card shadow-sm mb-4">
+    <div class="card__header bg-surface">
+        <h5 class="mb-0"><i class="fm fm-database fm-lg"></i> Размер ipset</h5>
+    </div>
+    <div class="card__body">
+        {% if stats.ipset_sizes %}
+        <div class="overflow-auto">
+            <table class="table table--hover">
+                <thead>
+                    <tr>
+                        <th>ipset</th>
+                        <th>Записей</th>
+                        <th>Статус</th>
+                        <th>Прогресс</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ipset_name, ipset_info in stats.ipset_sizes.items() %}
+                    <tr>
+                        <td>
+                            <i class="fm fm-layers text-secondary"></i> {{ ipset_name }}
+                        </td>
+                        <td>
+                            {% if ipset_info.count >= 0 %}
+                                <span class="badge badge--{{ 'success' if ipset_info.status == 'ok' else ('warning' if ipset_info.status == 'warning' else 'danger') }}">
+                                    {{ ipset_info.count }}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ipset_info.status == 'ok' %}
+                                <i class="fm fm-check-circle text-success"></i> <span class="text-success">Норма</span>
+                            {% elif ipset_info.status == 'warning' %}
+                                <i class="fm fm-exclamation-triangle text-warning"></i> <span class="text-warning">Много</span>
+                            {% elif ipset_info.status == 'danger' %}
+                                <i class="fm fm-x-circle text-danger"></i> <span class="text-danger">КРИТИЧНО</span>
+                            {% else %}
+                                <span class="text-muted">Неизвестно</span>
+                            {% endif %}
+                        </td>
+                        <td style="min-width: 150px;">
+                            {% if ipset_info.count >= 0 %}
+                                {% set pct = (ipset_info.count / ipset_info.max * 100) | round(1) %}
+                                <div class="progress-bar" style="background: #e5e7eb; border-radius: 4px; height: 8px;">
+                                    <div class="progress-bar__fill" style="width: {{ [pct, 100] | min }}%; background: {{ '#22c55e' if ipset_info.status == 'ok' else ('#f59e0b' if ipset_info.status == 'warning' else '#ef4444') }}; height: 100%; border-radius: 4px;"></div>
+                                </div>
+                                <span class="text-muted small">{{ pct }}%</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-muted text-center">Информация об ipset недоступна</p>
+        {% endif %}
+    </div>
+</div>
+
 <!-- Информация -->
 <div class="card shadow-sm">
     <div class="card__body">

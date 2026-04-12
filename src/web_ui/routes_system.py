@@ -96,7 +96,7 @@ def stats():
     # DNS Override status
     # FIX #4: Проверяем маркерный файл для точного статуса
     dns_override_enabled = os.path.exists(DNS_OVERRIDE_FLAG)
-    
+
     # Fallback: если маркера нет, проверяем iptables
     if not dns_override_enabled:
         try:
@@ -109,6 +109,20 @@ def stats():
         except Exception:
             pass
 
+    # IPSET sizes (FIX: monitoring ipset bloat)
+    from core.ipset_ops import _count_ipset_entries
+    from core.constants import IPSET_MAP, IPSET_MAX_ENTRIES
+    ipset_sizes = {}
+    for ipset_name in IPSET_MAP.values():
+        count = _count_ipset_entries(ipset_name)
+        ipset_sizes[ipset_name] = {
+            'count': count if count >= 0 else -1,
+            'max': IPSET_MAX_ENTRIES,
+            'status': 'ok' if count >= 0 and count < 500 else (
+                'warning' if count >= 0 and count < 1000 else 'danger'
+            ) if count >= 0 else 'unknown',
+        }
+
     stats_data = {
         'total_services': len(services),
         'active_services': active_services,
@@ -120,6 +134,7 @@ def stats():
         'dns_spoofing_enabled': dns_status.get('enabled', False),
         'dns_spoofing_domains': dns_status.get('domain_count', 0),
         'dns_override_enabled': dns_override_enabled,
+        'ipset_sizes': ipset_sizes,
     }
     return render_template('stats.html', stats=stats_data, config=config)
 

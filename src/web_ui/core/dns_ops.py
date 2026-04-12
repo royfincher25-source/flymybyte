@@ -12,7 +12,6 @@ import re
 import logging
 import traceback
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime
 
@@ -352,110 +351,31 @@ def get_dns_monitor() -> DNSMonitor:
 # =============================================================================
 # DNS Resolver (formerly dns_resolver.py)
 # =============================================================================
+# NOTE: resolve_single() и parallel_resolve() удалены — dnsmasq обрабатывает
+# резолв доменов автоматически через ipset=/domain/ipset_name директивы.
+# Ручной резолв приводил к накоплению 24000+ IP в ipset (CDN round-robin).
+# resolve_domains_for_ipset() теперь добавляет только CIDR и статические IP.
+# =============================================================================
 
-MAX_WORKERS = 10  # Maximum parallel workers for 128MB RAM
-DEFAULT_TIMEOUT = 5.0  # DNS resolution timeout in seconds
-DNS_SERVER = "8.8.8.8"  # External DNS server for reliable resolution
 
-
-def resolve_single(domain: str, timeout: float = DEFAULT_TIMEOUT) -> List[str]:
+def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -> int:
     """
-    Resolve a single domain to IP addresses using socket.getaddrinfo.
+    Добавить IP из bypass файла в ipset (только CIDR и статические IP).
 
-    Args:
-        domain: Domain name to resolve
-        timeout: Resolution timeout in seconds (default: 5.0)
-
-    Returns:
-        List of IP addresses
-    """
-    # Skip wildcard domains (*.example.com) — DNS cannot resolve them
-    if domain.startswith('*.'):
-        return []
-    # Skip domains with @ads suffix (tracking/ads lists)
-    if ' @ads' in domain or ' @trackers' in domain:
-        return []
-
-    try:
-        # FIX: Use socket.getaddrinfo instead of nslookup subprocess
-        # nslookup on BusyBox often fails or has different output format
-        socket.setdefaulttimeout(timeout)
-        results = socket.getaddrinfo(domain, None, socket.AF_INET, socket.SOCK_STREAM)
-        ips = list(set(r[4][0] for r in results))
-        logger.debug(f"Resolved {domain} -> {ips}")
-        return ips
-    except socket.gaierror as e:
-        logger.debug(f"Failed to resolve {domain}: {e}")
-        return []
-    except socket.timeout:
-        logger.debug(f"Timeout resolving {domain}")
-        return []
-    except Exception as e:
-        logger.error(f"Unexpected error resolving {domain}: {e}")
-        return []
-
-
-def parallel_resolve(domains: List[str], max_workers: int = MAX_WORKERS) -> Dict[str, List[str]]:
-    """
-    Resolve multiple domains in parallel.
-
-    Args:
-        domains: List of domains to resolve
-        max_workers: Maximum parallel workers (default: 10 for embedded)
-
-    Returns:
-        Dict mapping domain -> list of IPs
-    """
-    if not domains:
-        return {}
-
-    valid_domains = list(set(
-        domain for domain in domains
-        if domain and isinstance(domain, str) and domain.strip()
-    ))
-
-    if not valid_domains:
-        return {}
-
-    max_workers = min(max_workers, MAX_WORKERS)
-    results = {}
-
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_domain = {
-            executor.submit(resolve_single, domain): domain
-            for domain in valid_domains
-        }
-
-        for future in as_completed(future_to_domain):
-            domain = future_to_domain[future]
-            try:
-                ips = future.result()
-                if ips:
-                    results[domain] = ips
-            except Exception as e:
-                logger.error(f"Error resolving {domain}: {e}")
-                results[domain] = []
-
-    logger.info(f"Resolved {len(results)}/{len(valid_domains)} domains")
-    return results
-
-
-def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ipset_name: Optional[str] = None) -> int:
-    """
-    Добавить IP из bypass файла в ipset.
-    
     Логика:
-    1. CIDR (149.154.160.0/20) -> добавить напрямую в ipset
-    2. IP (91.108.6.1) -> добавить напрямую в ipset  
-    3. Домены (telegram.org) -> НЕ резолвим здесь (dnsmasq делает это автоматически)
-    
+    1. CIDR (149.154.160.0/20) -> добавить напрямую в ipset через bulk_add_to_ipset()
+    2. IP (91.108.6.1) -> добавить напрямую в ipset через bulk_add_to_ipset()
+    3. Домены (telegram.org) -> ПРОПУСТИТЬ (dnsmasq обрабатывает через ipset=/domain/ipset_name)
+
+    Домены НЕ резолвятся здесь — dnsmasq автоматически добавляет их в ipset
+    при обработке DNS-запросов через директивы ipset=/domain/ipset_name.
+
     Args:
         filepath: Путь к bypass файлу (vless.txt)
-        max_workers: Параллельные воркеры для резолвинга (не используется)
-        ipset_name: Имя ipset (auto-detect если None)
-    
+        ipset_name: Имя ipset (auto-detect из имени файла если None)
+
     Returns:
-        Количество добавленных записей
+        Количество добавленных записей (CIDR + IP, без доменов)
     """
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists

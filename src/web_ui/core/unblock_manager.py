@@ -22,7 +22,6 @@ from .app_config import WebConfig
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_THREAD_COUNT = 4
 IPSET_NAMES = ['unblocksh', 'unblockvless', 'unblocktroj']
 
 
@@ -97,10 +96,10 @@ class UnblockManager:
         logger.info("[UNBLOCK] update_dnsmasq() called")
         return self._update_dnsmasq()
     
-    def update_ipsets(self, max_workers: int = None) -> Tuple[bool, str]:
+    def update_ipsets(self) -> Tuple[bool, str]:
         """Обновить только ipset (без dnsmasq)."""
         logger.info("[UNBLOCK] update_ipsets() called")
-        return self._update_ipsets(max_workers)
+        return self._update_ipsets()
     
     def get_status(self) -> Dict:
         """Получить статус всех компонентов."""
@@ -185,13 +184,9 @@ class UnblockManager:
             logger.error(traceback.format_exc())
             return False, str(e)
     
-    def _update_ipsets(self, max_workers: int = None) -> Tuple[bool, str]:
+    def _update_ipsets(self) -> Tuple[bool, str]:
         """Обновить ipsets из файлов через Python."""
         logger.info("[UNBLOCK] _update_ipsets() - Python path")
-        
-        if max_workers is None:
-            max_workers = DEFAULT_THREAD_COUNT
-        logger.info(f"[UNBLOCK] Using max_workers={max_workers}")
         
         unblock_dir = self._config.unblock_dir
         logger.info(f"[UNBLOCK] unblock_dir: {unblock_dir}")
@@ -219,7 +214,7 @@ class UnblockManager:
             
             try:
                 from .services import refresh_ipset_from_file
-                ok, msg = refresh_ipset_from_file(filepath, max_workers)
+                ok, msg = refresh_ipset_from_file(filepath)
                 logger.info(f"[UNBLOCK] refresh_ipset_from_file({ipset_name}): {ok} - {msg}")
                 
                 if ok:

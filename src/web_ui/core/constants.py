@@ -12,7 +12,7 @@ Used by:
 - core/app_config.py: DEFAULT_WEB_*, DEFAULT_ROUTER_IP, DEFAULT_UNBLOCK_DIR, UNBLOCK_DIR
 - core/backup_manager.py: BACKUP_DIR, BACKUP_FILES, INIT_SCRIPTS
 - core/dnsmasq_manager.py: DNSMASQ_*, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT
-- core/ipset_ops.py: IPSET_MAX_BULK_ENTRIES
+- core/ipset_ops.py: IPSET_MAX_BULK_ENTRIES, IPSET_MAX_ENTRIES
 """
 
 # =============================================================================
@@ -279,6 +279,9 @@ IPSET_MAP = {
 
 # Maximum entries per ipset bulk operation
 IPSET_MAX_BULK_ENTRIES = 5000
+
+# Maximum total entries per ipset (protection against bloat)
+IPSET_MAX_ENTRIES = 5000
 
 # =============================================================================
 # SERVICE PROCESS NAMES (для pgrep)
