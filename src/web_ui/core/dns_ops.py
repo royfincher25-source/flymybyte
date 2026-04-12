@@ -458,10 +458,10 @@ def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ips
     entries = load_bypass_list(filepath)
     
     # Separate CIDR entries (add directly without resolving)
-    # Filter out IPv6 CIDR - not supported by ipset hash:net on Keenetic
-    cidr_entries = [e for e in entries if is_cidr(e) and ':' not in e]
-    # Filter out IPs and CIDR, keep only domains
-    domains = [e for e in entries if not is_ip_address(e) and not is_cidr(e)]
+    # IPv6 CIDR not supported by Keenetic, skip it
+    cidr_entries = [e for e in entries if is_cidr(e) and not e.startswith('2001:') and not e.startswith('fe80:')]
+    # Filter out CIDR and keep only domains (IPs/CIDR will be resolved by DNS)
+    domains = [e for e in entries if not is_ip_address(e) or is_cidr(e)]
 
     # Auto-detect ipset name once at the beginning
     if ipset_name is None:
