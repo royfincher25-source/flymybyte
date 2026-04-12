@@ -29,15 +29,14 @@ def _sanitize_for_ipset(entry: str) -> str:
 
 
 def _is_valid_ipset_entry(entry: str) -> bool:
-    """Basic validation — IP or domain string."""
+    """Validate entry for ipset (IPv4, IPv4 CIDR, or IPv6)."""
     import re
     # IPv4 with optional CIDR (e.g., 192.168.0.0/24 or 192.168.0.1)
-    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{1,2})?$', entry):
+    if re.match(r'^(\d{1,3}\.){3}\d{1,3}(/\d{1,2})?$', entry):
         return True
-    # IPv6 (single IP only, NOT CIDR) - for domains/hosts file
+    # IPv6 (single IP only, NOT CIDR)
     if ':' in entry and re.match(r'^[0-9a-fA-F:]+$', entry):
         return True
-    # IPv6 CIDR (e.g., 2001:db8::/32) - NOT supported by Keenetic ipset
     return False
 
 
