@@ -25,12 +25,6 @@
                     <a href="{{ url_for('bypass.remove_from_bypass', filename=filename) }}" class="btn btn--danger">
                         <i class="fm fm-dash-lg"></i> Удалить из списка
                     </a>
-                    <form method="POST" action="{{ url_for('bypass.refresh_bypass_ipset', filename=filename) }}">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <button type="submit" class="btn btn--primary">
-                            <i class="fm fm-arrow-repeat"></i> Обновить ipset
-                        </button>
-                    </form>
                 </div>
             </div>
         </div>

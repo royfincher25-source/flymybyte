@@ -276,17 +276,9 @@ def add_to_bypass(filename: str):
             added_text = ', '.join(added_preview) if added_preview else ''
 
         if added_count > 0:
-            # FIX: Refresh ipset immediately after adding domains
-            try:
-                ok, msg = refresh_ipset_from_file(filepath)
-                if ok:
-                    logger.info(f"[ROUTES] ipset refreshed: {msg}")
-                else:
-                    logger.warning(f"[ROUTES] ipset refresh failed: {msg}")
-            except Exception as e:
-                logger.error(f"[ROUTES] ipset refresh error: {e}")
-
             # Use DnsmasqManager for atomic config regeneration and dnsmasq restart
+            # DNSSpoofing will add domains to ipset automatically on DNS queries
+            # IP/CIDR entries will be loaded on web_ui startup
             try:
                 dns_mgr = get_dnsmasq_manager()
                 ok, msg = dns_mgr.generate_all()
@@ -357,50 +349,20 @@ def remove_from_bypass(filename: str):
     return render_template('bypass_remove.html', filename=filename, entries=entries)
 
 
-@bp.route('/bypass/<filename>/refresh', methods=['POST'])
+@bp.route('/bypass/<filename>/refresh-ipset', methods=['POST'])
 @login_required
 @csrf_required
-def refresh_bypass_ipset(filename: str):
+def refresh_ipset(filename: str):
+    """Legacy route - no longer used. IP/CIDR loaded on web_ui startup."""
     config = WebConfig()
     filename = secure_filename(filename)
     if not filename:
         flash('Неверное имя файла', 'danger')
         return redirect(url_for('bypass.bypass'))
     filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
-    logger.info(f"[ROUTES] /bypass/{filename}/refresh - filepath={filepath}")
-    if not os.path.exists(filepath):
-        flash('Файл не найден', 'danger')
-        return redirect(url_for('bypass.view_bypass', filename=filename))
-    success, msg = refresh_ipset_from_file(filepath, max_workers=10)
-    if success:
-        logger.info(f"[ROUTES] Refresh succeeded: {msg}")
-        flash(f'✅ {msg}', 'success')
-    else:
-        logger.error(f"[ROUTES] Refresh failed: {msg}")
-        flash(f'❌ Ошибка: {msg}', 'danger')
+    logger.info(f"[ROUTES] /bypass/{filename}/refresh-ipset - DEPRECATED")
+    flash('ℹ️ Обновление ipset теперь происходит автоматически при запуске web UI', 'info')
     return redirect(url_for('bypass.view_bypass', filename=filename))
-
-
-@bp.route('/bypass/<filename>/refresh-ipset', methods=['POST'])
-@login_required
-@csrf_required
-def refresh_ipset(filename: str):
-    """Refresh ipset from bypass list file."""
-    config = WebConfig()
-    filename = secure_filename(filename)
-    if not filename:
-        return jsonify({'success': False, 'error': 'Invalid filename'}), 400
-    filepath = os.path.join(config.unblock_dir, f"{filename}.txt")
-    try:
-        from core.services import refresh_ipset_from_file
-        ok, msg = refresh_ipset_from_file(filepath)
-        if ok:
-            return jsonify({'success': True, 'message': msg})
-        else:
-            return jsonify({'success': False, 'error': msg})
-    except Exception as e:
-        logger.error(f"[ROUTES] ipset refresh error: {e}")
-        return jsonify({'success': False, 'error': str(e)})
 
 
 @bp.route('/bypass/catalog')

@@ -93,6 +93,47 @@ def create_app(config_class=None):
     except Exception as e:
         logger.warning(f"Failed to sanitize dnsmasq.conf: {e}")
 
+    # Load IP/CIDR entries from bypass files on startup
+    # Domains are handled automatically by dnsmasq via ipset=/domain.com/ config
+    try:
+        from core.app_config import WebConfig
+        from core.utils import load_bypass_list
+        from core.utils import is_ip_address, is_cidr
+        from core.ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
+        from core.constants import IPSET_MAP, UNBLOCK_DIR
+        import os
+        
+        config = WebConfig()
+        unblock_dir = config.unblock_dir
+        
+        # Find all bypass files
+        if os.path.exists(unblock_dir):
+            for filename in os.listdir(unblock_dir):
+                if filename.endswith('.txt'):
+                    filepath = os.path.join(unblock_dir, filename)
+                    entries = load_bypass_list(filepath)
+                    
+                    # Separate IPs and CIDRs (not domains)
+                    ip_or_cidr = [e for e in entries if is_ip_address(e) or is_cidr(e)]
+                    
+                    if ip_or_cidr:
+                        # Get ipset name from filename
+                        name_stem = filename.replace('.txt', '')
+                        ipset_name = IPSET_MAP.get(name_stem, f'unblock{name_stem}')
+                        
+                        # Flush and reload
+                        try:
+                            import subprocess
+                            subprocess.run(['ipset', '-F', ipset_name], capture_output=True, timeout=5)
+                        except:
+                            pass
+                        
+                        ensure_ipset_exists(ipset_name)
+                        ok, msg = bulk_add_to_ipset(ipset_name, ip_or_cidr)
+                        logger.info(f"[STARTUP] Loaded {len(ip_or_cidr)} IP/CIDR to {ipset_name}: {msg}")
+    except Exception as e:
+        logger.warning(f"Failed to load IP/CIDR on startup: {e}")
+
     def graceful_shutdown(signum=None, frame=None):
         logger.info("Graceful shutdown initiated...")
         dns_monitor.stop()
