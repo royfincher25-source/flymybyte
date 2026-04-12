@@ -38,10 +38,11 @@ from .ipset_ops import (
 )
 
 
-def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool, str]:
+def refresh_ipset_from_file(filepath: str, max_workers: int = 10, ipset_name: str = None) -> Tuple[bool, str]:
     """Refresh ipset from bypass list file (resolve domains + add IPs)."""
     from .app_config import WebConfig
     from .dns_ops import resolve_domains_for_ipset
+    from .constants import IPSET_MAP
 
     config = WebConfig()
     real_path = os.path.realpath(filepath)
@@ -53,9 +54,22 @@ def refresh_ipset_from_file(filepath: str, max_workers: int = 10) -> Tuple[bool,
         logger.warning(f"File not found: {filepath}")
         return False, f"File not found: {filepath}"
 
+    # Auto-detect ipset name and flush before adding
+    if ipset_name is None:
+        filename = os.path.basename(filepath).replace('.txt', '')
+        ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
+    
+    # Flush before refresh to avoid accumulation
+    try:
+        import subprocess
+        subprocess.run(['ipset', '-F', ipset_name], capture_output=True, timeout=5)
+        logger.info(f"[IPSET] Flushed {ipset_name} before refresh")
+    except Exception as e:
+        logger.warning(f"[IPSET] Flush failed for {ipset_name}: {e}")
+
     try:
         logger.info(f"[IPSET] Refreshing from file: {filepath}")
-        count = resolve_domains_for_ipset(filepath, max_workers)
+        count = resolve_domains_for_ipset(filepath, max_workers, ipset_name)
         logger.info(f"[IPSET] Refresh complete: {count} IPs resolved and added from {filepath}")
         return True, f"Resolved and added {count} IPs"
     except Exception as e:
