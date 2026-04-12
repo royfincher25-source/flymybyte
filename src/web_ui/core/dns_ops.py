@@ -442,73 +442,48 @@ def parallel_resolve(domains: List[str], max_workers: int = MAX_WORKERS) -> Dict
 
 def resolve_domains_for_ipset(filepath: str, max_workers: int = MAX_WORKERS, ipset_name: Optional[str] = None) -> int:
     """
-    Resolve domains from bypass list file and add to ipset.
-
+    Добавить IP из bypass файла в ipset.
+    
+    Логика:
+    1. CIDR (149.154.160.0/20) -> добавить напрямую в ipset
+    2. IP (91.108.6.1) -> добавить напрямую в ipset  
+    3. Домены (telegram.org) -> НЕ резолвим здесь (dnsmasq делает это автоматически)
+    
     Args:
-        filepath: Path to bypass list file
-        max_workers: Parallel workers (default: 10)
-        ipset_name: Target ipset name (auto-detect from filepath if None)
-
+        filepath: Путь к bypass файлу (vless.txt)
+        max_workers: Параллельные воркеры для резолвинга (не используется)
+        ipset_name: Имя ipset (auto-detect если None)
+    
     Returns:
-        Number of IPs added to ipset
+        Количество добавленных записей
     """
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
     entries = load_bypass_list(filepath)
     
-    # Separate IPv4 CIDR entries (add directly without resolving)
-    # IPv6 CIDR not supported by Keenetic, skip it
-    cidrs = [e for e in entries if is_cidr(e)]
-    cidr_entries = [c for c in cidrs if not c.startswith('2001:') and not c.startswith('fe80:')]
-    # Keep domains only (IPs/CIDR added directly without resolving)
+    # Фильтрация:
+    # - CIDR: добавить напрямую (dns_ops не резолвит CIDR)
+    # - IP: добавить напрямую
+    # - Домены: пропустить (dnsmasq добавит при запросе)
+    cidr_entries = [e for e in entries if is_cidr(e) and not e.startswith(('2001:', 'fe80:'))]
+    ip_entries = [e for e in entries if is_ip_address(e) and '/' not in e]
     domains = [e for e in entries if not is_ip_address(e) and not is_cidr(e)]
 
-    # Auto-detect ipset name once at the beginning
+    # Auto-detect ipset name from filename
     if ipset_name is None:
         filename = Path(filepath).stem
         ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
 
-    # Add CIDR directly to ipset
-    if cidr_entries:
-        ensure_ipset_exists(ipset_name)
-        cidr_ok, cidr_msg = bulk_add_to_ipset(ipset_name, cidr_entries)
-        logger.info(f"Added {len(cidr_entries)} CIDR entries to {ipset_name}: {cidr_msg}")
-
-    if not domains:
-        logger.info(f"No domains to resolve in {filepath}")
-        return 0
-
-    MAX_RESOLVED_IPS = 1000  # Limit to prevent CPU overload
-    BATCH_SIZE = 500
-    total_ips_added = 0
-
-    for i in range(0, len(domains), BATCH_SIZE):
-        batch_domains = domains[i:i + BATCH_SIZE]
-        resolved = parallel_resolve(batch_domains, max_workers)
-
-        batch_ips = set()
-        for domain, ips in resolved.items():
-            batch_ips.update(ips)
-
-        # Limit resolved IPs to prevent overload
-        if total_ips_added + len(batch_ips) > MAX_RESOLVED_IPS:
-            allowed = MAX_RESOLVED_IPS - total_ips_added
-            if allowed > 0:
-                batch_ips = set(list(batch_ips)[:allowed])
-                logger.warning(f"IP limit reached ({MAX_RESOLVED_IPS}), truncating batch to {allowed}")
-            else:
-                logger.warning(f"IP limit reached ({MAX_RESOLVED_IPS}), skipping remaining domains")
-                break
-
-        if batch_ips:
+    total_added = 0
+    
+    # Add CIDR and IP directly (no DNS resolution needed)
+    for entries_batch in [cidr_entries, ip_entries]:
+        if entries_batch:
             ensure_ipset_exists(ipset_name)
-            success, msg = bulk_add_to_ipset(ipset_name, list(batch_ips))
-            if success:
-                total_ips_added += len(batch_ips)
-                logger.info(f"Batch {i // BATCH_SIZE + 1}: added {len(batch_ips)} IPs to {ipset_name}")
-            else:
-                logger.error(f"Failed to add batch IPs: {msg}")
+            ok, msg = bulk_add_to_ipset(ipset_name, entries_batch)
+            total_added += len(entries_batch)
+            logger.info(f"[IPSET] Added {len(entries_batch)} to {ipset_name}")
 
-    logger.info(f"Total: added {total_ips_added} resolved IPs to ipset {ipset_name}")
-    return total_ips_added
+    logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains (skipped)")
+    return total_added

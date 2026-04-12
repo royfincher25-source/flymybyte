@@ -76,6 +76,8 @@ class DnsmasqManager:
     def load_all_bypass_domains(self) -> Dict[str, Set[str]]:
         """
         Загрузить домены из ВСЕХ bypass-файлов (.txt).
+        
+        Использует IPSET_MAP для маппинга filename -> ipset_name.
 
         Returns:
             Dict[str, Set[str]]: {ipset_name: set_of_domains}
@@ -84,15 +86,9 @@ class DnsmasqManager:
         if not os.path.exists(self._unblock_dir):
             return result
 
-        # Маппинг файлов на ipset имена
-        file_to_ipset = {
-            'shadowsocks.txt': 'unblocksh',
-            'vless.txt': 'unblockvless',
-            'trojan.txt': 'unblocktroj',
-        }
-
-        for filename, ipset_name in file_to_ipset.items():
-            filepath = os.path.join(self._unblock_dir, filename)
+        # Используем IPSET_MAP: filename (без .txt) -> ipset_name
+        for filename_stem, ipset_name in IPSET_MAP.items():
+            filepath = os.path.join(self._unblock_dir, f"{filename_stem}.txt")
             domains = self.load_domains_from_file(filepath)
             if domains:
                 result[ipset_name] = domains
