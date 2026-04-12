@@ -103,7 +103,6 @@ def create_app(config_class=None):
         from core.ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
         from core.constants import IPSET_MAP
         import subprocess
-        import os
         
         config = WebConfig()
         unblock_dir = config.unblock_dir
