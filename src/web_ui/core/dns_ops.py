@@ -401,8 +401,11 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
         import subprocess
         try:
             result = subprocess.run(
-                [RESOLVE_SCRIPT, filepath, ipset_name],
-                capture_output=True, text=True, timeout=60
+                f'{RESOLVE_SCRIPT} {filepath} {ipset_name}',
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=60
             )
             if result.returncode == 0:
                 logger.info(f"[DNS] {result.stdout.strip()}")
