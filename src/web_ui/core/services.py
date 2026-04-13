@@ -70,7 +70,7 @@ def refresh_ipset_from_file(filepath: str, ipset_name: str = None) -> Tuple[bool
 
     # --- Step 1: Count entries BEFORE flush ---
     def count_ipset_entries(name: str) -> int:
-        """Count entries in an ipset by counting lines starting with digits."""
+        """Count entries in an ipset by counting lines with IP addresses (ending in timeout)."""
         try:
             result = subprocess.run(
                 ['ipset', '-L', name],
@@ -79,7 +79,7 @@ def refresh_ipset_from_file(filepath: str, ipset_name: str = None) -> Tuple[bool
             if result.returncode == 0:
                 return len([
                     line for line in result.stdout.splitlines()
-                    if re.match(r'^[0-9]', line)
+                    if re.match(r'^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+.*timeout', line)
                 ])
             return -1
         except Exception as e:

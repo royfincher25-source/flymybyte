@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # ===========================================================================
 
 def _count_ipset_entries(setname: str) -> int:
-    """Count entries in an ipset by counting lines starting with digits.
+    """Count entries in an ipset by counting lines with IP addresses (ending in timeout).
     Returns -1 if unable to count (ipset doesn't exist or error)."""
     import re
     try:
@@ -30,7 +30,7 @@ def _count_ipset_entries(setname: str) -> int:
         if result.returncode == 0:
             return len([
                 line for line in result.stdout.splitlines()
-                if re.match(r'^[0-9]', line)
+                if re.match(r'^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+.*timeout', line)
             ])
         return -1
     except Exception:
