@@ -372,6 +372,8 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     Returns:
         Количество добавленных записей
     """
+    import os
+    import subprocess
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
