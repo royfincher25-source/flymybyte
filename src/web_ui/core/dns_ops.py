@@ -400,6 +400,7 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     if domains and os.path.exists(RESOLVE_SCRIPT):
         import subprocess
         try:
+            logger.info(f"[DNS] Running script: {RESOLVE_SCRIPT} {filepath} {ipset_name}")
             result = subprocess.run(
                 f'{RESOLVE_SCRIPT} {filepath} {ipset_name}',
                 shell=True,
@@ -407,6 +408,9 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
                 text=True,
                 timeout=60
             )
+            logger.info(f"[DNS] Script stdout: {result.stdout[:100]}")
+            logger.info(f"[DNS] Script stderr: {result.stderr[:100]}")
+            logger.info(f"[DNS] Script returncode: {result.returncode}")
             if result.returncode == 0:
                 logger.info(f"[DNS] {result.stdout.strip()}")
                 total_added = 24065
