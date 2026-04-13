@@ -14,6 +14,7 @@ FlyMyByte — Unified dnsmasq Config Manager
     mgr.restart_dnsmasq()             # применить
 """
 import os
+import re
 import logging
 import subprocess
 import shutil
@@ -351,7 +352,7 @@ class DnsmasqManager:
         Returns:
             Tuple[bool, str]: (valid, message)
         """
-        if not os.path.exists(DNSMASQ_CONF):
+        if not os.path.exists(DNSMASQ_CONFIG):
             return False, "dnsmasq.conf not found"
 
         try:
@@ -380,8 +381,6 @@ class DnsmasqManager:
         """
         if not domain or len(domain) > 253:
             return False
-        # Только буквы, цифры, точки, дефисы
-        import re
         return bool(re.match(r'^[a-z0-9]([a-z0-9\-\.]*[a-z0-9])?$', domain))
 
     # =========================================================================

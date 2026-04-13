@@ -5,6 +5,7 @@ Consolidates: dns_manager, dns_monitor, dns_resolver
 All DNS-related functionality in one module for embedded devices (128MB RAM).
 """
 import subprocess
+import os
 import socket
 import threading
 import time
@@ -372,8 +373,6 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     Returns:
         Количество добавленных записей
     """
-    import os
-    import subprocess
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
@@ -398,27 +397,24 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
             total_added += len(entries_batch)
 
     if domains and os.path.exists(RESOLVE_SCRIPT):
-        import subprocess
-        try:
-            logger.info(f"[DNS] Running script: {RESOLVE_SCRIPT} {filepath} {ipset_name}")
-            result = subprocess.run(
-                f'{RESOLVE_SCRIPT} {filepath} {ipset_name}',
-                shell=True,
-                capture_output=True,
-                text=True,
-                timeout=60
-            )
-            logger.info(f"[DNS] Script stdout: {result.stdout[:100]}")
-            logger.info(f"[DNS] Script stderr: {result.stderr[:100]}")
-            logger.info(f"[DNS] Script returncode: {result.returncode}")
-            if result.returncode == 0:
-                logger.info(f"[DNS] {result.stdout.strip()}")
-                total_added = 24065
-        except Exception as e:
-            logger.warning(f"[DNS] Script error: {e}")
+        if not filepath.startswith('/') or '..' in filepath:
+            logger.error(f"[DNS] Invalid filepath: {filepath}")
+        else:
+            try:
+                result = subprocess.run(
+                    [RESOLVE_SCRIPT, filepath, ipset_name],
+                    shell=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                logger.info(f"[DNS] Script stdout: {result.stdout[:100]}")
+                logger.info(f"[DNS] Script stderr: {result.stderr[:100]}")
+                logger.info(f"[DNS] Script returncode: {result.returncode}")
+                if result.returncode == 0:
+                    logger.info(f"[DNS] {result.stdout.strip()}")
+            except Exception as e:
+                logger.warning(f"[DNS] Script error: {e}")
 
     logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains")
-    return total_added
-
-    logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains resolved")
     return total_added
