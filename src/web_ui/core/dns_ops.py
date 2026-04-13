@@ -385,8 +385,8 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
-    MAX_IPS_PER_DOMAIN = 10
-    MAX_WORKERS = 20
+    MAX_IPS_PER_DOMAIN = 5  # меньше IP = быстрее
+    MAX_WORKERS = 5
     DNS_SERVER = "8.8.8.8"
 
     def resolve_single_domain(domain: str) -> List[str]:

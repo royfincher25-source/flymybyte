@@ -1,5 +1,8 @@
 {
   "intel": {
     "enabled": true
+  },
+  "features": {
+    "global_learnings": true
   }
 }

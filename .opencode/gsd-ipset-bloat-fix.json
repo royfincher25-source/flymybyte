@@ -1,8 +1,8 @@
 {
   "title": "Fix ipset bloat: 24064 entries in unblockvless",
-  "status": "completed",
+  "status": "testing_failed",
   "created": "2026-04-13",
-  "updated": "2026-04-13",
+  "updated": "2026-04-13T03:00:00Z",
   "problem": "ipset unblockvless содержит 24064 записей, что критически много для роутера с 128MB RAM. Причина: resolve_domains_for_ipset() резолвит каждый домен через socket.getaddrinfo() и добавляет ВСЕ IP (CDN даёт 10-30 IP на домен). IP накапливаются, т.к. flush не происходит перед добавлением.",
   "root_cause": "1. resolve_domains_for_ipset() в dns_ops.py резолвит домены в IP (дублирует dnsmasq)\n2. bulk_add_to_ipset() не делает flush перед добавлением\n3. Нет лимита на количество IP в ipset\n4. DNsmasq уже настроен на ipset=/domain/ipset_name — ручной резолв не нужен",
   "approach": "Вариант B: Отказаться от ручного резолва доменов. Положиться на dnsmasq для доменов. В ipset только CIDR и статические IP.",
@@ -20,7 +20,8 @@
       "file": "src/web_ui/core/dns_ops.py",
       "action": "Убрать parallel_resolve() для доменов. Оставить только CIDR и IP. Домены пропускаются — dnsmasq сам добавит их при DNS-запросах через ipset=/domain/ipset_name.",
       "acceptance": "resolve_domains_for_ipset() добавляет только CIDR и IP, домены логируются как skipped",
-      "priority": "critical"
+      "priority": "critical",
+      "status": "completed"
     },
     {
       "id": 2,
@@ -28,7 +29,8 @@
       "file": "src/web_ui/core/services.py",
       "action": "В refresh_ipset_from_file() добавить надёжный flush ipset_name ПЕРЕД добавлением новых записей. Если flush не работает (iptables ссылки), логировать warning и продолжить.",
       "acceptance": "При каждом refresh_ipset_from_file() ipset очищается перед добавлением",
-      "priority": "critical"
+      "priority": "critical",
+      "status": "completed"
     },
     {
       "id": 3,
@@ -36,7 +38,8 @@
       "file": "src/web_ui/core/constants.py",
       "action": "Добавить константу IPSET_MAX_ENTRIES = 5000 (защита от переполнения). Использовать в bulk_add_to_ipset() для проверки.",
       "acceptance": "bulk_add_to_ipset() отказывает если len(entries) > IPSET_MAX_ENTRIES",
-      "priority": "high"
+      "priority": "high",
+      "status": "completed"
     },
     {
       "id": 4,
@@ -44,7 +47,8 @@
       "file": "src/web_ui/routes_system.py",
       "action": "В endpoint /stats добавить размер каждого ipset (ipset -L name | grep -c). Показывать warning если > 1000.",
       "acceptance": "В статусе отображается размер каждого ipset с цветовой индикацией (зелёный < 500, жёлтый < 1000, красный > 1000)",
-      "priority": "medium"
+      "priority": "medium",
+      "status": "completed"
     },
     {
       "id": 5,
@@ -52,12 +56,53 @@
       "file": "src/web_ui/core/dns_ops.py",
       "action": "Убрать функции parallel_resolve() и resolve_single() если они не используются в других местах.",
       "acceptance": "Нет неиспользуемого кода, dns_ops.py содержит только dnsmasq-операции",
-      "priority": "low"
+      "priority": "low",
+      "status": "completed"
+    },
+    {
+      "id": 6,
+      "title": "Добавить timeout=300 при создании ipset",
+      "file": "src/web_ui/core/ipset_ops.py, services.py",
+      "action": "ensure_ipset_exists() и recreate в services.py создают ipset с timeout=300 для авто-очистки от CDN round-robin.",
+      "acceptance": "ipset создан с timeout=300, IP автоматически удаляются через 5 минут",
+      "priority": "critical",
+      "status": "completed"
+    },
+    {
+      "id": 7,
+      "title": "Проверить что app.py startup hook загружает CIDR из файлов",
+      "file": "src/web_ui/app.py",
+      "action": "Убедиться что startup hook вызывает ensure_ipset_exists() с timeout и загружает CIDR/IP из bypass файлов",
+      "acceptance": "После restart web_ui CIDR из файлов попадают в ipset",
+      "priority": "high",
+      "status": "pending",
+      "note": "На роутере unblockvless=0 после restart — vless.txt не содержит CIDR. Нужно добавить CIDR из telegram.txt в vless.txt."
     }
   ],
   "verification": {
     "tests": "Запустить tests/ если есть, проверить что resolve_domains_for_ipset() не резолвит домены",
-    "manual": "1. ipset -L unblockvless | grep -c — должно стать < 500\n2. Веб-интерфейс /stats показывает размер ipset\n3. Добавление доменов в bypass работает через dnsmasq"
+    "manual": "1. ipset -L unblockvless | grep -c — должно стать < 500\n2. Веб-интерфейс /stats показывает размер ipset\n3. Добавление доменов в bypass работает через dnsmasq",
+    "router_results": {
+      "status": "FAILED",
+      "date": "2026-04-13T02:38:00Z",
+      "ipset_sizes_after_restart": {
+        "unblockvless": 24064,
+        "unblocksh": 43,
+        "unblocktroj": 0,
+        "unblockproxy": 0
+      },
+      "issue": "ipset unblockvless остался 24064 после restart — timeout не применялся т.к. ipset нельзя destroy пока iptables правила ссылаются на него",
+      "fix_applied": "Пересоздали ipset с timeout=300 вручную (остановили VPN, удалили iptables, destroy ipset, create с timeout, восстановили iptables, запустили VPN)",
+      "ipset_sizes_after_manual_fix": {
+        "unblockvless": 0,
+        "unblocksh": 2,
+        "unblocktroj": 0,
+        "unblockproxy": 0
+      },
+      "timeout_confirmed": true,
+      "new_issue": "ipset пустой после restart — CIDR/IP из bypass файлов не загружаются. Причина: vless.txt содержит только домены (без CIDR/IP). Домены обрабатываются dnsmasq автоматически при DNS запросах клиентов. Для Telegram CIDR обязательны (MTProto подключается к IP напрямую).",
+      "remaining_work": "1. Убедиться что vless.txt на роутере содержит CIDR из telegram.txt\n2. Проверить что app.py startup hook загружает CIDR из файлов\n3. Добавить проверку в startup что CIDR загружены"
+    }
   },
   "risks": [
     "Если dnsmasq не настроен правильно, домены не попадут в ipset",
