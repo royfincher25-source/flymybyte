@@ -87,71 +87,16 @@ def refresh_ipset_from_file(filepath: str, ipset_name: str = None) -> Tuple[bool
             return -1
 
     entries_before = count_ipset_entries(ipset_name)
-    logger.info(f"[IPSET] Refresh: {ipset_name} has {entries_before} entries before flush")
+    logger.info(f"[IPSET] Refresh: {ipset_name} has {entries_before} entries")
 
-    # --- Step 2: Flush ipset ---
-    flush_ok = False
-    try:
-        logger.info(f"[IPSET] Flushing {ipset_name}...")
-        result = subprocess.run(
-            ['ipset', '-F', ipset_name],
-            capture_output=True, text=True, timeout=10
-        )
-        if result.returncode == 0:
-            logger.info(f"[IPSET] Flush succeeded for {ipset_name}")
-            flush_ok = True
-        else:
-            logger.warning(f"[IPSET] Flush failed for {ipset_name}: {result.stderr.strip()[:150]}")
-    except subprocess.TimeoutExpired:
-        logger.warning(f"[IPSET] Flush timeout for {ipset_name}")
-    except Exception as e:
-        logger.warning(f"[IPSET] Flush exception for {ipset_name}: {e}")
+    # --- Step 2: Skip flush (не работает на Keenetic из-за iptables references)
+    # Используем -exist для upsert, timeout=300 удаляет старые записи
+    logger.info(f"[IPSET] Skip flush - using -exist for upsert (timeout handles cleanup)")
+    flush_ok = True
 
-    # --- Step 3: If flush failed — recreate ipset ---
-    if not flush_ok:
-        logger.warning(f"[IPSET] Flush failed, attempting recreate for {ipset_name}")
-        try:
-            # Destroy
-            logger.info(f"[IPSET] Destroying {ipset_name}...")
-            destroy_result = subprocess.run(
-                ['ipset', 'destroy', ipset_name],
-                capture_output=True, text=True, timeout=10
-            )
-            if destroy_result.returncode != 0:
-                logger.warning(
-                    f"[IPSET] Destroy failed for {ipset_name}: "
-                    f"{destroy_result.stderr.strip()[:150]}"
-                )
-                # Destroy may fail if referenced by iptables; try flush again
-                logger.info(f"[IPSET] Retrying flush after destroy failure...")
-                retry = subprocess.run(
-                    ['ipset', '-F', ipset_name],
-                    capture_output=True, text=True, timeout=10
-                )
-                if retry.returncode == 0:
-                    flush_ok = True
-                    logger.info(f"[IPSET] Retry flush succeeded for {ipset_name}")
-                else:
-                    logger.error(f"[IPSET] Retry flush also failed: {retry.stderr.strip()[:150]}")
-            else:
-                # Create
-                logger.info(f"[IPSET] Recreating {ipset_name}...")
-                create_result = subprocess.run(
-                    ['ipset', 'create', ipset_name, 'hash:ip', 'maxelem', '1048576', 'timeout', '300'],
-                    capture_output=True, text=True, timeout=10
-                )
-                if create_result.returncode == 0:
-                    flush_ok = True
-                    logger.info(f"[IPSET] Recreate succeeded for {ipset_name}")
-                else:
-                    logger.error(
-                        f"[IPSET] Create failed for {ipset_name}: "
-                        f"{create_result.stderr.strip()[:150]}"
-                    )
-        except subprocess.TimeoutExpired:
-            logger.warning(f"[IPSET] Recreate timeout for {ipset_name}")
-        except Exception as e:
-            logger.error(f"[IPSET] Recreate exception for {ipset_name}: {e}")
+    # --- Step 4: Verify state ---
+    entries_after_flush = count_ipset_entries(ipset_name)
+    logger.info(f"[IPSET] Current state: {entries_after_flush} entries (timeout=300 handles cleanup)")
 
     # --- Step 4: Verify flush ---
     entries_after_flush = count_ipset_entries(ipset_name)
