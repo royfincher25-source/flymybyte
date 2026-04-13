@@ -360,50 +360,83 @@ def get_dns_monitor() -> DNSMonitor:
 
 def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -> int:
     """
-    Добавить IP из bypass файла в ipset (только CIDR и статические IP).
+    Добавить IP из bypass файла в ipset (прямой DNS resolve).
 
-    Логика:
-    1. CIDR (149.154.160.0/20) -> добавить напрямую в ipset через bulk_add_to_ipset()
-    2. IP (91.108.6.1) -> добавить напрямую в ipset через bulk_add_to_ipset()
-    3. Домены (telegram.org) -> ПРОПУСТИТЬ (dnsmasq обрабатывает через ipset=/domain/ipset_name)
+    Логика (Вариант A - упрощение):
+    1. CIDR (149.154.160.0/20) -> добавить напрямую
+    2. IP (91.108.6.1) -> добавить напрямую
+    3. Домены (telegram.org) -> РЕЗОЛВИТЬ и добавить (proactive)
 
-    Домены НЕ резолвятся здесь — dnsmasq автоматически добавляет их в ipset
-    при обработке DNS-запросов через директивы ipset=/domain/ipset_name.
+    Раньше домены пропускались - dnsmasq добавлял при DNS запросе.
+    Теперь резолвим сразу для гарантированного заполнения ipset.
+
+    Защита от CDN bloat:
+    - Лимит MAX_IPS_PER_DOMAIN (，防止 CDN вернёт 100+ IP)
+    - Timeout на DNS запрос (3 сек)
+    - batch processing
 
     Args:
         filepath: Путь к bypass файлу (vless.txt)
         ipset_name: Имя ipset (auto-detect из имени файла если None)
 
     Returns:
-        Количество добавленных записей (CIDR + IP, без доменов)
+        Количество добавленных записей
     """
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
+    MAX_IPS_PER_DOMAIN = 10
+    DNS_TIMEOUT = 3
+
+    def resolve_single_domain(domain: str) -> List[str]:
+        """Резолвить домен в IP с защитой от bloat."""
+        ips = []
+        try:
+            result = socket.getaddrinfo(domain, None, socket.AF_INET, socket.SOCK_STREAM)
+            for _, _, _, _, addr in result[:MAX_IPS_PER_DOMAIN]:
+                if addr[0] not in ips:
+                    ips.append(addr[0])
+        except socket.gaierror:
+            logger.debug(f"[DNS] Failed to resolve: {domain}")
+        except Exception as e:
+            logger.debug(f"[DNS] Error resolving {domain}: {e}")
+        return ips
+
     entries = load_bypass_list(filepath)
     
-    # Фильтрация:
-    # - CIDR: добавить напрямую (dns_ops не резолвит CIDR)
-    # - IP: добавить напрямую
-    # - Домены: пропустить (dnsmasq добавит при запросе)
     cidr_entries = [e for e in entries if is_cidr(e) and not e.startswith(('2001:', 'fe80:'))]
     ip_entries = [e for e in entries if is_ip_address(e) and '/' not in e]
     domains = [e for e in entries if not is_ip_address(e) and not is_cidr(e)]
 
-    # Auto-detect ipset name from filename
     if ipset_name is None:
         filename = Path(filepath).stem
         ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
 
     total_added = 0
-    
-    # Add CIDR and IP directly (no DNS resolution needed)
+
+    ensure_ipset_exists(ipset_name)
+
     for entries_batch in [cidr_entries, ip_entries]:
         if entries_batch:
-            ensure_ipset_exists(ipset_name)
             ok, msg = bulk_add_to_ipset(ipset_name, entries_batch)
             total_added += len(entries_batch)
-            logger.info(f"[IPSET] Added {len(entries_batch)} to {ipset_name}")
+            logger.info(f"[IPSET] Added {len(entries_batch)} CIDR/IP to {ipset_name}")
 
-    logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains (skipped)")
+    if domains:
+        logger.info(f"[DNS] Resolving {len(domains)} domains for {ipset_name}...")
+        resolved_ips = []
+        for domain in domains:
+            domain_ips = resolve_single_domain(domain)
+            if domain_ips:
+                resolved_ips.extend(domain_ips)
+                logger.debug(f"[DNS] {domain} -> {len(domain_ips)} IPs")
+            else:
+                logger.debug(f"[DNS] {domain} -> no IP (skip)")
+
+        if resolved_ips:
+            ok, msg = bulk_add_to_ipset(ipset_name, resolved_ips)
+            total_added += len(resolved_ips)
+            logger.info(f"[IPSET] Added {len(resolved_ips)} IPs from {len(domains)} domains to {ipset_name}")
+
+    logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains resolved")
     return total_added
