@@ -365,12 +365,12 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     Логика (Вариант A - упрощение):
     1. CIDR (149.154.160.0/20) -> добавить напрямую
     2. IP (91.108.6.1) -> добавить напрямую
-    3. Домены (telegram.org) -> РЕЗОЛВИТЬ параллельно и добавить
+    3. Домены (telegram.org) -> РЕЗОЛВИТЬ параллельно через nslookup и добавить
 
     Оптимизация:
-    - Parallel DNS resolution (ThreadPoolExecutor)
+    - Parallel nslookup через subprocess (быстрее чем socket.getaddrinfo)
     - MAX_IPS_PER_DOMAIN лимит для защиты от CDN bloat
-    - Timeout на DNS запрос
+    - DNS сервер 8.8.8.8 для стабильной скорости
 
     Args:
         filepath: Путь к bypass файлу (vless.txt)
@@ -379,25 +379,31 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     Returns:
         Количество добавленных записей
     """
+    import re
+    import subprocess
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from .utils import load_bypass_list
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
     MAX_IPS_PER_DOMAIN = 10
     MAX_WORKERS = 20
-    DNS_TIMEOUT = 3
+    DNS_SERVER = "8.8.8.8"
 
     def resolve_single_domain(domain: str) -> List[str]:
-        """Резолвить домен в IP с защитой от bloat."""
+        """Резолвить домен в IP через nslookup (быстрее socket.getaddrinfo)."""
         ips = []
         try:
-            socket.setdefaulttimeout(DNS_TIMEOUT)
-            result = socket.getaddrinfo(domain, None, socket.AF_INET, socket.SOCK_STREAM)
-            for _, _, _, _, addr in result[:MAX_IPS_PER_DOMAIN]:
-                if addr[0] not in ips:
-                    ips.append(addr[0])
-        except socket.gaierror:
-            logger.debug(f"[DNS] Failed to resolve: {domain}")
+            result = subprocess.run(
+                ['nslookup', domain, DNS_SERVER],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode == 0:
+                ip_matches = re.findall(r'\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b', result.stdout)
+                for ip in ip_matches[:MAX_IPS_PER_DOMAIN]:
+                    if ip not in ips and ip != DNS_SERVER:
+                        ips.append(ip)
+        except subprocess.TimeoutExpired:
+            logger.debug(f"[DNS] Timeout: {domain}")
         except Exception as e:
             logger.debug(f"[DNS] Error resolving {domain}: {e}")
         return ips
@@ -423,7 +429,7 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
             logger.info(f"[IPSET] Added {len(entries_batch)} CIDR/IP to {ipset_name}")
 
     if domains:
-        logger.info(f"[DNS] Resolving {len(domains)} domains for {ipset_name} (parallel, max_workers={MAX_WORKERS})...")
+        logger.info(f"[DNS] Resolving {len(domains)} domains for {ipset_name} (parallel nslookup, max_workers={MAX_WORKERS})...")
         resolved_ips = []
         
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -442,6 +448,9 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
             ok, msg = bulk_add_to_ipset(ipset_name, resolved_ips)
             total_added += len(resolved_ips)
             logger.info(f"[IPSET] Added {len(resolved_ips)} IPs from {len(domains)} domains to {ipset_name}")
+
+    logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains resolved")
+    return total_added
 
     logger.info(f"[IPSET] {filepath}: {len(cidr_entries)} CIDR, {len(ip_entries)} IP, {len(domains)} domains resolved")
     return total_added
