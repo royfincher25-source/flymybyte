@@ -3,7 +3,13 @@
     "allow": [
       "Bash(python *)",
       "Bash(do *)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(powershell *)",
+      "Bash(git branch *)",
+      "Bash(dir *)",
+      "Bash(git *)",
+      "Bash(del *)",
+      "Bash(rmdir *)"
     ]
   },
   "$version": 3

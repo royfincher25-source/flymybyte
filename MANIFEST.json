@@ -3,8 +3,8 @@
   "files": {
     "VERSION": {
       "dest": "/opt/etc/web_ui/VERSION",
-      "md5": "5846a55e8e47f55c6ea51bd374b865b4",
-      "size": 6
+      "md5": "2e3f2b4b1ffd948e55757aeb60f3944e",
+      "size": 7
     },
     "web_ui/.env.example": {
       "dest": "/opt/etc/web_ui/.env.example",
@@ -18,43 +18,43 @@
     },
     "web_ui/app.py": {
       "dest": "/opt/etc/web_ui/app.py",
-      "md5": "38a00a9eec6dece53fd9523026a20472",
-      "size": 3578
+      "md5": "96c8f2443f959f3f9869b512ac37e568",
+      "size": 6112
     },
     "web_ui/core/__init__.py": {
       "dest": "/opt/etc/web_ui/core/__init__.py",
-      "md5": "bd8229634ddf220c6944a3879b04e51e",
-      "size": 1802
+      "md5": "0368bdb4504f1a3cd9cf354e049c402f",
+      "size": 1839
     },
     "web_ui/core/constants.py": {
       "dest": "/opt/etc/web_ui/core/constants.py",
-      "md5": "c5cea8907ceaa16f2a39bd83516b65ba",
-      "size": 11289
+      "md5": "9db7ca25c916432c1d729d254da9e9e1",
+      "size": 13491
     },
     "web_ui/core/utils.py": {
       "dest": "/opt/etc/web_ui/core/utils.py",
-      "md5": "75e009d285efe33207798a12589993cf",
-      "size": 16212
+      "md5": "2a5489937de34cb775e366c0139b83c9",
+      "size": 16793
     },
     "web_ui/core/services.py": {
       "dest": "/opt/etc/web_ui/core/services.py",
-      "md5": "39f756a8fa4c20fefd023a5ecbb7ed9d",
-      "size": 63029
+      "md5": "50a89bc176408ee2d9e3c70ce432f5ef",
+      "size": 25189
     },
     "web_ui/core/dns_ops.py": {
       "dest": "/opt/etc/web_ui/core/dns_ops.py",
-      "md5": "7751e5de0f2b95af0c974687eceebda6",
-      "size": 15390
+      "md5": "1a9ae7193950208d1128beac283d86ba",
+      "size": 15750
     },
     "web_ui/core/app_config.py": {
       "dest": "/opt/etc/web_ui/core/app_config.py",
-      "md5": "5b7f7a0607f552bb638d83350a35e979",
-      "size": 4591
+      "md5": "8f179d2ae98cb11d74cfb4c7d5d9819d",
+      "size": 6082
     },
     "web_ui/core/update_progress.py": {
       "dest": "/opt/etc/web_ui/core/update_progress.py",
-      "md5": "70346fcce59d630197c19a2189fbe516",
-      "size": 2254
+      "md5": "7d0998cd28cad8af35b3f1bc644d4b61",
+      "size": 3451
     },
     "web_ui/core/decorators.py": {
       "dest": "/opt/etc/web_ui/core/decorators.py",
@@ -63,48 +63,48 @@
     },
     "web_ui/core/ipset_ops.py": {
       "dest": "/opt/etc/web_ui/core/ipset_ops.py",
-      "md5": "57046ea88702f2c1aaef2f7ffa5f13d8",
-      "size": 5596
+      "md5": "87a43ddadf7a60482cc28186a7409681",
+      "size": 7861
     },
     "web_ui/core/emergency_restore.py": {
       "dest": "/opt/etc/web_ui/core/emergency_restore.py",
-      "md5": "b4d52b6f8a6f6fe657e6de0174174323",
-      "size": 6230
+      "md5": "66d5c8381afdc2df57a6ddd3061c95b9",
+      "size": 6130
     },
     "web_ui/core/dnsmasq_manager.py": {
       "dest": "/opt/etc/web_ui/core/dnsmasq_manager.py",
-      "md5": "14ff67839a0d1f8a1d8fa45fc701ce10",
-      "size": 14798
+      "md5": "763ab6e6b7a109743a4e801417258d3f",
+      "size": 17643
     },
     "web_ui/core/iptables_manager.py": {
       "dest": "/opt/etc/web_ui/core/iptables_manager.py",
-      "md5": "2d5fb42fedb64064c2a02c41bdd9cc54",
-      "size": 14768
+      "md5": "e4f8e218b912345cb574d4d5efd892c2",
+      "size": 25777
     },
     "web_ui/routes_core.py": {
       "dest": "/opt/etc/web_ui/routes_core.py",
-      "md5": "a63a82efe7c1151b1cf209a5d4abebe0",
-      "size": 2211
+      "md5": "bfe211b71c274d69fdbdaf31e76d2fa8",
+      "size": 2175
     },
     "web_ui/routes_system.py": {
       "dest": "/opt/etc/web_ui/routes_system.py",
-      "md5": "c36220df04d0a29c6ac8e03d88578c0c",
-      "size": 32203
+      "md5": "2e9155af52bb3442aef23d9a540900db",
+      "size": 32504
     },
     "web_ui/routes_vpn.py": {
       "dest": "/opt/etc/web_ui/routes_vpn.py",
-      "md5": "b3348ea9b53cdc7b20d5fc0a1c40e5d6",
-      "size": 21646
+      "md5": "f7c723009fd04a5d2336a0f41fc615a9",
+      "size": 4636
     },
     "web_ui/routes_bypass.py": {
       "dest": "/opt/etc/web_ui/routes_bypass.py",
-      "md5": "071928505f4ad2d84f9d427a4b43fb00",
-      "size": 16913
+      "md5": "9a63661d1bd343c1c7fc726822caf985",
+      "size": 16221
     },
     "web_ui/routes_updates.py": {
       "dest": "/opt/etc/web_ui/routes_updates.py",
-      "md5": "226968118e92a83a88ed50127ba76e53",
-      "size": 18967
+      "md5": "ba1adc4d4ada85d99b45832300db8392",
+      "size": 29904
     },
     "web_ui/static/main.js": {
       "dest": "/opt/etc/web_ui/static/main.js",
@@ -113,18 +113,18 @@
     },
     "web_ui/resources/scripts/S99unblock": {
       "dest": "/opt/etc/init.d/S99unblock",
-      "md5": "04893b0a3fa8471f1036f337c58a1697",
-      "size": 3685
+      "md5": "3b4b5cbb8a9a4abe27174a904ea24052",
+      "size": 11086
     },
     "web_ui/resources/scripts/S99web_ui": {
       "dest": "/opt/etc/init.d/S99web_ui",
-      "md5": "7a03f65a52204de47cc80eec47ccddab",
-      "size": 1332
+      "md5": "06408146d98b0ecb4b8d7ab6210d78de",
+      "size": 1965
     },
     "web_ui/resources/scripts/100-redirect.sh": {
       "dest": "/opt/etc/ndm/netfilter.d/100-redirect.sh",
-      "md5": "fe9825a2b634fc702a046a3900349ca0",
-      "size": 9195
+      "md5": "4348c27b24635aefa68fd67ab24de51a",
+      "size": 9015
     },
     "web_ui/resources/scripts/100-unblock-vpn.sh": {
       "dest": "/opt/etc/ndm/ifstatechanged.d/100-unblock-vpn.sh",
@@ -133,33 +133,28 @@
     },
     "web_ui/resources/scripts/100-ipset.sh": {
       "dest": "/opt/etc/ndm/fs.d/100-ipset.sh",
-      "md5": "bca64210b9ab22aa42eeddef5164cdda",
-      "size": 528
+      "md5": "66340a0dc18e6a48289cf55289c8b078",
+      "size": 488
     },
     "web_ui/resources/scripts/unblock_ipset.sh": {
       "dest": "/opt/bin/unblock_ipset.sh",
-      "md5": "17312098159bcd400c1a5d855f4ed848",
-      "size": 8904
+      "md5": "367b96b621a2091d27ca415b29b95548",
+      "size": 8697
     },
     "web_ui/resources/scripts/unblock_dnsmasq.sh": {
       "dest": "/opt/etc/web_ui/resources/scripts/unblock_dnsmasq.sh",
-      "md5": "c66c6881e5835feabecef488c084bccc",
-      "size": 5844
+      "md5": "c5c4502ada1266a5fb8bce6c607d0f7c",
+      "size": 6058
     },
     "web_ui/resources/scripts/unblock_update.sh": {
       "dest": "/opt/bin/unblock_update.sh",
-      "md5": "cf93ed7ac41626f59f4ec750fae55d12",
-      "size": 1058
-    },
-    "web_ui/resources/scripts/refresh_ipset.sh": {
-      "dest": "/opt/bin/refresh_ipset.sh",
-      "md5": "13402d400d7109cf468f5adbd5dd1032",
-      "size": 3553
+      "md5": "63833107504dca7af6bb5273fbba37b7",
+      "size": 978
     },
     "web_ui/resources/config/dnsmasq.conf": {
       "dest": "/opt/etc/dnsmasq.conf",
-      "md5": "6471850183032ad13e8832a1709ffa92",
-      "size": 3091
+      "md5": "15e2ad0c2db517a6c487944fa2d082fd",
+      "size": 3068
     },
     "web_ui/resources/config/crontab": {
       "dest": "/opt/etc/crontab",
@@ -168,8 +163,8 @@
     },
     "web_ui/scripts/script.sh": {
       "dest": "/opt/root/script.sh",
-      "md5": "777c2e7ffe7639ae5378d2549b566a9a",
-      "size": 16755
+      "md5": "7b3e03d111388ca570714e64949b4196",
+      "size": 15840
     },
     "web_ui/templates/base.html": {
       "dest": "/opt/etc/web_ui/templates/base.html",
@@ -188,13 +183,13 @@
     },
     "web_ui/templates/keys.html": {
       "dest": "/opt/etc/web_ui/templates/keys.html",
-      "md5": "639b2416e4b14e5ed415aeb232ecd01c",
-      "size": 5342
+      "md5": "35642f74078c35d095e75a447fff8c8f",
+      "size": 4485
     },
     "web_ui/templates/bypass.html": {
       "dest": "/opt/etc/web_ui/templates/bypass.html",
-      "md5": "c0c56ab5d112cbc883b90b91cf1ffb39",
-      "size": 3354
+      "md5": "478ecde02322899149b33cb30dd39a19",
+      "size": 3165
     },
     "web_ui/templates/install.html": {
       "dest": "/opt/etc/web_ui/templates/install.html",
@@ -203,13 +198,13 @@
     },
     "web_ui/templates/stats.html": {
       "dest": "/opt/etc/web_ui/templates/stats.html",
-      "md5": "40f5c3bc2f5a16ef75d9fcca850afc68",
-      "size": 8035
+      "md5": "dca3a2b3b5ce10151e12100aa695deb6",
+      "size": 11099
     },
     "web_ui/templates/service.html": {
       "dest": "/opt/etc/web_ui/templates/service.html",
-      "md5": "1753df019b6a9fded28089e19575d9d7",
-      "size": 27693
+      "md5": "13220e6b28c1769c75f7b1bf996a9388",
+      "size": 27672
     },
     "web_ui/templates/updates.html": {
       "dest": "/opt/etc/web_ui/templates/updates.html",
@@ -238,13 +233,13 @@
     },
     "web_ui/templates/key_generic.html": {
       "dest": "/opt/etc/web_ui/templates/key_generic.html",
-      "md5": "87fdf921db85ff44981d6940c426a4b2",
-      "size": 9866
+      "md5": "4fb0906cc18b6de04bd1b67c63d6e680",
+      "size": 6035
     },
     "web_ui/templates/backup.html": {
       "dest": "/opt/etc/web_ui/templates/backup.html",
-      "md5": "d6ffd661f566a43d240e6eea9e67afe1",
-      "size": 6327
+      "md5": "5a5bdcbe3646277a8bd4885631c41e7c",
+      "size": 8969
     },
     "web_ui/templates/dns_monitor.html": {
       "dest": "/opt/etc/web_ui/templates/dns_monitor.html",
@@ -288,18 +283,23 @@
     },
     "web_ui/resources/scripts/emergency_restore.sh": {
       "dest": "/opt/bin/emergency_restore.sh",
-      "md5": "aab8be138055918f15829e4f8972a657",
-      "size": 3550
+      "md5": "b1b6160bb2458fca01aab60678472158",
+      "size": 3510
     },
     "web_ui/resources/scripts/dnsmasq_watchdog.sh": {
       "dest": "/opt/bin/dnsmasq_watchdog.sh",
-      "md5": "ea3781a6802d070205139618d62ae583",
-      "size": 3351
+      "md5": "d9e13143cbf9d7b6f753163467e4f2d5",
+      "size": 3834
+    },
+    "web_ui/resources/scripts/vpn_watchdog.sh": {
+      "dest": "/opt/bin/vpn_watchdog.sh",
+      "md5": "d5235d984b5ab5fb9bf21e19f4f98b14",
+      "size": 4133
     },
     "web_ui/resources/scripts/rollback.sh": {
       "dest": "/opt/bin/rollback.sh",
-      "md5": "5569cc9ce8e05371c20fda28838e9850",
-      "size": 5662
+      "md5": "d6ffd9829383ae252aa156159c7faaa2",
+      "size": 5622
     },
     "web_ui/resources/scripts/test_bypass.sh": {
       "dest": "/opt/bin/test_bypass.sh",

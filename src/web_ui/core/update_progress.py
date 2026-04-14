@@ -1,91 +1,118 @@
 """
-Update progress tracking for long-running update operations.
+FlyMyByte Web Interface - Update Progress Tracker
 
-Stores progress state in memory (not persisted across restarts).
-Thread-safe via threading.Lock.
+Thread-safe singleton for tracking update installation progress.
+Used by routes_updates.py to report progress via /api/update/progress.
 """
-
 import threading
 import time
-from typing import Dict, Optional
+import logging
+from typing import Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 
-# Singleton instance
-_instance = None
-_instance_lock = threading.Lock()
+class ProgressTracker:
+    """Tracks update progress with thread-safe state management."""
 
-
-def get_progress_instance() -> 'UpdateProgress':
-    """Get the global UpdateProgress singleton."""
-    global _instance
-    if _instance is None:
-        with _instance_lock:
-            if _instance is None:
-                _instance = UpdateProgress()
-    return _instance
-
-
-class UpdateProgress:
-    """Thread-safe progress tracker for update operations."""
+    _instance = None
+    _lock = threading.Lock()
 
     def __init__(self):
-        self._lock = threading.Lock()
         self._state = {
-            'running': False,
-            'total_files': 0,
-            'current_file': '',
-            'progress': 0,  # 0-100
-            'success': 0,
-            'errors': 0,
-            'error_msg': None,
+            'is_running': False,
+            'message': '',
+            'file': '',
+            'progress': 0,
+            'total': 100,
+            'error': None,
             'started_at': None,
+            'completed_at': None,
         }
+
+    @classmethod
+    def get_instance(cls) -> 'ProgressTracker':
+        """Get singleton instance (thread-safe)."""
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset(cls):
+        """Reset singleton (for testing)."""
+        with cls._lock:
+            if cls._instance is not None:
+                cls._instance = None
+
+    # State properties
 
     @property
     def is_running(self) -> bool:
-        with self._lock:
-            return self._state['running']
+        return self._state['is_running']
 
-    def start_update(self, total_files: int = 0) -> None:
-        with self._lock:
-            self._state['running'] = True
-            self._state['total_files'] = total_files
-            self._state['current_file'] = ''
-            self._state['progress'] = 0
-            self._state['success'] = 0
-            self._state['errors'] = 0
-            self._state['error_msg'] = None
-            self._state['started_at'] = time.time()
+    # Public methods
 
-    def update_progress(self, message: str = '', file: str = '', progress: int = 0, total: int = 100) -> None:
-        with self._lock:
-            self._state['current_file'] = file
-            self._state['progress'] = min(progress, total)
-            # Store last message for API endpoint
-            self._state['last_message'] = message
+    def start_update(self, total_files: int = 0, message: str = 'Начало обновления...') -> None:
+        """Mark update as started."""
+        self._state.update({
+            'is_running': True,
+            'message': message,
+            'file': '',
+            'progress': 0,
+            'total': max(total_files, 100),
+            'error': None,
+            'started_at': time.time(),
+            'completed_at': None,
+        })
+        logger.info(f"[PROGRESS] Update started: {message}")
 
-    def set_error(self, msg: str) -> None:
-        with self._lock:
-            self._state['error_msg'] = msg
+    def update_progress(self, message: str, file: str = '', progress: int = 0, total: int = 100) -> None:
+        """Update progress state."""
+        self._state.update({
+            'message': message,
+            'file': file,
+            'progress': progress,
+            'total': total,
+        })
+        logger.debug(f"[PROGRESS] {progress}/{total}: {message}")
+
+    def set_error(self, error: str) -> None:
+        """Mark update as failed."""
+        self._state.update({
+            'is_running': False,
+            'error': error,
+            'message': f'Ошибка: {error}',
+            'completed_at': time.time(),
+        })
+        logger.error(f"[PROGRESS] Error: {error}")
 
     def complete(self) -> None:
-        with self._lock:
-            self._state['running'] = False
-            self._state['progress'] = 100
+        """Mark update as completed."""
+        self._state.update({
+            'is_running': False,
+            'message': 'Обновление завершено!',
+            'progress': self._state['total'],
+            'completed_at': time.time(),
+        })
+        logger.info("[PROGRESS] Update completed")
 
-    def get_status(self) -> Dict:
-        with self._lock:
-            return dict(self._state)
+    def get_status(self) -> Dict[str, Any]:
+        """Get current progress state."""
+        elapsed = 0
+        if self._state['started_at']:
+            end_time = self._state['completed_at'] or time.time()
+            elapsed = int(end_time - self._state['started_at'])
 
-    def reset(self) -> None:
-        with self._lock:
-            self._state = {
-                'running': False,
-                'total_files': 0,
-                'current_file': '',
-                'progress': 0,
-                'success': 0,
-                'errors': 0,
-                'error_msg': None,
-                'started_at': None,
-            }
+        return {
+            **self._state,
+            'elapsed_seconds': elapsed,
+        }
+
+
+# Module-level singleton
+
+def get_progress_instance() -> ProgressTracker:
+    """Get ProgressTracker singleton."""
+    return ProgressTracker.get_instance()

@@ -68,7 +68,20 @@ src/web_ui/
 ├── core/
 │   ├── __init__.py             # Экспорты модулей
 │   ├── services.py             # VPN-парсеры, ipset, DNS-обход, каталог списков
-│   ├── dns_ops.py              # DNS мониторинг, резолв, управление dnsmasq
+│   ├── dns_ops.py              # DNS мониторинг, управление dnsmasq
+│   ├── dnsmasq_manager.py     # Управление dnsmasq конфигурацией
+│   ├── ipset_ops.py            # Операции с ipset (create, flush, add)
+│   ├── iptables_manager.py     # Управление iptables правилами
+│   ├── vpn_manager.py          # Управление VPN процессами
+│   ├── unblock_manager.py      # Управление bypass списками
+│   ├── service_ops.py          # Операции с сервисами (restart, status)
+│   ├── service_locator.py      # DI контейнер для сервисов
+│   ├── key_manager.py          # Управление ключами активации
+│   ├── parsers.py              # Парсеры VPN ключей
+│   ├── backup_manager.py       # Резервное копирование
+│   ├── decorators.py           # Decorators (auth, csrf)
+│   ├── exceptions.py           # Кастомные исключения
+│   ├── handlers.py             # Обработчики ошибок
 │   ├── utils.py                # Утилиты, кэш, логирование
 │   ├── constants.py            # Константы и пути
 │   ├── app_config.py           # WebConfig
@@ -99,9 +112,9 @@ WEB_PASSWORD=your_secure_password_here
 
 ## Документация
 
-- [Инструкция по DNS-обходу AI](docs/DNS_SPOOFING_INSTRUCTION.md)
-- [Проверка обхода](docs/CHECK_BYPASS_INSTRUCTION.md)
-- [Полное руководство](docs/OBSIDIAN_INSTRUCTION.md)
+- [Установка на роутер](docs/INSTALL-manual.md)
+- [Оптимизация ipset bypass](docs/IPSET-BYPASS-OPTIMIZATION.md)
+- [План рефакторинга](docs/plans/2026-04-10-refactoring-plan.md)
 
 ## Поддержка
 
