@@ -170,15 +170,29 @@ def get_local_version():
 
 
 def get_remote_version():
-    """Получить удалённую версию с GitHub"""
+    """Получить удалённую версию с GitHub.
+
+    Использует GitHub API (не кешируется CDN) вместо raw URL.
+    """
     import requests
     try:
         github_repo = 'royfincher25-source/flymybyte'
-        github_branch = 'master'
-        url = f'https://raw.githubusercontent.com/{github_repo}/{github_branch}/VERSION'
-        response = requests.get(url, timeout=10)
+        # GitHub API returns file content as base64
+        url = f'https://api.github.com/repos/{github_repo}/contents/VERSION'
+        response = requests.get(url, timeout=10, headers={
+            'Accept': 'application/vnd.github.v3+json',
+            'Cache-Control': 'no-cache',
+        })
         if response.status_code == 200:
-            return response.text.strip()
+            import base64
+            data = response.json()
+            content = base64.b64decode(data['content']).decode('utf-8')
+            return content.strip()
+        # Fallback to raw URL if API fails (rate limit, etc.)
+        raw_url = f'https://raw.githubusercontent.com/{github_repo}/master/VERSION'
+        raw_resp = requests.get(raw_url, timeout=10)
+        if raw_resp.status_code == 200:
+            return raw_resp.text.strip()
         return 'N/A'
     except Exception as e:
         logger.error(f'Error fetching remote version: {e}')
