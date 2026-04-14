@@ -202,10 +202,10 @@ def emergency_restore() -> Tuple[bool, List[str]]:
 
     # 8. Запустить S99unblock start — полный цикл восстановления
     log.append("🔄 Полный цикл восстановления (S99unblock)...")
-    log.append("  ⏳ Это может занять 15-30 секунд...")
+    log.append("  ⏳ Это может занять 60-180 секунд...")
     if os.path.exists(S99UNBLOCK):
         try:
-            ok, out = _run_cmd(['sh', S99UNBLOCK, 'start'], timeout=120)
+            ok, out = _run_cmd(['sh', S99UNBLOCK, 'start'], timeout=300)
             if ok:
                 log.append("  ✅ S99unblock start completed")
                 logger.info("[EMERGENCY] S99unblock start succeeded")
@@ -213,7 +213,7 @@ def emergency_restore() -> Tuple[bool, List[str]]:
                 log.append(f"  ⚠️ S99unblock exit code: {out[:200]}")
                 logger.warning(f"[EMERGENCY] S99unblock start returned: {out[:200]}")
         except subprocess.TimeoutExpired:
-            log.append("  ⚠️ S99unblock timed out (120s)")
+            log.append("  ⚠️ S99unblock timed out (300s)")
             logger.warning("[EMERGENCY] S99unblock start timed out")
         except Exception as e:
             log.append(f"  ⚠️ S99unblock error: {e}")
@@ -222,7 +222,33 @@ def emergency_restore() -> Tuple[bool, List[str]]:
         log.append(f"  ⚠️ S99unblock not found at {S99UNBLOCK}")
         logger.warning("[EMERGENCY] S99unblock not found")
 
-    # 9. Финальная проверка — работают ли VPN сервисы
+    # 9. Если S99unblock не заполнил ipset — запустить unblock_ipset.sh напрямую
+    log.append("🔍 Проверка ipset...")
+    total_entries = 0
+    for ipset_name in IPSET_LIST:
+        try:
+            result = subprocess.run(['ipset', 'list', ipset_name], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                count = len([l for l in result.stdout.split('\n') if l.strip() and l.strip()[0].isdigit()])
+                total_entries += count
+        except Exception:
+            pass
+
+    if total_entries == 0:
+        log.append("  ⚠️ ipset пусты — запускаем unblock_ipset.sh напрямую...")
+        try:
+            shell_script = '/opt/bin/unblock_ipset.sh'
+            if os.path.exists(shell_script):
+                ok, out = _run_cmd(['sh', shell_script], timeout=180)
+                log.append(f"  {'✅' if ok else '⚠️'} unblock_ipset.sh: {out[:100] if out else 'no output'}")
+            else:
+                log.append("  ⚠️ unblock_ipset.sh не найден")
+        except Exception as e:
+            log.append(f"  ⚠️ unblock_ipset.sh error: {e}")
+    else:
+        log.append(f"  ✅ ipset заполнены: {total_entries} записей")
+
+    # 10. Финальная проверка — работают ли VPN сервисы
     log.append("🔍 Проверка VPN сервисов...")
     vpn_ok = True
     for init_script, name in VPN_SERVICES:
@@ -237,7 +263,7 @@ def emergency_restore() -> Tuple[bool, List[str]]:
         else:
             log.append(f"  ℹ️ {name}: script not found")
 
-    # 10. Финальный статус
+    # 11. Финальный статус
     log.append("")
     if success and vpn_ok:
         log.append("✅ Аварийное восстановление завершено успешно!")
