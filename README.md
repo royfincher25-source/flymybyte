@@ -19,6 +19,15 @@ curl -sL https://raw.githubusercontent.com/royfincher25-source/flymybyte/master/
 
 Затем откройте http://192.168.1.1:8080 и нажмите **Установить**.
 
+## Автоматический мониторинг
+
+После установки автоматически запускаются два watchdog-сервиса:
+
+- **dnsmasq_watchdog** — мониторит dnsmasq:5353, удаляет DNAT при падении
+- **vpn_watchdog** — мониторит VLESS/Shadowsocks/Trojan, перезапускает при падении
+
+Логи: `/opt/var/log/dnsmasq_watchdog.log`, `/opt/var/log/vpn_watchdog.log`
+
 ## Требования
 
 - Python 3.8+

@@ -169,9 +169,33 @@ case "$1" in
         log "  dnsmasq_watchdog.sh not found, skipping"
     fi
 
-    # Step 6: Sync VPN interfaces (routes + ipsets)
+    # Step 6: Start VPN watchdog (monitors VLESS, Shadowsocks, Trojan)
     log "========================================"
-    log "Step 6: Syncing VPN interfaces..."
+    log "Step 6: Starting VPN watchdog..."
+    log "========================================"
+    curl -s -o /opt/bin/vpn_watchdog.sh https://raw.githubusercontent.com/royfincher25-source/flymybyte/master/src/web_ui/resources/scripts/vpn_watchdog.sh 2>/dev/null
+    chmod +x /opt/bin/vpn_watchdog.sh 2>/dev/null
+    
+    if [ -x "/opt/bin/vpn_watchdog.sh" ]; then
+        for pid in /proc/[0-9]*; do
+            pid_num=$(basename "$pid" 2>/dev/null)
+            [ "$pid_num" -eq "$pid_num" ] 2>/dev/null || continue
+            [ "$pid_num" -gt 1 ] 2>/dev/null || continue
+            if [ -f "$pid/cmdline" ] && grep -q "vpn_watchdog" "$pid/cmdline" 2>/dev/null; then
+                kill -9 "$pid_num" 2>/dev/null
+            fi
+        done
+        rm -f /tmp/vpn_watchdog.pid
+        sleep 1
+        /opt/bin/vpn_watchdog.sh &
+        log "  Started VPN watchdog (PID: $!)"
+    else
+        log "  vpn_watchdog.sh not found, skipping"
+    fi
+
+    # Step 7: Sync VPN interfaces (routes + ipsets)
+    log "========================================"
+    log "Step 7: Syncing VPN interfaces..."
     log "========================================"
     if [ -x "/opt/bin/unblock.py" ]; then
         if /opt/bin/unblock.py sync-vpn >> "$LOGFILE" 2>&1; then
@@ -197,6 +221,14 @@ case "$1" in
             kill -9 "$pid_num" 2>/dev/null && log "  Killed $pid_num" || true
         fi
     done
+    log "  Stopping VPN watchdog..."
+    for pid in /proc/[0-9]*; do
+        if [ -f "$pid/cmdline" ] && grep -q "vpn_watchdog" "$pid/cmdline" 2>/dev/null; then
+            pid_num=$(basename "$pid")
+            kill -9 "$pid_num" 2>/dev/null && log "  Killed $pid_num" || true
+        fi
+    done
+    rm -f /tmp/vpn_watchdog.pid
     log "  Flushing iptables redirect rules..."
     for proto in tcp udp; do
         iptables -t nat -F PREROUTING 2>/dev/null && log "  Flushed PREROUTING ($proto)" || log_error "  Failed to flush PREROUTING ($proto)"
@@ -216,6 +248,13 @@ case "$1" in
         fi
     done
     rm -f /tmp/dnsmasq_watchdog.pid
+    for pid in /proc/[0-9]*; do
+        if [ -f "$pid/cmdline" ] && grep -q "vpn_watchdog" "$pid/cmdline" 2>/dev/null; then
+            pid_num=$(basename "$pid")
+            kill -9 "$pid_num" 2>/dev/null
+        fi
+    done
+    rm -f /tmp/vpn_watchdog.pid
     sleep 1
     $0 start
     ;;

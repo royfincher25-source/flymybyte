@@ -110,6 +110,7 @@ SCRIPT_UNBLOCK_DNSMASQ = '/opt/bin/unblock_dnsmasq.sh'
 SCRIPT_UNBLOCK_UPDATE = '/opt/bin/unblock_update.sh'
 SCRIPT_EMERGENCY_RESTORE = '/opt/bin/emergency_restore.sh'
 SCRIPT_DNSMASQ_WATCHDOG = '/opt/bin/dnsmasq_watchdog.sh'
+SCRIPT_VPN_WATCHDOG = '/opt/bin/vpn_watchdog.sh'
 SCRIPT_ROLLBACK = '/opt/bin/rollback.sh'
 SCRIPT_TEST_BYPASS = '/opt/bin/test_bypass.sh'
 SCRIPT_INSTALL = '/opt/root/script.sh'
@@ -223,6 +224,7 @@ FILES_TO_UPDATE = {
     'web_ui/resources/scripts/unblock_dnsmasq.sh': f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh',
     'web_ui/resources/scripts/emergency_restore.sh': SCRIPT_EMERGENCY_RESTORE,
     'web_ui/resources/scripts/dnsmasq_watchdog.sh': SCRIPT_DNSMASQ_WATCHDOG,
+    'web_ui/resources/scripts/vpn_watchdog.sh': SCRIPT_VPN_WATCHDOG,
     'web_ui/resources/scripts/rollback.sh': SCRIPT_ROLLBACK,
     'web_ui/resources/scripts/test_bypass.sh': SCRIPT_TEST_BYPASS,
 }
