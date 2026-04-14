@@ -389,7 +389,7 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
         ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
 
     total_added = 0
-    ensure_ipset_exists(ipset_name, 'hash:net')
+    ensure_ipset_exists(ipset_name)
 
     for entries_batch in [cidr_entries, ip_entries]:
         if entries_batch:

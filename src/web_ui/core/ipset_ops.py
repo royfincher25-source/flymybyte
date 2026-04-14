@@ -173,7 +173,7 @@ def bulk_remove_from_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]
         return False, str(e)
 
 
-def ensure_ipset_exists(setname: str, settype: str = 'hash:net') -> Tuple[bool, str]:
+def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, str]:
     """Ensure ipset exists, create if not.
 
     Creates ipset with timeout=300 (5 min) to prevent bloat from CDN round-robin DNS.
@@ -189,13 +189,8 @@ def ensure_ipset_exists(setname: str, settype: str = 'hash:net') -> Tuple[bool, 
         )
 
         if result.returncode == 0:
-            # Check type - recreate if wrong type (hash:ip can't store CIDR)
-            import re
-            type_match = re.search(r'Type:\s*(\S+)', result.stdout)
-            if type_match and type_match.group(1) != settype:
-                logger.warning(f"[IPSET] {setname}: wrong type {type_match.group(1)} — recreating as {settype}")
-                subprocess.run(['ipset', 'destroy', setname], capture_output=True, text=True, timeout=10)
-            elif 'timeout 300' not in result.stdout and 'timeout:' not in result.stdout:
+            # Check if timeout is already set correctly
+            if 'timeout 300' not in result.stdout and 'timeout:' not in result.stdout:
                 logger.warning(f"[IPSET] {setname}: exists but no timeout — recreating with timeout={IPSET_TIMEOUT}")
                 subprocess.run(['ipset', 'destroy', setname], capture_output=True, text=True, timeout=10)
             else:
