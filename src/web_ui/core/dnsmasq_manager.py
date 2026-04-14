@@ -254,6 +254,25 @@ class DnsmasqManager:
     # DNSMASQ RESTART
     # =========================================================================
 
+    def _check_process(self, pattern: str) -> bool:
+        """Проверить наличие процесса через /proc (BusyBox-совместимо)."""
+        try:
+            for pid_dir in os.listdir('/proc'):
+                if not pid_dir.isdigit():
+                    continue
+                cmdline_path = f'/proc/{pid_dir}/cmdline'
+                try:
+                    with open(cmdline_path, 'rb') as f:
+                        cmdline = f.read().decode('utf-8', errors='ignore')
+                        if re.search(pattern, cmdline):
+                            return True
+                except (FileNotFoundError, PermissionError):
+                    continue
+            return False
+        except Exception as e:
+            logger.warning(f"Error checking process '{pattern}': {e}")
+            return False
+
     def restart_dnsmasq(self, signal_only: bool = False) -> Tuple[bool, str]:
         """
         Перезапустить dnsmasq для применения новых конфигов.
@@ -267,15 +286,20 @@ class DnsmasqManager:
         if signal_only:
             # Быстрый SIGHUP (не останавливает dnsmasq)
             try:
-                result = subprocess.run(
-                    ['pgrep', 'dnsmasq'],
-                    capture_output=True, text=True, timeout=5
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    pid = result.stdout.strip().split('\n')[0]
-                    subprocess.run(['kill', '-HUP', pid], capture_output=True, timeout=5)
-                    logger.info("Sent SIGHUP to dnsmasq")
-                    return True, "SIGHUP sent to dnsmasq"
+                # Найти PID dnsmasq через /proc
+                for pid_dir in os.listdir('/proc'):
+                    if not pid_dir.isdigit():
+                        continue
+                    cmdline_path = f'/proc/{pid_dir}/cmdline'
+                    try:
+                        with open(cmdline_path, 'rb') as f:
+                            cmdline = f.read().decode('utf-8', errors='ignore')
+                            if 'dnsmasq' in cmdline:
+                                subprocess.run(['kill', '-HUP', pid_dir], capture_output=True, timeout=5)
+                                logger.info("Sent SIGHUP to dnsmasq")
+                                return True, "SIGHUP sent to dnsmasq"
+                    except (FileNotFoundError, PermissionError):
+                        continue
             except Exception as e:
                 logger.error(f"SIGHUP failed: {e}")
 
@@ -402,12 +426,8 @@ class DnsmasqManager:
             'config_valid': False,
         }
 
-        # Проверяем запущен ли dnsmasq
-        try:
-            result = subprocess.run(['pgrep', 'dnsmasq'], capture_output=True, text=True, timeout=3)
-            status['dnsmasq_running'] = result.returncode == 0
-        except Exception:
-            pass
+        # Проверяем запущен ли dnsmasq через /proc
+        status['dnsmasq_running'] = self._check_process('dnsmasq')
 
         # Считаем домены
         bypass_domains = self.load_all_bypass_domains()

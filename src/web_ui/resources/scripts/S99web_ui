@@ -4,6 +4,18 @@
 WEB_DIR="/opt/etc/web_ui"
 PIDFILE="/var/run/web_ui.pid"
 
+# check_process: проверить наличие процесса через /proc (совместимо с BusyBox)
+# Использование: check_process "pattern"
+check_process() {
+    PATTERN="$1"
+    for f in /proc/[0-9]*/cmdline; do
+        if tr '\0' ' ' < "$f" 2>/dev/null | grep -q "$PATTERN"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 start() {
     # FIX: Singleton protection — check if already running
     if [ -f "$PIDFILE" ]; then
@@ -17,9 +29,9 @@ start() {
         fi
         rm -f "$PIDFILE"
     fi
-    
-    # Also check for any python3 app.py processes
-    if pgrep -f "python.*app.py" > /dev/null 2>&1; then
+
+    # Also check for any python3 app.py processes (BusyBox-compatible)
+    if check_process "python.*app.py"; then
         echo "Web UI already running (process detected)"
         return 0
     fi
@@ -57,7 +69,7 @@ restart() {
 }
 
 status() {
-    if pgrep -f "python.*app.py" > /dev/null 2>&1 || pgrep -f "python3.*app.py" > /dev/null 2>&1; then
+    if check_process "python.*app.py" || check_process "python3.*app.py"; then
         echo "Web UI is running"
         exit 0
     else

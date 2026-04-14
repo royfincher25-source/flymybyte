@@ -404,10 +404,11 @@ def service_restore_dns():
     logger.info("[ROUTES] /service/restore-dns - Starting DNS restoration")
     results = []
 
-    # 1. Check if dnsmasq is running
+    # 1. Check if dnsmasq is running (BusyBox-compatible via /proc)
     try:
-        result = subprocess.run(['pgrep', 'dnsmasq'], capture_output=True, text=True)
-        if result.returncode == 0:
+        from core.service_ops import _is_process_running
+        dnsmasq_running = _is_process_running('dnsmasq')
+        if dnsmasq_running:
             results.append('✅ dnsmasq работает')
             logger.info("[ROUTES] DNS restore: dnsmasq is running")
         else:

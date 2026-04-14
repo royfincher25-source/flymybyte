@@ -140,19 +140,23 @@ class VPNManager:
                 pid = self._extract_pid(stop_output)
                 if not pid:
                     proc_name = PROC_NAME_MAP.get(self.service_name, self.service_name)
-                    logger.debug(f"[VPN]   No PID from output, trying pgrep for '{proc_name}'")
+                    logger.debug(f"[VPN]   No PID from output, checking /proc for '{proc_name}'")
                     try:
-                        pgrep_result = subprocess.run(
-                            ['pgrep', '-f', proc_name],
-                            capture_output=True,
-                            text=True,
-                            timeout=3
-                        )
-                        if pgrep_result.returncode == 0 and pgrep_result.stdout.strip():
-                            pid = pgrep_result.stdout.strip().split('\n')[0]
-                            logger.debug(f"[VPN]   Found PID via pgrep: {pid}")
+                        for pid_dir in os.listdir('/proc'):
+                            if not pid_dir.isdigit():
+                                continue
+                            cmdline_path = f'/proc/{pid_dir}/cmdline'
+                            try:
+                                with open(cmdline_path, 'rb') as f:
+                                    cmdline = f.read().decode('utf-8', errors='ignore')
+                                    if proc_name in cmdline:
+                                        pid = pid_dir
+                                        logger.debug(f"[VPN]   Found PID via /proc: {pid}")
+                                        break
+                            except (FileNotFoundError, PermissionError):
+                                continue
                     except Exception as e:
-                        logger.debug(f"[VPN]   pgrep failed: {e}")
+                        logger.debug(f"[VPN]   /proc check failed: {e}")
                 else:
                     logger.debug(f"[VPN]   Extracted PID from output: {pid}")
             else:

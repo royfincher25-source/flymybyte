@@ -504,18 +504,25 @@ class DNSSpoofing:
     def _restart_dnsmasq(self) -> Tuple[bool, str]:
         """Restart dnsmasq service using SIGHUP to reload config."""
         try:
-            pid_result = subprocess.run(
-                ['pgrep', 'dnsmasq'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
+            # Найти PID dnsmasq через /proc (BusyBox-совместимо)
+            dnsmasq_pid = None
+            for pid_dir in os.listdir('/proc'):
+                if not pid_dir.isdigit():
+                    continue
+                cmdline_path = f'/proc/{pid_dir}/cmdline'
+                try:
+                    with open(cmdline_path, 'rb') as f:
+                        cmdline = f.read().decode('utf-8', errors='ignore')
+                        if 'dnsmasq' in cmdline:
+                            dnsmasq_pid = pid_dir
+                            break
+                except (FileNotFoundError, PermissionError):
+                    continue
 
-            if pid_result.returncode == 0 and pid_result.stdout.strip():
-                pid = pid_result.stdout.strip().split('\n')[0]
-                logger.debug(f"Sending SIGHUP to dnsmasq (PID {pid})")
+            if dnsmasq_pid:
+                logger.debug(f"Sending SIGHUP to dnsmasq (PID {dnsmasq_pid})")
                 kill_result = subprocess.run(
-                    ['kill', '-HUP', pid],
+                    ['kill', '-HUP', dnsmasq_pid],
                     capture_output=True,
                     text=True,
                     timeout=5
@@ -578,17 +585,24 @@ class DNSSpoofing:
                 logger.info(f"Removed AI domains config: {self._config_path}")
 
             try:
-                pid_result = subprocess.run(
-                    ['pgrep', 'dnsmasq'],
-                    capture_output=True,
-                    text=True,
-                    timeout=5
-                )
+                # Найти PID dnsmasq через /proc (BusyBox-совместимо)
+                dnsmasq_pid = None
+                for pid_dir in os.listdir('/proc'):
+                    if not pid_dir.isdigit():
+                        continue
+                    cmdline_path = f'/proc/{pid_dir}/cmdline'
+                    try:
+                        with open(cmdline_path, 'rb') as f:
+                            cmdline = f.read().decode('utf-8', errors='ignore')
+                            if 'dnsmasq' in cmdline:
+                                dnsmasq_pid = pid_dir
+                                break
+                    except (FileNotFoundError, PermissionError):
+                        continue
 
-                if pid_result.returncode == 0 and pid_result.stdout.strip():
-                    pid = pid_result.stdout.strip().split('\n')[0]
+                if dnsmasq_pid:
                     subprocess.run(
-                        ['kill', '-HUP', pid],
+                        ['kill', '-HUP', dnsmasq_pid],
                         capture_output=True,
                         text=True,
                         timeout=5
@@ -637,15 +651,20 @@ class DNSSpoofing:
         }
 
     def _check_dnsmasq_status(self) -> bool:
-        """Check if dnsmasq is running."""
+        """Check if dnsmasq is running (BusyBox-compatible via /proc)."""
         try:
-            result = subprocess.run(
-                ['pgrep', 'dnsmasq'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            return result.returncode == 0
+            for pid_dir in os.listdir('/proc'):
+                if not pid_dir.isdigit():
+                    continue
+                cmdline_path = f'/proc/{pid_dir}/cmdline'
+                try:
+                    with open(cmdline_path, 'rb') as f:
+                        cmdline = f.read().decode('utf-8', errors='ignore')
+                        if 'dnsmasq' in cmdline:
+                            return True
+                except (FileNotFoundError, PermissionError):
+                    continue
+            return False
         except Exception:
             return False
 

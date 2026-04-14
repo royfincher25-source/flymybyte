@@ -116,12 +116,30 @@ class UnblockManager:
         logger.info("[UNBLOCK] flush_ipsets() called")
         return self._flush_ipsets()
     
-    def _check_dnsmasq(self) -> bool:
-        """Проверить запущен ли dnsmasq."""
-        logger.debug("[UNBLOCK] Checking dnsmasq status...")
+    def _check_process(self, pattern: str) -> bool:
+        """Проверить наличие процесса через /proc (BusyBox-совместимо)."""
         try:
-            result = subprocess.run(['pgrep', 'dnsmasq'], capture_output=True, timeout=3)
-            is_running = result.returncode == 0
+            for pid_dir in os.listdir('/proc'):
+                if not pid_dir.isdigit():
+                    continue
+                cmdline_path = f'/proc/{pid_dir}/cmdline'
+                try:
+                    with open(cmdline_path, 'rb') as f:
+                        cmdline = f.read().decode('utf-8', errors='ignore')
+                        if re.search(pattern, cmdline):
+                            return True
+                except (FileNotFoundError, PermissionError):
+                    continue
+            return False
+        except Exception as e:
+            logger.warning(f"[UNBLOCK] Error checking process '{pattern}': {e}")
+            return False
+
+    def _check_dnsmasq(self) -> bool:
+        """Проверить запущен ли dnsmasq (BusyBox-совместимо, без pgrep)."""
+        logger.debug("[UNBLOCK] Checking dnsmasq status via /proc...")
+        try:
+            is_running = self._check_process('dnsmasq')
             logger.debug(f"[UNBLOCK] dnsmasq running: {is_running}")
             return is_running
         except Exception as e:
