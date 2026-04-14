@@ -66,16 +66,6 @@ check_process() {
     return 1
 }
 
-check_port() {
-    port="$1"
-    for pid_dir in /proc/[0-9]*; do
-        if [ -r "$pid_dir/net/tcp" ] || [ -r "$pid_dir/fd" ]; then
-            return 0
-        fi
-    done
-    return 1
-}
-
 restart_service() {
     svc="$1"
     info=$(get_service_info "$svc")
@@ -108,7 +98,7 @@ while true; do
         fi
         
         if check_process "$proc"; then
-            RESTART_ATTEMPTS_$svc=0
+            eval "RESTART_ATTEMPTS_$svc=0"
         else
             log_error "$svc ($proc) NOT running!"
             
