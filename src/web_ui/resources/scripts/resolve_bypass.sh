@@ -1,30 +1,85 @@
 #!/bin/sh
-# resolve_bypass.sh - Параллельный DNS resolve для bypass списков
-# Использует xargs для параллельного запуска nslookup
-# Скорость: ~10-15 секунд для 240 доменов
+# resolve_bypass.sh - DNS resolve для bypass списков
+# Резолвит домены из файла и добавляет IP в ipset
+#
+# Usage: resolve_bypass.sh <bypass_file> [ipset_name] [dns_server]
 
-FILE=$1
-SETNAME=${2:-unblockvless}
-DNS=${3:-8.8.8.8}
-MAX_WORKERS=${4:-10}
+FILE="$1"
+SETNAME="${2:-unblockvless}"
+DNS="${3:-8.8.8.8}"
 
-if [ -z "$FILE" ]; then
-    echo "Usage: $0 <bypass_file> [ipset_name] [dns_server] [max_workers]"
+if [ -z "$FILE" ] || [ ! -f "$FILE" ]; then
+    echo "Usage: $0 <bypass_file> [ipset_name] [dns_server]"
     exit 1
 fi
 
-ipset create $SETNAME hash:ip timeout 300 maxelem 1048576 -exist 2>/dev/null
+# Создать ipset если не существует (hash:ip, timeout 300)
+ipset create "$SETNAME" hash:ip timeout 300 maxelem 1048576 -exist 2>/dev/null
 
-TEMP=$(mktemp)
-> $TEMP
+TEMP_IPS=$(mktemp)
+> "$TEMP_IPS"
 
-grep -v '^#' "$FILE" | grep -v '^[0-9]' | grep -v '^$' | xargs -P $MAX_WORKERS -I{} sh -c "nslookup {} $DNS 2>/dev/null | grep '^Address:' | grep -v '$DNS\$' | awk '{print \$2}'" >> $TEMP 2>/dev/null
+COUNT_RESOLVED=0
+COUNT_FAILED=0
 
-sort -u $TEMP | while read ip; do
-    [ -n "$ip" ] && ipset add -exist $SETNAME $ip 2>/dev/null
-done
+# Читаем файл построчно, пропускаем комментарии, IP/CIDR, пустые строки
+while IFS= read -r line; do
+    # Убираем пробелы
+    line=$(echo "$line" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
-rm -f $TEMP
+    # Пропускаем пустые строки
+    [ -z "$line" ] && continue
 
-COUNT=$(ipset list $SETNAME 2>/dev/null | tail -n +7 | wc -l)
-echo "Done: $COUNT entries in $SETNAME"
+    # Пропускаем комментарии
+    case "$line" in
+        \#*) continue ;;
+    esac
+
+    # Пропускаем IP-адреса и CIDR (начинаются с цифры)
+    case "$line" in
+        [0-9]*) continue ;;
+    esac
+
+    # Пропускаем wildcard (начинаются с *) — они резолвятся через nslookup
+    # но nslookup не понимает *.domain — убираем *
+    domain="$line"
+    case "$domain" in
+        \*.*) domain=$(echo "$domain" | sed 's/^\*\.//') ;;
+    esac
+
+    # Пропускаем строки с @ (метки типа @ads)
+    case "$domain" in
+        *@*) continue ;;
+    esac
+
+    # Резолвим домен через nslookup
+    if [ -n "$domain" ]; then
+        result=$(nslookup "$domain" "$DNS" 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            # Извлекаем IPv4 адреса (исключая DNS сервер)
+            echo "$result" | grep '^Address:' | grep -v "$DNS" | while read -r _ addr; do
+                # Только IPv4 (пропускаем IPv6)
+                case "$addr" in
+                    *:*) ;;  # skip IPv6
+                    *) echo "$addr" >> "$TEMP_IPS" ;;
+                esac
+            done
+            COUNT_RESOLVED=$((COUNT_RESOLVED + 1))
+        else
+            COUNT_FAILED=$((COUNT_FAILED + 1))
+        fi
+    fi
+done < "$FILE"
+
+# Добавляем уникальные IP в ipset
+if [ -s "$TEMP_IPS" ]; then
+    sort -u "$TEMP_IPS" | while read -r ip; do
+        [ -n "$ip" ] && ipset add -exist "$SETNAME" "$ip" 2>/dev/null
+    done
+fi
+
+FINAL_COUNT=$(ipset list "$SETNAME" 2>/dev/null | tail -n +7 | grep -c '^[0-9]')
+
+rm -f "$TEMP_IPS"
+
+echo "Resolved: $COUNT_RESOLVED domains, Failed: $COUNT_FAILED, IP in $SETNAME: $FINAL_COUNT"

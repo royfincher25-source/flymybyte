@@ -20,7 +20,7 @@ import subprocess
 import shutil
 from typing import List, Dict, Tuple, Set, Optional
 
-from .constants import DNSMASQ_CONFIG, DNSMASQ_AI_CONFIG, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT
+from .constants import DNSMASQ_CONFIG, DNSMASQ_AI_CONFIG, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT, IPSET_MAP
 
 logger = logging.getLogger(__name__)
 
