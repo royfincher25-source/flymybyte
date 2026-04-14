@@ -109,6 +109,31 @@ done
 3. ✅ Лог не содержит ошибок
 4. ✅ Один watchdog (не больше)
 
+## После каждого изменения
+
+После каждого `git commit` выводи таблицу изменений:
+
+```
+| Файл | Изменения |
+|------|-----------|
+| path/to/file.py | +X/-Y строк |
+```
+
+Пример:
+```
+| Файл | Изменения |
+|------|-----------|
+| README.md | +9 строк |
+| src/web_ui/core/constants.py | +2 строки |
+| src/web_ui/resources/scripts/S99unblock | +43 строки |
+| src/web_ui/resources/scripts/vpn_watchdog.sh | Новый файл (+147 строк) |
+```
+
+Команда для получения:
+```bash
+git diff master --stat
+```
+
 ## Notes (см. ROUTER_NOTES.md)
 
 - Git на роутере НЕ установлен
