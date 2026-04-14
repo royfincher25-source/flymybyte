@@ -9,8 +9,11 @@ PIDFILE="/var/run/web_ui.pid"
 check_process() {
     PATTERN="$1"
     for f in /proc/[0-9]*/cmdline; do
-        if tr '\0' ' ' < "$f" 2>/dev/null | grep -q "$PATTERN"; then
-            return 0
+        # Check file exists and is readable before redirecting (prevents "no such file" errors)
+        if [ -r "$f" ] 2>/dev/null; then
+            if tr '\0' ' ' < "$f" 2>/dev/null | grep -q "$PATTERN" 2>/dev/null; then
+                return 0
+            fi
         fi
     done
     return 1
