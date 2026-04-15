@@ -28,11 +28,11 @@ DNSMASQ_CONF = '/opt/etc/dnsmasq.conf'
 DNSMASQ_TEMPLATE = '/opt/etc/web_ui/resources/config/dnsmasq.conf'
 S99UNBLOCK = f'{INIT_DIR}/S99unblock'
 
-# VPN сервисы
+# VPN сервисы (init_script, config_key для CONFIG_PATHS)
 VPN_SERVICES = [
-    ('S24xray', 'VLESS'),
-    ('S22shadowsocks', 'Shadowsocks'),
-    ('S22trojan', 'Trojan'),
+    ('S24xray', 'vless'),
+    ('S22shadowsocks', 'shadowsocks'),
+    ('S22trojan', 'trojan'),
 ]
 
 # IPset списки
@@ -98,9 +98,11 @@ def emergency_restore() -> Tuple[bool, List[str]]:
     """
     Полный сброс к рабочему состоянию.
     1. Останавливает watchdog (чтобы не мешали)
-    2. Останавливает VPN, чистит iptables/ipset
-    3. Восстанавливает dnsmasq.conf из шаблона
-    4. Запускает S99unblock start для полного восстановления
+    2. Сохраняет состояние VPN (включён/выключен)
+    3. Останавливает VPN, чистит iptables/ipset
+    4. Восстанавливает dnsmasq.conf из шаблона
+    5. Запускает S99unblock start для полного восстановления
+    6. Восстанавливает исходное состояние VPN (только те что были включены)
     """
     log = []
     success = True
@@ -117,14 +119,26 @@ def emergency_restore() -> Tuple[bool, List[str]]:
         log.append(f"  ⚠️ Watchdog stop error: {e}")
         logger.warning(f"[EMERGENCY] Watchdog stop failed: {e}")
 
+    # 0.5. Сохранить состояние VPN (включён/выключен по наличию конфига)
+    log.append("💾 Сохранение состояния VPN...")
+    vpn_was_enabled = {}
+    for init_script, config_key in VPN_SERVICES:
+        from core.constants import CONFIG_PATHS
+        config_path = CONFIG_PATHS.get(config_key, '')
+        is_enabled = os.path.exists(config_path) if config_path else False
+        vpn_was_enabled[config_key] = is_enabled
+        status_str = "включён" if is_enabled else "выключен"
+        log.append(f"  ℹ️ {config_key}: {status_str}")
+    logger.info(f"[EMERGENCY] VPN state saved: {vpn_was_enabled}")
+
     # 1. Остановить все VPN-сервисы
     log.append("⏹️  Остановка VPN-сервисов...")
-    for init_script, name in VPN_SERVICES:
+    for init_script, config_key in VPN_SERVICES:
         script_path = f'{INIT_DIR}/{init_script}'
         if os.path.exists(script_path):
             ok, out = _run_cmd(['sh', script_path, 'stop'], timeout=10)
             status = "✅" if ok else "⚠️"
-            log.append(f"  {status} {name}: {'stopped' if ok else 'not found'}")
+            log.append(f"  {status} {config_key}: {'stopped' if ok else 'not found'}")
 
     # 2. Очистить iptables PREROUTING через IptablesManager
     log.append("🧹 Очистка iptables правил...")
@@ -248,29 +262,53 @@ def emergency_restore() -> Tuple[bool, List[str]]:
     else:
         log.append(f"  ✅ ipset заполнены: {total_entries} записей")
 
-    # 10. Финальная проверка — работают ли VPN сервисы
+    # 9.5. Восстановить исходное состояние VPN — отключить те что были выключены
+    log.append("🔄 Восстановление состояния VPN...")
+    for init_script, config_key in VPN_SERVICES:
+        if vpn_was_enabled.get(config_key, True):
+            log.append(f"  ℹ️ {config_key}: был включён — оставляем")
+        else:
+            log.append(f"  ⏹️ {config_key}: был выключен — останавливаем...")
+            script_path = f'{INIT_DIR}/{init_script}'
+            if os.path.exists(script_path):
+                ok, out = _run_cmd(['sh', script_path, 'stop'], timeout=15)
+                log.append(f"  {'✅' if ok else '⚠️'} {config_key} stopped")
+                from core.constants import CONFIG_PATHS
+                config_path = CONFIG_PATHS.get(config_key, '')
+                if config_path and os.path.exists(config_path):
+                    try:
+                        os.remove(config_path)
+                        log.append(f"  ✅ {config_key} config removed (prevents auto-restart)")
+                    except Exception:
+                        pass
+
+    # 10. Финальная проверка — работают ли VPN сервисы (только те что были включены)
     log.append("🔍 Проверка VPN сервисов...")
     vpn_ok = True
-    for init_script, name in VPN_SERVICES:
+    for init_script, config_key in VPN_SERVICES:
+        if not vpn_was_enabled.get(config_key, True):
+            log.append(f"  ℹ️ {config_key}: пропуск (был выключен)")
+            continue
         script_path = f'{INIT_DIR}/{init_script}'
         if os.path.exists(script_path):
             ok, out = _run_cmd(['sh', script_path, 'status'], timeout=5)
             if ok and 'running' in out.lower():
-                log.append(f"  ✅ {name}: running")
+                log.append(f"  ✅ {config_key}: running")
             else:
-                log.append(f"  ⚠️ {name}: not running (это может быть нормально если нет конфига)")
+                log.append(f"  ⚠️ {config_key}: not running")
                 vpn_ok = False
         else:
-            log.append(f"  ℹ️ {name}: script not found")
+            log.append(f"  ℹ️ {config_key}: script not found")
 
     # 11. Финальный статус
     log.append("")
+    enabled_count = sum(1 for v in vpn_was_enabled.values() if v)
     if success and vpn_ok:
         log.append("✅ Аварийное восстановление завершено успешно!")
         log.append("🌐 Интернет должен работать. Попробуйте открыть любой сайт.")
     elif success:
         log.append("✅ Аварийное восстановление завершено (но VPN могут быть не активны)")
-        log.append("🔧 Проверьте что VPN-ключи установлены на странице 'Ключи'")
+        log.append(f"🔧 Включено VPN: {enabled_count}/{len(VPN_SERVICES)}")
     else:
         log.append("⚠️ Восстановление завершено с предупреждениями.")
         log.append("🔧 Проверьте логи для деталей.")
