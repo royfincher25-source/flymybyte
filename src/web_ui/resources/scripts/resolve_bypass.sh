@@ -58,13 +58,17 @@ while IFS= read -r line; do
         result=$(nslookup "$domain" "$DNS" 2>/dev/null)
         rv=$?
         if [ $rv -eq 0 ]; then
-            # Извлекаем IPv4 адреса - используем for loop вместо pipe while
+            # Извлекаем IPv4 адреса - IP в 3-й колонке (Address 1: IP hostname)
             for line in $(echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS"); do
-                addr=$(echo "$line" | awk '{print $2}')
+                addr=$(echo "$line" | awk '{print $3}')
                 if [ -n "$addr" ]; then
                     # Пропускаем IPv6
                     case "$addr" in
                         *:*) continue ;;
+                    esac
+                    # Пропускаем если не похоже на IP
+                    case "$addr" in
+                        *[a-zA-Z]*) continue ;;
                     esac
                     echo "DEBUG: Adding IP: $addr" >&2
                     echo "$addr" >> "$TEMP_IPS"
@@ -77,11 +81,11 @@ while IFS= read -r line; do
     fi
 done < "$FILE"
 
-# Добавляем уникальные IP в ipset
+# Добавляем уникальные IP в ipset - используем for loop для BusyBox
 if [ -s "$TEMP_IPS" ]; then
     echo "DEBUG: Adding IPs from $TEMP_IPS:" >&2
     cat "$TEMP_IPS" >&2
-    sort -u "$TEMP_IPS" | while read -r ip; do
+    for ip in $(sort -u "$TEMP_IPS"); do
         if [ -n "$ip" ]; then
             echo "DEBUG: Adding $ip to $SETNAME" >&2
             ipset add -exist "$SETNAME" "$ip" 2>&1 || echo "DEBUG: FAILED to add $ip: $?" >&2
