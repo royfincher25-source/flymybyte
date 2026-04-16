@@ -73,8 +73,13 @@ done < "$FILE"
 
 # Добавляем уникальные IP в ipset
 if [ -s "$TEMP_IPS" ]; then
+    echo "DEBUG: Adding IPs from $TEMP_IPS:" >&2
+    cat "$TEMP_IPS" >&2
     sort -u "$TEMP_IPS" | while read -r ip; do
-        [ -n "$ip" ] && ipset add -exist "$SETNAME" "$ip" 2>/dev/null
+        if [ -n "$ip" ]; then
+            echo "DEBUG: Adding $ip to $SETNAME" >&2
+            ipset add -exist "$SETNAME" "$ip" 2>&1 || echo "DEBUG: FAILED to add $ip: $?" >&2
+        fi
     done
 fi
 
