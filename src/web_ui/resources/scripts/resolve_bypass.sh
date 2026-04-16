@@ -56,13 +56,19 @@ while IFS= read -r line; do
     if [ -n "$domain" ]; then
         echo "DEBUG: Resolving: $domain" >&2
         result=$(nslookup "$domain" "$DNS" 2>/dev/null)
-        if [ $? -eq 0 ]; then
-            # Извлекаем IPv4 адреса (исключая DNS сервер) - поддерживаем "Address:" и "Address 1:"
+        rv=$?
+        if [ $rv -eq 0 ]; then
+            # Извлекаем IPv4 адреса - с debugging
+            echo "DEBUG: nslookup result: $result" >&2
+            ips_found=$(echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS" | wc -l)
+            echo "DEBUG: Found $ips_found addresses" >&2
             echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS" | while read -r _ addr; do
                 # Только IPv4 (пропускаем IPv6)
                 case "$addr" in
                     *:*) ;;  # skip IPv6
-                    *) echo "$addr" >> "$TEMP_IPS" ;;
+                    *) 
+                        echo "DEBUG: Adding IP: $addr" >&2
+                        echo "$addr" >> "$TEMP_IPS" ;;
                 esac
             done
             COUNT_RESOLVED=$((COUNT_RESOLVED + 1))
