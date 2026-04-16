@@ -54,10 +54,11 @@ while IFS= read -r line; do
 
     # Резолвим домен через nslookup
     if [ -n "$domain" ]; then
+        echo "DEBUG: Resolving: $domain" >&2
         result=$(nslookup "$domain" "$DNS" 2>/dev/null)
         if [ $? -eq 0 ]; then
-            # Извлекаем IPv4 адреса (исключая DNS сервер)
-            echo "$result" | grep '^Address:' | grep -v "$DNS" | while read -r _ addr; do
+            # Извлекаем IPv4 адреса (исключая DNS сервер) - поддерживаем "Address:" и "Address 1:"
+            echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS" | while read -r _ addr; do
                 # Только IPv4 (пропускаем IPv6)
                 case "$addr" in
                     *:*) ;;  # skip IPv6
