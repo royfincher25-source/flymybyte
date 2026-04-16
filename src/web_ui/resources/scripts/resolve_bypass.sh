@@ -58,11 +58,10 @@ while IFS= read -r line; do
         result=$(nslookup "$domain" "$DNS" 2>/dev/null)
         rv=$?
         if [ $rv -eq 0 ]; then
-            # Извлекаем IPv4 адреса - IP в 3-й колонке (Address 1: IP hostname)
-            for line in $(echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS"); do
-                addr=$(echo "$line" | awk '{print $3}')
+            # Извлекаем IPv4 адреса через grep -o (все IP в каждой строке)
+            for addr in $(echo "$result" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | grep -v "^${DNS}\."); do
                 if [ -n "$addr" ]; then
-                    # Пропускаем IPv6
+                    # Пропускаем IPv6 (содержит :)
                     case "$addr" in
                         *:*) continue ;;
                     esac
