@@ -60,9 +60,9 @@ while IFS= read -r line; do
         if [ $rv -eq 0 ]; then
             # Извлекаем IPv4 адреса - с debugging
             echo "DEBUG: nslookup result: $result" >&2
-            ips_found=$(echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS" | wc -l)
-            echo "DEBUG: Found $ips_found addresses" >&2
+            ips_found=0
             echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS" | while read -r _ addr; do
+                ips_found=$((ips_found+1))
                 # Только IPv4 (пропускаем IPv6)
                 case "$addr" in
                     *:*) ;;  # skip IPv6
@@ -71,6 +71,7 @@ while IFS= read -r line; do
                         echo "$addr" >> "$TEMP_IPS" ;;
                 esac
             done
+            echo "DEBUG: Total found: $ips_found" >&2
             COUNT_RESOLVED=$((COUNT_RESOLVED + 1))
         else
             COUNT_FAILED=$((COUNT_FAILED + 1))
