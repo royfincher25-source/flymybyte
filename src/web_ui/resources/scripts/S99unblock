@@ -69,6 +69,11 @@ case "$1" in
     log "Step 2: Populating ipsets..."
     log "========================================"
     if [ "$PYTHON_OK" = "false" ]; then
+        # Flush ipsets before population to ensure clean state
+        log "Flushing ipsets before population..."
+        for setname in unblocksh unblockvless unblocktroj; do
+            ipset flush "$setname" 2>/dev/null || true
+        done
         log "Python failed, using shell unblock_ipset.sh..."
         if /opt/bin/unblock_ipset.sh >> "$LOGFILE" 2>&1; then
             log "  unblock_ipset.sh completed successfully"
