@@ -85,14 +85,6 @@ def stats():
     active_services = sum(1 for s in services.values() if s['status'] == '✅ Активен')
     config_files = sum(1 for s in services.values() if s['config_exists'])
 
-    # DNS spoofing status
-    from core.services import DNSSpoofing
-    try:
-        spoofing = DNSSpoofing()
-        dns_status = spoofing.get_status()
-    except Exception:
-        dns_status = {'enabled': False, 'domain_count': 0}
-
     # DNS Override status
     # FIX #4: Проверяем маркерный файл для точного статуса
     dns_override_enabled = os.path.exists(DNS_OVERRIDE_FLAG)
@@ -131,8 +123,6 @@ def stats():
         'total_domains': total_domains,
         'services': services,
         'bypass_lists': bypass_lists,
-        'dns_spoofing_enabled': dns_status.get('enabled', False),
-        'dns_spoofing_domains': dns_status.get('domain_count', 0),
         'dns_override_enabled': dns_override_enabled,
         'ipset_sizes': ipset_sizes,
     }
@@ -484,8 +474,7 @@ def service_restore_dns():
                 if toggle_cfg:
                     ipset_name = toggle_cfg['ipset']
                     port = toggle_cfg['port']
-                    ipt.add_rule(ipset_name, port, 'tcp')
-                    ipt.add_rule(ipset_name, port, 'udp')
+                    ipt.add_vpn_redirect(ipset_name, port)
                     results.append(f'✅ iptables {svc_name} восстановлены')
                     logger.info(f"[ROUTES] DNS restore: iptables rules for {svc_name} restored")
 

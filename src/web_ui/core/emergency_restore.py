@@ -181,13 +181,12 @@ def emergency_restore() -> Tuple[bool, List[str]]:
             shutil.copy2(DNSMASQ_TEMPLATE, DNSMASQ_CONF)
             log.append("  ✅ dnsmasq.conf restored from template")
 
-        # Очищаем конфиги bypass
-        for conf_file in [DNSMASQ_CONF.replace('dnsmasq.conf', 'unblock.dnsmasq'),
-                          DNSMASQ_CONF.replace('dnsmasq.conf', 'unblock-ai.dnsmasq')]:
-            if os.path.exists(conf_file):
-                with open(conf_file, 'w') as f:
-                    f.write('')
-                log.append(f"  ✅ Cleared {os.path.basename(conf_file)}")
+        # Clear bypass config
+        bypass_conf = DNSMASQ_CONF.replace('dnsmasq.conf', 'unblock.dnsmasq')
+        if os.path.exists(bypass_conf):
+            with open(bypass_conf, 'w') as f:
+                f.write('')
+            log.append(f"  ✅ Cleared {os.path.basename(bypass_conf)}")
     except Exception as e:
         log.append(f"  ⚠️ DnsmasqManager error: {e}")
         success = False

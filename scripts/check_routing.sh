@@ -18,7 +18,7 @@ if command -v ipset > /dev/null; then
     done
     
     # Проверка конкретных ipset для обхода
-    for ipset in unblocksh unblocktor unblockvless unblocktroj unblock unblock_domains; do
+    for ipset in unblocksh unblockvless unblocktroj unblock unblock_domains; do
         if ipset list "$ipset" -n 2>/dev/null | grep -q "^${ipset}$"; then
             count=$(ipset list "$ipset" 2>/dev/null | grep -c "^[0-9]" || echo 0)
             echo "   ✅ $ipset: $count записей"

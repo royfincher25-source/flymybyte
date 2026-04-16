@@ -46,7 +46,6 @@ opkg install curl ipset iptables dnsmasq-full
 
 ```bash
 ipset create unblocksh hash:net
-ipset create unblocktor hash:net
 ipset create unblockvless hash:net
 ipset create unblocktroj hash:net
 ```
@@ -127,7 +126,6 @@ done
 ```bash
 #!/bin/sh
 ipset flush unblocksh
-ipset flush unblocktor
 ipset flush unblockvless
 ipset flush unblocktroj
 

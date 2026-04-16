@@ -1,8 +1,8 @@
 """
 FlyMyByte Web Interface - Bypass Routes
 
-Blueprint for bypass lists and DNS spoofing:
-/bypass/*, /dns-spoofing/*
+Blueprint for bypass lists:
+/bypass/*
 """
 import logging
 import os
@@ -29,7 +29,6 @@ from core.constants import (
     MAX_ENTRIES_PER_REQUEST,
     MAX_ENTRY_LENGTH,
     MAX_TOTAL_INPUT_SIZE,
-    AI_DOMAINS_LIST,
     WEB_UI_DIR,
 )
 from core.utils import (
@@ -42,155 +41,13 @@ from core.utils import (
 from core.app_config import WebConfig
 from core.dnsmasq_manager import get_dnsmasq_manager
 from core.services import (
-    DNSSpoofing, apply_dns_spoofing, disable_dns_spoofing,
-    get_dns_spoofing_status, get_catalog, download_list,
+    get_catalog, download_list,
 )
 from core.services import refresh_ipset_from_file
 from core.handlers import redirect_with_message
 
 
 bp = Blueprint('bypass', __name__, template_folder='templates', static_folder='static')
-
-
-# =============================================================================
-# DNS SPOOFING ROUTES
-# =============================================================================
-
-@bp.route('/dns-spoofing')
-@login_required
-def dns_spoofing():
-    return render_template('dns_spoofing.html')
-
-
-@bp.route('/dns-spoofing/status')
-@login_required
-def dns_spoofing_status():
-    try:
-        status = get_dns_spoofing_status()
-        # Use DnsmasqManager for accurate dnsmasq status
-        try:
-            dns_mgr = get_dnsmasq_manager()
-            dns_status = dns_mgr.get_status()
-            status['dnsmasq_running'] = dns_status['dnsmasq_running']
-            status['config_valid'] = dns_status['config_valid']
-        except Exception:
-            pass
-        return jsonify(status)
-    except Exception as e:
-        logger.error(f"dns_spoofing_status error: {e}")
-        return jsonify({'enabled': False, 'domain_count': 0, 'config_exists': False, 'dnsmasq_running': False, 'error': str(e)})
-
-
-@bp.route('/dns-spoofing/apply', methods=['POST'])
-@login_required
-def dns_spoofing_apply():
-    """Применить DNS-обход AI-доменов через DnsmasqManager."""
-    try:
-        dns_mgr = get_dnsmasq_manager()
-        ok, msg = dns_mgr.generate_ai_config()
-        if ok:
-            dns_mgr.restart_dnsmasq_with_retry()
-            return jsonify({'success': True, 'message': msg})
-        else:
-            return jsonify({'success': False, 'error': msg})
-    except Exception as e:
-        logger.error(f"dns_spoofing_apply error: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-
-@bp.route('/dns-spoofing/disable', methods=['POST'])
-@login_required
-def dns_spoofing_disable():
-    """Отключить DNS-обход AI-доменов через DnsmasqManager."""
-    try:
-        dns_mgr = get_dnsmasq_manager()
-        # Очищаем AI конфиг
-        ai_conf = '/opt/etc/unblock-ai.dnsmasq'
-        if os.path.exists(ai_conf):
-            with open(ai_conf, 'w') as f:
-                f.write('')
-        # Перезапускаем dnsmasq
-        dns_mgr.restart_dnsmasq_with_retry()
-        return jsonify({'success': True, 'message': 'DNS-обход AI выключен'})
-    except Exception as e:
-        logger.error(f"dns_spoofing_disable error: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-
-@bp.route('/dns-spoofing/domains')
-@login_required
-def dns_spoofing_get_domains():
-    try:
-        spoofing = DNSSpoofing()
-        domains = spoofing.load_domains()
-        return jsonify({'success': True, 'domains': domains})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e), 'domains': []})
-
-
-@bp.route('/dns-spoofing/domains', methods=['POST'])
-@login_required
-def dns_spoofing_save_domains():
-    try:
-        from pathlib import Path
-        data = request.get_json()
-        domains = data.get('domains', [])
-        if not isinstance(domains, list):
-            return jsonify({'success': False, 'error': 'Invalid domains format'})
-        spoofing = DNSSpoofing()
-        valid_domains = [d for d in domains if spoofing._validate_domain(d)]
-        domains_path = Path(AI_DOMAINS_LIST)
-        domains_path.parent.mkdir(parents=True, exist_ok=True)
-        domains_path.write_text('\n'.join(valid_domains), encoding='utf-8')
-        logger.info(f"Saved {len(valid_domains)} AI domains")
-        return jsonify({'success': True, 'count': len(valid_domains), 'message': f'Сохранено {len(valid_domains)} доменов'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-
-@bp.route('/dns-spoofing/preset')
-@login_required
-def dns_spoofing_preset():
-    try:
-        from pathlib import Path
-        preset_path = Path(f'{WEB_UI_DIR}/resources/lists/unblock-ai-domains.txt')
-        if not preset_path.exists():
-            return jsonify({'success': False, 'error': 'Preset not found'})
-        content = preset_path.read_text(encoding='utf-8')
-        domains = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith('#')]
-        return jsonify({'success': True, 'domains': domains, 'count': len(domains)})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e), 'domains': []})
-
-
-@bp.route('/dns-spoofing/test', methods=['POST'])
-@login_required
-def dns_spoofing_test():
-    try:
-        data = request.get_json()
-        domain = data.get('domain', '')
-        if not domain:
-            return jsonify({'success': False, 'error': 'Domain required'})
-        spoofing = DNSSpoofing()
-        result = spoofing.test_domain(domain)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'domain': domain, 'resolved': False, 'error': str(e)})
-
-
-@bp.route('/dns-spoofing/logs')
-@login_required
-def dns_spoofing_logs():
-    try:
-        from pathlib import Path
-        log_file = Path('/opt/var/log/unblock_dnsmasq.log')
-        if not log_file.exists():
-            return jsonify({'success': True, 'logs': 'Логов нет'})
-        content = log_file.read_text(encoding='utf-8', errors='ignore')
-        lines = content.splitlines()[-50:]
-        return jsonify({'success': True, 'logs': '\n'.join(lines) if lines else 'Логов нет'})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
 
 
 # =============================================================================
@@ -277,7 +134,6 @@ def add_to_bypass(filename: str):
 
         if added_count > 0:
             # Use DnsmasqManager for atomic config regeneration and dnsmasq restart
-            # DNSSpoofing will add domains to ipset automatically on DNS queries
             # IP/CIDR entries will be loaded on web_ui startup
             try:
                 dns_mgr = get_dnsmasq_manager()

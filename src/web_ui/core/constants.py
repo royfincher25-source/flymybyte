@@ -7,11 +7,11 @@ Used by:
 - routes_system.py: SERVICE_TOGGLE_CONFIG, INIT_SCRIPTS, DNSMASQ_CONFIG
 - routes_vpn.py: SERVICES, CONFIG_PATHS, INIT_SCRIPTS
 - core/vpn_manager.py: SERVICE_TOGGLE_CONFIG, INIT_SCRIPTS, PROC_NAME_MAP
-- core/services.py: DNSMASQ_AI_CONFIG, AI_DOMAINS_LIST, VPN_DNS_*, MAX_*, INIT_SCRIPTS
+- core/services.py: VPN_DNS_*, MAX_*, INIT_SCRIPTS
 - core/dns_ops.py: DNS_CHECK_INTERVAL, DNS_TIMEOUT, DEFAULT_DNS_SERVERS
 - core/app_config.py: DEFAULT_WEB_*, DEFAULT_ROUTER_IP, DEFAULT_UNBLOCK_DIR, UNBLOCK_DIR
 - core/backup_manager.py: BACKUP_DIR, BACKUP_FILES, INIT_SCRIPTS
-- core/dnsmasq_manager.py: DNSMASQ_*, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT
+- core/dnsmasq_manager.py: DNSMASQ_*, UNBLOCK_DIR, VPN_DNS_PORT
 - core/ipset_ops.py: IPSET_MAX_BULK_ENTRIES, IPSET_MAX_ENTRIES
 """
 
@@ -91,11 +91,7 @@ TMP_RESTART_SCRIPT = '/tmp/restart_webui.sh'
 DNS_OVERRIDE_FLAG = '/opt/etc/web_ui/.dns_override.flag'  # Постоянный маркер DNS Override
 
 DNSMASQ_CONFIG = '/opt/etc/dnsmasq.conf'
-DNSMASQ_AI_CONFIG = '/opt/etc/unblock-ai.dnsmasq'
 DNSMASQ_BYPASS_CONF = '/opt/etc/unblock.dnsmasq'
-DNSMASQ_AI_TEMPLATE = '/opt/etc/web_ui/resources/config/unblock-ai.dnsmasq.template'
-
-AI_DOMAINS_LIST = '/opt/etc/unblock/ai-domains.txt'
 
 SHADOWSOCKS_CONFIG = '/opt/etc/shadowsocks.json'
 TROJAN_CONFIG_DIR = '/opt/etc/trojan'
@@ -215,12 +211,9 @@ FILES_TO_UPDATE = {
     'web_ui/templates/backup.html': f'{WEB_UI_DIR}/templates/backup.html',
     'web_ui/templates/dns_monitor.html': f'{WEB_UI_DIR}/templates/dns_monitor.html',
     'web_ui/templates/logs.html': f'{WEB_UI_DIR}/templates/logs.html',
-    'web_ui/templates/dns_spoofing.html': f'{WEB_UI_DIR}/templates/dns_spoofing.html',
     'web_ui/static/style.css': f'{WEB_UI_DIR}/static/style.css',
     'web_ui/static/fonts/flymybyte-icons.css': f'{WEB_UI_DIR}/static/fonts/flymybyte-icons.css',
     'web_ui/static/fonts/flymybyte-icons.woff2': f'{WEB_UI_DIR}/static/fonts/flymybyte-icons.woff2',
-    'web_ui/resources/lists/unblock-ai-domains.txt': AI_DOMAINS_LIST,
-    'web_ui/resources/config/unblock-ai.dnsmasq.template': DNSMASQ_AI_TEMPLATE,
     'web_ui/resources/scripts/unblock_dnsmasq.sh': f'{WEB_UI_DIR}/resources/scripts/unblock_dnsmasq.sh',
     'web_ui/resources/scripts/emergency_restore.sh': SCRIPT_EMERGENCY_RESTORE,
     'web_ui/resources/scripts/dnsmasq_watchdog.sh': SCRIPT_DNSMASQ_WATCHDOG,
@@ -240,8 +233,6 @@ BACKUP_FILES = [
     SHADOWSOCKS_CONFIG,
     '/opt/etc/proxy.json',      # Proxy config
     f'{UNBLOCK_DIR}',
-    DNSMASQ_AI_CONFIG,
-    AI_DOMAINS_LIST,
     DNSMASQ_BYPASS_CONF,        # Bypass dnsmasq config (generated)
     DNSMASQ_CONFIG,
     CRONTAB_FILE,
@@ -258,8 +249,22 @@ UPDATE_BACKUP_FILES = [
     f'{TROJAN_CONFIG_DIR}',
     SHADOWSOCKS_CONFIG,
     f'{UNBLOCK_DIR}',
-    DNSMASQ_AI_CONFIG,
-    AI_DOMAINS_LIST,
+    DNSMASQ_BYPASS_CONF,        # Bypass dnsmasq config (generated)
+    DNSMASQ_CONFIG,
+    CRONTAB_FILE,
+    '/opt/bin',
+    f'{NDM_DIR}',
+    f'{INIT_DIR}',
+    SCRIPT_INSTALL,
+    WEB_UI_LOG_FILE,
+]
+
+UPDATE_BACKUP_FILES = [
+    f'{WEB_UI_DIR}',
+    f'{XRAY_DIR}',
+    f'{TROJAN_CONFIG_DIR}',
+    SHADOWSOCKS_CONFIG,
+    f'{UNBLOCK_DIR}',
     DNSMASQ_CONFIG,
     CRONTAB_FILE,
     '/opt/bin',

@@ -112,14 +112,6 @@
     <div class="card__body">
         <div class="row row--2col">
             <div>
-                <h6><i class="fm fm-shield-check"></i> DNS-обход AI</h6>
-                {% if stats.dns_spoofing_enabled %}
-                    <p class="text-success"><i class="fm fm-check-circle-fill"></i> Активен ({{ stats.dns_spoofing_domains }} доменов)</p>
-                {% else %}
-                    <p class="text-danger"><i class="fm fm-x-circle-fill"></i> Выключен</p>
-                {% endif %}
-            </div>
-            <div>
                 <h6><i class="fm fm-globe"></i> DNS Override</h6>
                 {% if stats.dns_override_enabled %}
                     <p class="text-success"><i class="fm fm-check-circle-fill"></i> ВКЛ (порт 5353)</p>

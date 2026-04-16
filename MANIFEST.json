@@ -251,11 +251,6 @@
       "md5": "9e16012d334a489ce41898858dcecb29",
       "size": 2303
     },
-    "web_ui/templates/dns_spoofing.html": {
-      "dest": "/opt/etc/web_ui/templates/dns_spoofing.html",
-      "md5": "f1f669fd6ab562e8e74c580e0d0b0702",
-      "size": 12476
-    },
     "web_ui/static/style.css": {
       "dest": "/opt/etc/web_ui/static/style.css",
       "md5": "b503bfff1bea6903370bea12c468278b",
@@ -270,16 +265,6 @@
       "dest": "/opt/etc/web_ui/static/fonts/flymybyte-icons.woff2",
       "md5": "d98ce1de2de1ff65b757a6c56a7fca34",
       "size": 3636
-    },
-    "web_ui/resources/lists/unblock-ai-domains.txt": {
-      "dest": "/opt/etc/unblock/ai-domains.txt",
-      "md5": "53d008d271a71e27a3e6bbca456c2e0b",
-      "size": 5757
-    },
-    "web_ui/resources/config/unblock-ai.dnsmasq.template": {
-      "dest": "/opt/etc/web_ui/resources/config/unblock-ai.dnsmasq.template",
-      "md5": "b8150cd0ab147c9f4bfb9048d62296e2",
-      "size": 1797
     },
     "web_ui/resources/scripts/emergency_restore.sh": {
       "dest": "/opt/bin/emergency_restore.sh",

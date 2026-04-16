@@ -1,5 +1,5 @@
 #!/bin/sh
-# Применение правил маршрутизации трафика через Shadowsocks/Tor
+# Применение правил маршрутизации трафика через Shadowsocks
 # Запуск: sh /opt/root/apply_routing.sh
 
 echo "============================================================"
@@ -10,7 +10,6 @@ echo ""
 # 1. Создание ipset
 echo "[1/3] Создание ipset..."
 ipset create unblocksh hash:net -exist 2>/dev/null && echo "✅ unblocksh создан" || echo "❌ unblocksh ошибка"
-ipset create unblocktor hash:net -exist 2>/dev/null && echo "✅ unblocktor создан" || echo "❌ unblocktor ошибка"
 ipset create unblockvless hash:net -exist 2>/dev/null && echo "✅ unblockvless создан" || echo "❌ unblockvless ошибка"
 ipset create unblocktroj hash:net -exist 2>/dev/null && echo "✅ unblocktroj создан" || echo "❌ unblocktroj ошибка"
 echo ""
@@ -42,7 +41,7 @@ echo "============================================================"
 echo ""
 
 echo "ipset:"
-for ipset in unblocksh unblocktor unblockvless unblocktroj; do
+for ipset in unblocksh unblockvless unblocktroj; do
     if ipset list "$ipset" -n 2>/dev/null | grep -q "^${ipset}$"; then
         count=$(ipset list "$ipset" 2>/dev/null | grep -c "^[0-9]" || echo 0)
         echo "✅ $ipset: $count записей"

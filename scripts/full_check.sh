@@ -55,7 +55,7 @@ echo ""
 
 # 4. ipset
 echo "[4/8] Проверка ipset..."
-for ipset_name in unblocksh unblocktor unblockvless unblocktroj; do
+for ipset_name in unblocksh unblockvless unblocktroj; do
     if ipset list "$ipset_name" -n 2>/dev/null | grep -q "^${ipset_name}$"; then
         count=$(ipset list "$ipset_name" 2>/dev/null | grep -c "^[0-9]" 2>/dev/null || echo "0")
         if [ "$count" -gt 0 ] 2>/dev/null; then

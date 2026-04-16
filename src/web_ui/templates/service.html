@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Сервис — FlyMyByte{% endblock %}
 
@@ -387,19 +387,6 @@ function escapeHtml(text) {
                 <h5 class="card__title"><i class="fm fm-activity"></i> DNS Монитор</h5>
                 <p class="text-muted small">Автоматическое переключение при отказе DNS</p>
                 <a href="{{ url_for('system.dns_monitor_status') }}" class="btn btn--primary btn--sm">
-                    <i class="fm fm-gear"></i> Настроить
-                </a>
-            </div>
-        </div>
-    </div>
-
-    <!-- DNS-обход AI-доменов -->
-    <div>
-        <div class="card shadow-sm">
-            <div class="card__body">
-                <h5 class="card__title"><i class="fm fm-globe2"></i> DNS-обход AI</h5>
-                <p class="text-muted small">Обход блокировок AI-сервисов через DNS</p>
-                <a href="{{ url_for('bypass.dns_spoofing') }}" class="btn btn--info btn--sm">
                     <i class="fm fm-gear"></i> Настроить
                 </a>
             </div>

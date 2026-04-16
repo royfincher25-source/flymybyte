@@ -107,7 +107,7 @@ echo "" >> "$RESULT_LOG"
 # ============================================================
 echo "=== ЭТАП 3: Проверка ipset ===" >> "$RESULT_LOG"
 TOTAL_IPSET=0
-for setname in unblocksh unblockhysteria2 unblocktor unblockvless unblocktroj; do
+for setname in unblocksh unblockvless unblocktroj; do
     if ipset list "$setname" -n >/dev/null 2>&1; then
         count=$(ipset list "$setname" 2>/dev/null | tail -n +7 | grep -c "^[0-9]")
         count=${count:-0}
@@ -146,7 +146,7 @@ fi
 # Check for duplicate REDIRECT rules (should be max 2 per ipset: tcp+udp)
 echo "  Checking for duplicate rules..." >> "$RESULT_LOG"
 duplicates=0
-for setname in unblocksh unblocktor unblockvless unblocktroj; do
+for setname in unblocksh unblockvless unblocktroj; do
     rule_count=$(iptables -t nat -L PREROUTING -n 2>/dev/null | grep -c "$setname")
     rule_count=${rule_count:-0}
     if [ "$rule_count" -gt 2 ]; then
@@ -164,7 +164,7 @@ done
 
 # Check for stale ipset entries (ipset has entries but service not running)
 echo "  Checking for stale ipset entries..." >> "$RESULT_LOG"
-for entry in "unblocksh:1082" "unblocktor:9141" "unblockvless:10810" "unblocktroj:10829"; do
+for entry in "unblocksh:1082" "unblockvless:10810" "unblocktroj:10829"; do
     setname=$(echo "$entry" | cut -d: -f1)
     port=$(echo "$entry" | cut -d: -f2)
     if ipset list "$setname" -n >/dev/null 2>&1; then

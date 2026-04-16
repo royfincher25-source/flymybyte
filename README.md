@@ -91,7 +91,7 @@ src/web_ui/
 │   ├── base.html
 │   ├── index.html
 │   ├── keys.html, bypass.html, install.html, stats.html
-│   ├── service.html, updates.html, dns_spoofing.html
+│   ├── service.html, updates.html
 │   └── ...
 │
 ├── static/

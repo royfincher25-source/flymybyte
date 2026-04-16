@@ -1,16 +1,14 @@
 """
 FlyMyByte — Unified dnsmasq Config Manager
 
-Единый генератор конфигурации dnsmasq для всех bypass-списков и AI-доменов.
-Заменяет: unblock_dnsmasq.sh, dns_spoofing.py generate_config.
+Единый генератор конфигурации dnsmasq для всех bypass-списков.
+Заменяет: unblock_dnsmasq.sh
 
-Использование:
+Usage:
     from core.dnsmasq_manager import DnsmasqManager
 
     mgr = DnsmasqManager()
     mgr.generate_bypass_config()     # из всех .txt списков
-    mgr.generate_ai_config()          # из ai-domains.txt
-    mgr.generate_all()                # оба сразу
     mgr.restart_dnsmasq()             # применить
 """
 import os
@@ -20,7 +18,7 @@ import subprocess
 import shutil
 from typing import List, Dict, Tuple, Set, Optional
 
-from .constants import DNSMASQ_CONFIG, DNSMASQ_AI_CONFIG, UNBLOCK_DIR, AI_DOMAINS_LIST, VPN_DNS_PORT, IPSET_MAP
+from .constants import DNSMASQ_CONFIG, UNBLOCK_DIR, VPN_DNS_PORT, IPSET_MAP
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +33,6 @@ class DnsmasqManager:
 
     def __init__(self, unblock_dir: str = UNBLOCK_DIR):
         self._unblock_dir = unblock_dir
-        self._ai_domains_file = AI_DOMAINS_LIST
 
     # =========================================================================
     # DOMAIN LOADING
@@ -97,10 +94,6 @@ class DnsmasqManager:
         logger.info(f"Loaded bypass domains from {len(result)} files")
         return result
 
-    def load_ai_domains(self) -> Set[str]:
-        """Загрузить AI-домены из файла."""
-        return self.load_domains_from_file(self._ai_domains_file)
-
     # =========================================================================
     # CONFIG GENERATION
     # =========================================================================
@@ -148,41 +141,6 @@ class DnsmasqManager:
             return True, f"Generated {total_domains} domains across {len(all_domains)} ipsets (direct resolve)"
         except Exception as e:
             logger.error(f"Failed to write bypass config: {e}")
-            return False, str(e)
-
-    def generate_ai_config(self) -> Tuple[bool, str]:
-        """
-        Сгенерировать конфиг для AI-доменов (unblock-ai.dnsmasq).
-
-        Формат:
-            server=/aistudio.google.com/127.0.0.1#40500
-
-        Returns:
-            Tuple[bool, str]: (success, message)
-        """
-        domains = self.load_ai_domains()
-        if not domains:
-            # Создаём пустой файл
-            try:
-                with open(DNSMASQ_AI_CONFIG, 'w') as f:
-                    f.write('# AI domains config (empty)\n')
-                return True, "No AI domains found, empty config created"
-            except Exception as e:
-                return False, str(e)
-
-        lines = ['# Auto-generated AI domains config', '']
-        for domain in sorted(domains):
-            lines.append(f'server=/{domain}/127.0.0.1#{VPN_DNS_PORT}')
-
-        try:
-            temp_path = DNSMASQ_AI_CONFIG + '.tmp'
-            with open(temp_path, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(lines) + '\n')
-            os.replace(temp_path, DNSMASQ_AI_CONFIG)
-            logger.info(f"Generated AI config: {len(domains)} domains")
-            return True, f"Generated {len(domains)} AI domains"
-        except Exception as e:
-            logger.error(f"Failed to write AI config: {e}")
             return False, str(e)
 
     def _sanitize_dnsmasq_conf(self):
@@ -233,22 +191,12 @@ class DnsmasqManager:
 
     def generate_all(self) -> Tuple[bool, str]:
         """
-        Сгенерировать ОБА конфига (bypass + AI).
+        Generate bypass config only (AI domains removed).
 
         Returns:
             Tuple[bool, str]: (success, message)
         """
-        bypass_ok, bypass_msg = self.generate_bypass_config()
-        ai_ok, ai_msg = self.generate_ai_config()
-
-        if bypass_ok and ai_ok:
-            return True, f"OK: {bypass_msg}; {ai_msg}"
-        elif bypass_ok:
-            return True, f"Partial: {bypass_msg}; AI failed: {ai_msg}"
-        elif ai_ok:
-            return True, f"Partial: Bypass failed: {bypass_msg}; {ai_msg}"
-        else:
-            return False, f"Failed: {bypass_msg}; {ai_msg}"
+        return self.generate_bypass_config()
 
     # =========================================================================
     # DNSMASQ RESTART
@@ -429,14 +377,11 @@ class DnsmasqManager:
         # Проверяем запущен ли dnsmasq через /proc
         status['dnsmasq_running'] = self._check_process('dnsmasq')
 
-        # Считаем домены
+        # Count domains
         bypass_domains = self.load_all_bypass_domains()
         status['bypass_domains'] = sum(len(d) for d in bypass_domains.values())
 
-        ai_domains = self.load_ai_domains()
-        status['ai_domains'] = len(ai_domains)
-
-        # Проверяем конфиг
+        # Check config
         valid, _ = self.test_config()
         status['config_valid'] = valid
 

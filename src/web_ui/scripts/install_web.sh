@@ -116,7 +116,7 @@ mkdir -p core
 cd core
 
 # Загружаем все .py файлы из core/
-for file in __init__.py app_config.py config.py utils.py services.py ipset_manager.py list_catalog.py dns_manager.py dns_monitor.py dns_resolver.py dns_spoofing.py; do
+for file in __init__.py app_config.py config.py utils.py services.py ipset_manager.py list_catalog.py dns_manager.py dns_monitor.py dns_resolver.py; do
     printf "  → %-20s" "$file"
     if curl -sL -o "$file" "$BASE_URL/core/$file"; then
         echo " ✅"
@@ -147,7 +147,7 @@ log_info "⏳ Загрузка шаблонов..."
 mkdir -p templates
 cd templates
 
-TEMPLATES="base.html login.html index.html keys.html bypass.html install.html stats.html service.html updates.html bypass_view.html bypass_add.html bypass_remove.html bypass_catalog.html key_generic.html backup.html dns_monitor.html logs.html dns_spoofing.html"
+TEMPLATES="base.html login.html index.html keys.html bypass.html install.html stats.html service.html updates.html bypass_view.html bypass_add.html bypass_remove.html bypass_catalog.html key_generic.html backup.html dns_monitor.html logs.html"
 for file in $TEMPLATES; do
     printf "  → %-20s" "$file"
     if curl -sL -o "$file" "$BASE_URL/templates/$file"; then
@@ -196,21 +196,11 @@ log_info "⏳ Загрузка ресурсов..."
 mkdir -p resources/lists resources/config resources/scripts
 cd resources
 
-# Списки доменов
-printf "  → %-20s" "lists/unblock-ai-domains.txt"
-if curl -sL -o "lists/unblock-ai-domains.txt" "$BASE_URL/resources/lists/unblock-ai-domains.txt"; then
-    echo " ✅"
-else
-    echo " ❌"
-fi
+# Списки доменов (только основные bypass списки)
+# AI domains удалены
 
 # Конфигурации
-printf "  → %-20s" "config/unblock-ai.dnsmasq.template"
-if curl -sL -o "config/unblock-ai.dnsmasq.template" "$BASE_URL/resources/config/unblock-ai.dnsmasq.template"; then
-    echo " ✅"
-else
-    echo " ❌"
-fi
+# AI dnsmasq config удалён
 
 # Скрипты
 printf "  → %-20s" "scripts/unblock_dnsmasq.sh"

@@ -113,9 +113,7 @@ if [ "$1" = "-remove" ]; then
         "$DNSMASQ_CONF" \
         "$XRAY_DIR" \
         "$TEMPLATES_DIR" \
-        "$TROJAN_DIR" \
-        "/opt/etc/unblock-ai.dnsmasq" \
-        "/opt/etc/unblock/ai-domains.txt"
+        "$TROJAN_DIR"
     do
         [ -e "$file" ] && rm -rf "$file" && echo "Удалён файл или директория: \"$file\""
     done
@@ -261,17 +259,6 @@ if [ "$1" = "-install" ]; then
         [ ! -f "$file" ] && touch "$file" && chmod 644 "$file" && echo "  ✅ $(basename $file) created"
     done
     echo "  ℹ️ Existing lists preserved"
-
-    # AI domains DNS spoofing - загрузка и настройка
-    echo ""
-    echo "⏳ Настройка DNS-обхода AI-доменов..."
-    mkdir -p /opt/etc/unblock
-    curl -sL -o "/opt/etc/unblock/ai-domains.txt" "$RESOURCES_URL/lists/unblock-ai-domains.txt" && \
-        echo "  ✅ AI domains list created" || echo "  ℹ️ AI domains list preserved"
-    
-    curl -sL -o "/opt/etc/unblock-ai.dnsmasq" "$RESOURCES_URL/config/unblock-ai.dnsmasq.template" && \
-        sed -i "s/40500/${dnsovertlsport}/g" "/opt/etc/unblock-ai.dnsmasq" && \
-        echo "  ✅ AI dnsmasq config created" || echo "  ❌ AI dnsmasq config"
 
     echo ""
     echo "⏳ Загрузка дополнительных файлов..."

@@ -201,7 +201,6 @@ class BackupManager:
                     'etc/ndm': '/opt/etc/ndm',
                     'etc/dnsmasq.conf': '/opt/etc/dnsmasq.conf',
                     'etc/crontab': '/opt/etc/crontab',
-                    'etc/unblock-ai.dnsmasq': '/opt/etc/unblock-ai.dnsmasq',
                     'bin': '/opt/bin',
                     'root': '/opt/root',
                     'var/log': '/opt/var/log',

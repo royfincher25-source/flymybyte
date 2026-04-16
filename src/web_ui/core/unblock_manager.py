@@ -169,18 +169,16 @@ class UnblockManager:
         return counts
     
     def _update_dnsmasq(self) -> Tuple[bool, str]:
-        """Обновить dnsmasq конфиги через Python."""
+        """Update dnsmasq config via Python."""
         logger.info("[UNBLOCK] _update_dnsmasq() - Python path")
-        
-        # Логируем конфиги
+
+        # Log config files
         bypass_conf = '/opt/etc/unblock.dnsmasq'
-        ai_conf = '/opt/etc/unblock-ai.dnsmasq'
         logger.info(f"[UNBLOCK] Checking config files:")
         logger.info(f"  - {bypass_conf}: exists={os.path.exists(bypass_conf)}")
-        logger.info(f"  - {ai_conf}: exists={os.path.exists(ai_conf)}")
-        
+
         try:
-            logger.info("[UNBLOCK] Generating all configs (bypass + AI)...")
+            logger.info("[UNBLOCK] Generating bypass config...")
             ok, msg = self._dnsmasq.generate_all()
             logger.info(f"[UNBLOCK] generate_all(): {ok} - {msg}")
             
