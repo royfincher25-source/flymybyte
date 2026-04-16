@@ -58,20 +58,18 @@ while IFS= read -r line; do
         result=$(nslookup "$domain" "$DNS" 2>/dev/null)
         rv=$?
         if [ $rv -eq 0 ]; then
-            # Извлекаем IPv4 адреса - с debugging
-            echo "DEBUG: nslookup result: $result" >&2
-            ips_found=0
-            echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS" | while read -r _ addr; do
-                ips_found=$((ips_found+1))
-                # Только IPv4 (пропускаем IPv6)
-                case "$addr" in
-                    *:*) ;;  # skip IPv6
-                    *) 
-                        echo "DEBUG: Adding IP: $addr" >&2
-                        echo "$addr" >> "$TEMP_IPS" ;;
-                esac
+            # Извлекаем IPv4 адреса - используем for loop вместо pipe while
+            for line in $(echo "$result" | grep -E '^Address( 1)?:' | grep -v "$DNS"); do
+                addr=$(echo "$line" | awk '{print $2}')
+                if [ -n "$addr" ]; then
+                    # Пропускаем IPv6
+                    case "$addr" in
+                        *:*) continue ;;
+                    esac
+                    echo "DEBUG: Adding IP: $addr" >&2
+                    echo "$addr" >> "$TEMP_IPS"
+                fi
             done
-            echo "DEBUG: Total found: $ips_found" >&2
             COUNT_RESOLVED=$((COUNT_RESOLVED + 1))
         else
             COUNT_FAILED=$((COUNT_FAILED + 1))
