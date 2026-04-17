@@ -168,7 +168,6 @@ FILES_TO_UPDATE = {
     'web_ui/core/__init__.py': f'{WEB_UI_DIR}/core/__init__.py',
     'web_ui/core/constants.py': f'{WEB_UI_DIR}/core/constants.py',
     'web_ui/core/utils.py': f'{WEB_UI_DIR}/core/utils.py',
-    'web_ui/core/services.py': f'{WEB_UI_DIR}/core/services.py',
     'web_ui/core/dns_ops.py': f'{WEB_UI_DIR}/core/dns_ops.py',
     'web_ui/core/app_config.py': f'{WEB_UI_DIR}/core/app_config.py',
     'web_ui/core/update_progress.py': f'{WEB_UI_DIR}/core/update_progress.py',
