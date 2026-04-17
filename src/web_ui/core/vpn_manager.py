@@ -15,7 +15,8 @@ from typing import Tuple, Optional
 
 from .app_config import INIT_SCRIPTS, CONFIG_PATHS, SERVICES, WebConfig
 from .constants import SERVICE_TOGGLE_CONFIG, PROC_NAME_MAP
-from .services import restart_service, check_service_status, refresh_ipset_from_file
+from .service_ops import restart_service, check_service_status
+from .ipset_ops import refresh_ipset_from_file
 from .utils import Cache
 from .iptables_manager import get_iptables_manager
 

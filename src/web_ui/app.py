@@ -68,7 +68,7 @@ def create_app(config_class=None):
         return dict(csrf_token=generate_csrf_token)
 
     try:
-        from core.services import get_local_version
+        from core.utils import get_local_version
         _app_version = get_local_version()
     except Exception:
         _app_version = 'unknown'

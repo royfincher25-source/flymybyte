@@ -216,3 +216,30 @@ def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, s
     except Exception as e:
         logger.error(f"[IPSET] {setname} exception: {e}")
         return False, str(e)
+
+
+def refresh_ipset_from_file(filepath: str, ipset_name: str = None) -> Tuple[bool, str]:
+    """Refresh ipset from bypass list file - resolves domains and adds IPs to ipset."""
+    import os
+    from .dns_ops import resolve_domains_for_ipset
+    from .constants import IPSET_MAP
+    
+    if not os.path.exists(filepath):
+        logger.warning(f"File not found: {filepath}")
+        return False, f"File not found: {filepath}"
+    
+    if ipset_name is None:
+        filename = os.path.basename(filepath).replace('.txt', '')
+        ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
+    
+    entries_before = _count_ipset_entries(ipset_name)
+    logger.info(f"[IPSET] Refresh: {ipset_name} has {entries_before} entries")
+    
+    try:
+        count = resolve_domains_for_ipset(filepath, ipset_name)
+        entries_final = _count_ipset_entries(ipset_name)
+        logger.info(f"[IPSET] Refresh complete: was {entries_before}, now {entries_final} ({count} resolved)")
+        return True, f"Refresh: was {entries_before}, now {entries_final} ({count} resolved)"
+    except Exception as e:
+        logger.error(f"[IPSET] Refresh failed for {filepath}: {e}")
+        return False, str(e)

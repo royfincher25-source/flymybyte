@@ -31,7 +31,7 @@ from core.constants import (
     INIT_DIR,
     UPDATE_BACKUP_FILES,
 )
-from core.services import get_local_version, get_remote_version
+from core.utils import get_local_version, get_remote_version
 
 
 # =============================================================================
@@ -365,8 +365,8 @@ def run_update_scripts(progress, start_step: int) -> bool:
     # Попробовать Python UnblockManager сначала
     try:
         logger.info("[UPDATE] Step 1: Trying Python UnblockManager...")
-        from core.service_locator import ServiceLocator
-        unblock_mgr = ServiceLocator.unblock()
+        from core.unblock_manager import get_unblock_manager
+        unblock_mgr = get_unblock_manager()
         
         logger.info("[UPDATE] Getting initial status...")
         status_before = unblock_mgr.get_status()

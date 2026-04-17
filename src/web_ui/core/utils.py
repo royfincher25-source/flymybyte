@@ -479,3 +479,146 @@ def get_memory_stats() -> dict:
             'available_mb': 0, 'cached_mb': 0, 'percent': 0,
             'cache_entries': 0, 'cache_max': cache_max, 'error': str(e)
         }
+
+
+# ===========================================================================
+# Version functions (moved from services.py)
+# ===========================================================================
+
+def get_local_version() -> str:
+    """Get local version from VERSION file."""
+    version_file = '/opt/etc/web_ui/VERSION'
+    try:
+        with open(version_file, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        local_version_file = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'VERSION')
+        if os.path.exists(local_version_file):
+            try:
+                with open(local_version_file, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+            except Exception:
+                pass
+        return 'N/A'
+
+
+def get_remote_version() -> str:
+    """Get remote version from GitHub."""
+    import requests
+    try:
+        github_repo = 'royfincher25-source/flymybyte'
+        url = f'https://api.github.com/repos/{github_repo}/contents/VERSION'
+        response = requests.get(url, timeout=10, headers={
+            'Accept': 'application/vnd.github.v3+json',
+            'Cache-Control': 'no-cache',
+        })
+        if response.status_code == 200:
+            import base64
+            data = response.json()
+            content = base64.b64decode(data['content']).decode('utf-8')
+            return content.strip()
+        raw_url = f'https://raw.githubusercontent.com/{github_repo}/master/VERSION'
+        raw_resp = requests.get(raw_url, timeout=10)
+        if raw_resp.status_code == 200:
+            return raw_resp.text.strip()
+        return 'N/A'
+    except Exception as e:
+        logger.error(f'Error fetching remote version: {e}')
+        return 'N/A'
+
+
+# ===========================================================================
+# Bypass catalog functions (moved from services.py)
+# ===========================================================================
+
+LIST_CATALOG: Dict[str, Dict[str, Any]] = {
+    'anticensor': {
+        'name': 'Антицензор',
+        'description': 'Обход блокировок Роскомнадзора',
+        'url': 'https://raw.githubusercontent.com/zhovner/zaborona_help/master/hosts.txt',
+        'format': 'hosts',
+    },
+    'reestr': {
+        'name': 'Реестр запрещённых сайтов',
+        'description': 'Официальный реестр запрещённых сайтов РФ',
+        'url': 'https://raw.githubusercontent.com/zhovner/zaborona_help/master/reestr.txt',
+        'format': 'domains',
+    },
+    'social': {
+        'name': 'Соцсети',
+        'description': 'Facebook, Instagram, Twitter, TikTok',
+        'domains': ['facebook.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'whatsapp.com', 'telegram.org'],
+        'format': 'domains',
+    },
+    'streaming': {
+        'name': 'Стриминговые сервисы',
+        'description': 'Netflix, Spotify, Disney+',
+        'domains': ['netflix.com', 'spotify.com', 'disneyplus.com', 'hulu.com', 'amazonprime.com'],
+        'format': 'domains',
+    },
+    'torrents': {
+        'name': 'Торрент-трекеры',
+        'description': 'RuTracker, ThePirateBay, 1337x',
+        'domains': ['rutracker.org', 'thepiratebay.org', '1337x.to', 'torrentz2.eu'],
+        'format': 'domains',
+    },
+}
+
+
+def get_catalog() -> Dict[str, Dict[str, Any]]:
+    """Get full catalog of bypass lists."""
+    return LIST_CATALOG
+
+
+def _parse_list_content(content: str, fmt: str) -> List[str]:
+    """Parse list content based on format."""
+    domains = []
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if fmt == 'hosts':
+            parts = line.split()
+            if len(parts) >= 2 and not parts[0].startswith('#'):
+                domain = parts[1]
+                if domain != 'localhost':
+                    domains.append(domain)
+        else:
+            domains.append(line)
+    return domains
+
+
+def download_list(name: str, dest_dir: str) -> Tuple[bool, str, int]:
+    """Download list from catalog and save to file."""
+    import requests
+    if name not in LIST_CATALOG:
+        return False, f"List '{name}' not found", 0
+    
+    list_info = LIST_CATALOG[name]
+    filename = f"{name}.txt"
+    filepath = os.path.join(dest_dir, filename)
+    
+    try:
+        if 'url' in list_info:
+            logger.info(f"Downloading {name} from {list_info['url']}")
+            response = requests.get(list_info['url'], timeout=30)
+            response.raise_for_status()
+            domains = _parse_list_content(response.text, list_info['format'])
+        elif 'domains' in list_info:
+            domains = list_info['domains']
+        else:
+            return False, "No data source", 0
+        
+        temp_path = filepath + '.tmp'
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            for domain in domains:
+                f.write(f"{domain}\n")
+        os.replace(temp_path, filepath)
+        logger.info(f"Saved {len(domains)} domains to {filepath}")
+        return True, f"Downloaded {len(domains)} domains", len(domains)
+    except requests.RequestException as e:
+        logger.error(f"Download error: {e}")
+        return False, f"Download error: {e}", 0
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return False, str(e), 0

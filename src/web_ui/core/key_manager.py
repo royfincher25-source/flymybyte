@@ -6,7 +6,7 @@ Extracted from routes_vpn.py to encapsulate key parsing logic.
 import logging
 from typing import Dict, Tuple, Optional, Callable
 
-from .services import (
+from .parsers import (
     parse_vless_key,
     parse_shadowsocks_key,
     parse_trojan_key,
@@ -16,8 +16,8 @@ from .services import (
     trojan_config,
     proxy_config,
     write_json_config,
-    restart_service,
 )
+from .service_ops import restart_service
 from .vpn_manager import VPNManager
 
 logger = logging.getLogger(__name__)
