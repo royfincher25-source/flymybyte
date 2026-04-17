@@ -400,6 +400,13 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
         if not filepath.startswith('/') or '..' in filepath:
             logger.error(f"[DNS] Invalid filepath: {filepath}")
         else:
+            # Flush ipset before resolving (prevent accumulation)
+            try:
+                subprocess.run(['ipset', 'flush', ipset_name], capture_output=True, timeout=5)
+                logger.info(f"[DNS] Flushed {ipset_name} before resolution")
+            except Exception as e:
+                logger.warning(f"[DNS] Failed to flush {ipset_name}: {e}")
+            
             try:
                 result = subprocess.run(
                     [RESOLVE_SCRIPT, filepath, ipset_name],

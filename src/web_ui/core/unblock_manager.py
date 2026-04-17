@@ -229,7 +229,7 @@ class UnblockManager:
             logger.info(f"[UNBLOCK] Processing: {ipset_name} from {filepath}")
             
             try:
-                from .services import refresh_ipset_from_file
+                from .ipset_ops import refresh_ipset_from_file
                 ok, msg = refresh_ipset_from_file(filepath)
                 logger.info(f"[UNBLOCK] refresh_ipset_from_file({ipset_name}): {ok} - {msg}")
                 

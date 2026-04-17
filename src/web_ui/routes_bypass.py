@@ -37,13 +37,12 @@ from core.utils import (
     validate_bypass_entry,
     run_unblock_update,
     is_ip_address,
+    get_catalog,
+    download_list,
 )
 from core.app_config import WebConfig
 from core.dnsmasq_manager import get_dnsmasq_manager
-from core.services import (
-    get_catalog, download_list,
-)
-from core.services import refresh_ipset_from_file
+from core.ipset_ops import refresh_ipset_from_file
 from core.handlers import redirect_with_message
 
 

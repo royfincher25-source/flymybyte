@@ -26,7 +26,7 @@ from core.constants import (
     DNS_OVERRIDE_FLAG,
 )
 from core.app_config import WebConfig
-from core.services import check_service_status
+from core.service_ops import check_service_status
 from core.backup_manager import get_backup_manager
 
 
@@ -156,7 +156,7 @@ def service():
 @csrf_required
 def service_restart_unblock():
     logger.info("[ROUTES] /service/restart-unblock")
-    from core.services import restart_service
+    from core.service_ops import restart_service
     success, output = restart_service('Unblock', INIT_SCRIPTS['unblock'])
     if success:
         flash('✅ Unblock-сервис успешно перезапущен', 'success')
@@ -450,7 +450,7 @@ def service_restore_dns():
 
     # 5. Restore iptables rules and refresh ipsets for active VPN services
     from core.iptables_manager import get_iptables_manager
-    from core.services import refresh_ipset_from_file
+    from core.ipset_ops import refresh_ipset_from_file
     from core.constants import SERVICE_TOGGLE_CONFIG
 
     vpn_services = [

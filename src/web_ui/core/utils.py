@@ -141,51 +141,40 @@ class Cache:
 
 
 # =============================================================================
-# VALIDATION FUNCTIONS
+# VALIDATION FUNCTIONS - moved to bypass_utils.py
 # =============================================================================
 
 def validate_bypass_entry(entry: str) -> bool:
     """Validate bypass list entry (domain, IP, CIDR, or comment)."""
-    import re
-    entry = entry.strip()
-    if not entry:
-        return False
-    if entry.startswith('#'):
-        return True
-    if len(entry) > 253:
-        return False
-    
-    # Check for CIDR notation ( IPv4 or IPv6 )
-    if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry) or re.match(r'^[a-fA-F0-9:]+/\d+$', entry):
-        return True
-    
-    parts = entry.split('.')
-    if len(parts) == 4:
-        try:
-            return all(0 <= int(p) <= 255 for p in parts)
-        except ValueError:
-            pass
-    if ':' in entry:
-        return True
-    if '.' in entry:
-        return True
-    return False
+    from .bypass_utils import validate_bypass_entry as _validate
+    return _validate(entry)
 
 
 def is_ip_address(entry: str) -> bool:
     """Check if entry is an IP address (IPv4/IPv6) or CIDR."""
-    import re
-    entry = entry.strip()
-    
-    # Check for IPv4/IPv6 CIDR (e.g., 192.168.0.0/24, 2001:db8::/32)
-    if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry):
-        return True
-    if re.match(r'^[a-fA-F0-9:]+/\d+$', entry):
-        return True
-    
-    parts = entry.split('.')
-    if len(parts) == 4:
-        try:
+    from .bypass_utils import is_ip_address as _is_ip
+    return _is_ip(entry)
+
+
+def is_cidr(entry: str) -> bool:
+    """Check if entry is CIDR notation."""
+    from .bypass_utils import is_cidr as _is_cidr
+    return _is_cidr(entry)
+
+
+def load_bypass_list(filepath: str):
+    """Load bypass list from file."""
+    from .bypass_utils import load_bypass_list as _load
+    return _load(filepath)
+
+
+def save_bypass_list(filepath: str, sites: list):
+    """Save bypass list to file."""
+    from .bypass_utils import save_bypass_list as _save
+    return _save(filepath, sites)
+
+
+def get_script_path(script_name: str) -> Optional[str]:
             return all(0 <= int(p) <= 255 for p in parts)
         except ValueError:
             pass
@@ -196,48 +185,27 @@ def is_ip_address(entry: str) -> bool:
 
 def is_cidr(entry: str) -> bool:
     """Check if entry is CIDR notation (IPv4 or IPv6)."""
-    return is_ip_address(entry) and '/' in entry
+    from .bypass_utils import is_cidr as _is_cidr
+    return _is_cidr(entry)
 
 
 # =============================================================================
-# FILE OPERATIONS
+# FILE OPERATIONS - moved to bypass_utils.py
 # =============================================================================
 
 def load_bypass_list(filepath: str) -> List[str]:
-    """Load bypass list from file with mtime-based caching (60s TTL)."""
-    cache_key = f'bypass:{filepath}'
-    if Cache.is_valid(cache_key):
-        cached = Cache.get(cache_key)
-        try:
-            mtime = os.path.getmtime(filepath)
-            if cached and mtime == cached.get('mtime'):
-                return cached['data']
-        except (OSError, IOError):
-            pass
-    if not os.path.exists(filepath):
-        logger.warning(f"[BYPASS] File not found: {filepath}")
-        return []
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
-        try:
-            mtime = os.path.getmtime(filepath)
-        except (OSError, IOError):
-            mtime = time.time()
-        Cache.set(cache_key, {'data': data, 'mtime': mtime}, ttl=60)
-        logger.info(f"[BYPASS] Loaded {len(data)} entries from {filepath}")
-        return data
-    except Exception as e:
-        logger.error(f"[BYPASS] Error loading {filepath}: {e}")
-        return []
+    """Load bypass list from file."""
+    from .bypass_utils import load_bypass_list as _load
+    return _load(filepath)
 
 
 def save_bypass_list(filepath: str, sites: List[str]) -> None:
-    """Save bypass list to file atomically (via .tmp + os.replace)."""
-    temp_path = filepath + '.tmp'
-    try:
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(sites))
+    """Save bypass list to file."""
+    from .bypass_utils import save_bypass_list as _save
+    return _save(filepath, sites)
+
+
+def get_script_path(script_name: str) -> Optional[str]:
         os.replace(temp_path, filepath)
         cache_key = f'bypass:{filepath}'
         Cache._cache.pop(cache_key, None)
@@ -378,19 +346,15 @@ class MemoryManager:
 
 
 def get_cpu_stats() -> dict:
-    """Get CPU usage from /proc/stat. Returns {'cpu_percent': float}."""
-    try:
-        with open('/proc/stat', 'r') as f:
-            lines = f.readlines()
-        for line in lines:
-            if line.startswith('cpu '):
-                parts = line.split()
-                if len(parts) >= 8:
-                    user = int(parts[1])
-                    nice = int(parts[2])
-                    system = int(parts[3])
-                    idle = int(parts[4])
-                    iowait = int(parts[5])
+    """Get CPU usage from /proc/stat."""
+    from .system_utils import get_cpu_stats as _get_cpu
+    return _get_cpu()
+
+
+def get_memory_stats() -> dict:
+    """Get memory usage from /proc/meminfo."""
+    from .system_utils import get_memory_stats as _get_mem
+    return _get_mem()
                     total = user + nice + system + idle + iowait
                     work = user + nice + system
                     if not hasattr(get_cpu_stats, 'prev_total'):
@@ -479,3 +443,146 @@ def get_memory_stats() -> dict:
             'available_mb': 0, 'cached_mb': 0, 'percent': 0,
             'cache_entries': 0, 'cache_max': cache_max, 'error': str(e)
         }
+
+
+# ===========================================================================
+# Version functions (moved from services.py)
+# ===========================================================================
+
+def get_local_version() -> str:
+    """Get local version from VERSION file."""
+    version_file = '/opt/etc/web_ui/VERSION'
+    try:
+        with open(version_file, 'r', encoding='utf-8') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        local_version_file = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'VERSION')
+        if os.path.exists(local_version_file):
+            try:
+                with open(local_version_file, 'r', encoding='utf-8') as f:
+                    return f.read().strip()
+            except Exception:
+                pass
+        return 'N/A'
+
+
+def get_remote_version() -> str:
+    """Get remote version from GitHub."""
+    import requests
+    try:
+        github_repo = 'royfincher25-source/flymybyte'
+        url = f'https://api.github.com/repos/{github_repo}/contents/VERSION'
+        response = requests.get(url, timeout=10, headers={
+            'Accept': 'application/vnd.github.v3+json',
+            'Cache-Control': 'no-cache',
+        })
+        if response.status_code == 200:
+            import base64
+            data = response.json()
+            content = base64.b64decode(data['content']).decode('utf-8')
+            return content.strip()
+        raw_url = f'https://raw.githubusercontent.com/{github_repo}/master/VERSION'
+        raw_resp = requests.get(raw_url, timeout=10)
+        if raw_resp.status_code == 200:
+            return raw_resp.text.strip()
+        return 'N/A'
+    except Exception as e:
+        logger.error(f'Error fetching remote version: {e}')
+        return 'N/A'
+
+
+# ===========================================================================
+# Bypass catalog functions (moved from services.py)
+# ===========================================================================
+
+LIST_CATALOG: Dict[str, Dict[str, Any]] = {
+    'anticensor': {
+        'name': 'Антицензор',
+        'description': 'Обход блокировок Роскомнадзора',
+        'url': 'https://raw.githubusercontent.com/zhovner/zaborona_help/master/hosts.txt',
+        'format': 'hosts',
+    },
+    'reestr': {
+        'name': 'Реестр запрещённых сайтов',
+        'description': 'Официальный реестр запрещённых сайтов РФ',
+        'url': 'https://raw.githubusercontent.com/zhovner/zaborona_help/master/reestr.txt',
+        'format': 'domains',
+    },
+    'social': {
+        'name': 'Соцсети',
+        'description': 'Facebook, Instagram, Twitter, TikTok',
+        'domains': ['facebook.com', 'instagram.com', 'twitter.com', 'tiktok.com', 'whatsapp.com', 'telegram.org'],
+        'format': 'domains',
+    },
+    'streaming': {
+        'name': 'Стриминговые сервисы',
+        'description': 'Netflix, Spotify, Disney+',
+        'domains': ['netflix.com', 'spotify.com', 'disneyplus.com', 'hulu.com', 'amazonprime.com'],
+        'format': 'domains',
+    },
+    'torrents': {
+        'name': 'Торрент-трекеры',
+        'description': 'RuTracker, ThePirateBay, 1337x',
+        'domains': ['rutracker.org', 'thepiratebay.org', '1337x.to', 'torrentz2.eu'],
+        'format': 'domains',
+    },
+}
+
+
+def get_catalog() -> Dict[str, Dict[str, Any]]:
+    """Get full catalog of bypass lists."""
+    return LIST_CATALOG
+
+
+def _parse_list_content(content: str, fmt: str) -> List[str]:
+    """Parse list content based on format."""
+    domains = []
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if fmt == 'hosts':
+            parts = line.split()
+            if len(parts) >= 2 and not parts[0].startswith('#'):
+                domain = parts[1]
+                if domain != 'localhost':
+                    domains.append(domain)
+        else:
+            domains.append(line)
+    return domains
+
+
+def download_list(name: str, dest_dir: str) -> Tuple[bool, str, int]:
+    """Download list from catalog and save to file."""
+    import requests
+    if name not in LIST_CATALOG:
+        return False, f"List '{name}' not found", 0
+    
+    list_info = LIST_CATALOG[name]
+    filename = f"{name}.txt"
+    filepath = os.path.join(dest_dir, filename)
+    
+    try:
+        if 'url' in list_info:
+            logger.info(f"Downloading {name} from {list_info['url']}")
+            response = requests.get(list_info['url'], timeout=30)
+            response.raise_for_status()
+            domains = _parse_list_content(response.text, list_info['format'])
+        elif 'domains' in list_info:
+            domains = list_info['domains']
+        else:
+            return False, "No data source", 0
+        
+        temp_path = filepath + '.tmp'
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            for domain in domains:
+                f.write(f"{domain}\n")
+        os.replace(temp_path, filepath)
+        logger.info(f"Saved {len(domains)} domains to {filepath}")
+        return True, f"Downloaded {len(domains)} domains", len(domains)
+    except requests.RequestException as e:
+        logger.error(f"Download error: {e}")
+        return False, f"Download error: {e}", 0
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return False, str(e), 0

@@ -68,7 +68,7 @@ def create_app(config_class=None):
         return dict(csrf_token=generate_csrf_token)
 
     try:
-        from core.services import get_local_version
+        from core.utils import get_local_version
         _app_version = get_local_version()
     except Exception:
         _app_version = 'unknown'
@@ -92,6 +92,15 @@ def create_app(config_class=None):
         logger.info("dnsmasq.conf sanitized (safe startup)")
     except Exception as e:
         logger.warning(f"Failed to sanitize dnsmasq.conf: {e}")
+
+    # Add DNS redirect at startup (перенаправляет DNS через dnsmasq:5353)
+    try:
+        from core.iptables_manager import get_iptables_manager
+        ipt = get_iptables_manager()
+        ipt.add_dns_redirect('192.168.1.1', 5353)
+        logger.info("DNS redirect added on startup")
+    except Exception as e:
+        logger.warning(f"Failed to add DNS redirect: {e}")
 
     # Load IP/CIDR entries from bypass files on startup
     # - Domains: handled by dnsmasq automatically (ipset=/domain.com/ipset)
