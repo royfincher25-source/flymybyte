@@ -172,16 +172,9 @@ def save_bypass_list(filepath: str, sites: list):
     """Save bypass list to file."""
     from .bypass_utils import save_bypass_list as _save
     return _save(filepath, sites)
-    
-    # Check for IPv4/IPv6 CIDR (e.g., 192.168.0.0/24, 2001:db8::/32)
-    if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry):
-        return True
-    if re.match(r'^[a-fA-F0-9:]+/\d+$', entry):
-        return True
-    
-    parts = entry.split('.')
-    if len(parts) == 4:
-        try:
+
+
+def get_script_path(script_name: str) -> Optional[str]:
             return all(0 <= int(p) <= 255 for p in parts)
         except ValueError:
             pass
@@ -210,33 +203,9 @@ def save_bypass_list(filepath: str, sites: List[str]) -> None:
     """Save bypass list to file."""
     from .bypass_utils import save_bypass_list as _save
     return _save(filepath, sites)
-                return cached['data']
-        except (OSError, IOError):
-            pass
-    if not os.path.exists(filepath):
-        logger.warning(f"[BYPASS] File not found: {filepath}")
-        return []
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
-        try:
-            mtime = os.path.getmtime(filepath)
-        except (OSError, IOError):
-            mtime = time.time()
-        Cache.set(cache_key, {'data': data, 'mtime': mtime}, ttl=60)
-        logger.info(f"[BYPASS] Loaded {len(data)} entries from {filepath}")
-        return data
-    except Exception as e:
-        logger.error(f"[BYPASS] Error loading {filepath}: {e}")
-        return []
 
 
-def save_bypass_list(filepath: str, sites: List[str]) -> None:
-    """Save bypass list to file atomically (via .tmp + os.replace)."""
-    temp_path = filepath + '.tmp'
-    try:
-        with open(temp_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(sites))
+def get_script_path(script_name: str) -> Optional[str]:
         os.replace(temp_path, filepath)
         cache_key = f'bypass:{filepath}'
         Cache._cache.pop(cache_key, None)
