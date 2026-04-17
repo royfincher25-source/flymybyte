@@ -141,41 +141,37 @@ class Cache:
 
 
 # =============================================================================
-# VALIDATION FUNCTIONS
+# VALIDATION FUNCTIONS - moved to bypass_utils.py
 # =============================================================================
 
 def validate_bypass_entry(entry: str) -> bool:
     """Validate bypass list entry (domain, IP, CIDR, or comment)."""
-    import re
-    entry = entry.strip()
-    if not entry:
-        return False
-    if entry.startswith('#'):
-        return True
-    if len(entry) > 253:
-        return False
-    
-    # Check for CIDR notation ( IPv4 or IPv6 )
-    if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry) or re.match(r'^[a-fA-F0-9:]+/\d+$', entry):
-        return True
-    
-    parts = entry.split('.')
-    if len(parts) == 4:
-        try:
-            return all(0 <= int(p) <= 255 for p in parts)
-        except ValueError:
-            pass
-    if ':' in entry:
-        return True
-    if '.' in entry:
-        return True
-    return False
+    from .bypass_utils import validate_bypass_entry as _validate
+    return _validate(entry)
 
 
 def is_ip_address(entry: str) -> bool:
     """Check if entry is an IP address (IPv4/IPv6) or CIDR."""
-    import re
-    entry = entry.strip()
+    from .bypass_utils import is_ip_address as _is_ip
+    return _is_ip(entry)
+
+
+def is_cidr(entry: str) -> bool:
+    """Check if entry is CIDR notation."""
+    from .bypass_utils import is_cidr as _is_cidr
+    return _is_cidr(entry)
+
+
+def load_bypass_list(filepath: str):
+    """Load bypass list from file."""
+    from .bypass_utils import load_bypass_list as _load
+    return _load(filepath)
+
+
+def save_bypass_list(filepath: str, sites: list):
+    """Save bypass list to file."""
+    from .bypass_utils import save_bypass_list as _save
+    return _save(filepath, sites)
     
     # Check for IPv4/IPv6 CIDR (e.g., 192.168.0.0/24, 2001:db8::/32)
     if re.match(r'^[\d:]+\.\d+\.\d+\.\d+/\d+$', entry):
@@ -196,21 +192,24 @@ def is_ip_address(entry: str) -> bool:
 
 def is_cidr(entry: str) -> bool:
     """Check if entry is CIDR notation (IPv4 or IPv6)."""
-    return is_ip_address(entry) and '/' in entry
+    from .bypass_utils import is_cidr as _is_cidr
+    return _is_cidr(entry)
 
 
 # =============================================================================
-# FILE OPERATIONS
+# FILE OPERATIONS - moved to bypass_utils.py
 # =============================================================================
 
 def load_bypass_list(filepath: str) -> List[str]:
-    """Load bypass list from file with mtime-based caching (60s TTL)."""
-    cache_key = f'bypass:{filepath}'
-    if Cache.is_valid(cache_key):
-        cached = Cache.get(cache_key)
-        try:
-            mtime = os.path.getmtime(filepath)
-            if cached and mtime == cached.get('mtime'):
+    """Load bypass list from file."""
+    from .bypass_utils import load_bypass_list as _load
+    return _load(filepath)
+
+
+def save_bypass_list(filepath: str, sites: List[str]) -> None:
+    """Save bypass list to file."""
+    from .bypass_utils import save_bypass_list as _save
+    return _save(filepath, sites)
                 return cached['data']
         except (OSError, IOError):
             pass
@@ -378,19 +377,15 @@ class MemoryManager:
 
 
 def get_cpu_stats() -> dict:
-    """Get CPU usage from /proc/stat. Returns {'cpu_percent': float}."""
-    try:
-        with open('/proc/stat', 'r') as f:
-            lines = f.readlines()
-        for line in lines:
-            if line.startswith('cpu '):
-                parts = line.split()
-                if len(parts) >= 8:
-                    user = int(parts[1])
-                    nice = int(parts[2])
-                    system = int(parts[3])
-                    idle = int(parts[4])
-                    iowait = int(parts[5])
+    """Get CPU usage from /proc/stat."""
+    from .system_utils import get_cpu_stats as _get_cpu
+    return _get_cpu()
+
+
+def get_memory_stats() -> dict:
+    """Get memory usage from /proc/meminfo."""
+    from .system_utils import get_memory_stats as _get_mem
+    return _get_mem()
                     total = user + nice + system + idle + iowait
                     work = user + nice + system
                     if not hasattr(get_cpu_stats, 'prev_total'):
