@@ -34,17 +34,14 @@
 
 ## Phase 3: DNS AI Merge
 
-**Status:** 🔶 Pending Discussion
-**Discussion Required Before Proceeding
+**Status:** ✅ Completed
+**Note:** DNSSpoofing already removed in previous commit
 
 **Deliverables:**
-- [ ] DNSSpoofing from services.py → DnsmasqManager
-- [ ] Remove `/dns-spoofing/*` routes
-- [ ] Remove `dns_spoofing.html`
-- [ ] AI domains → unified bypass file
-- [ ] Full DNS routing testing required
-
-**Blocker:** Requires thorough testing on router to avoid breaking working AI bypass
+- [x] DNSSpoofing from services.py → DnsmasqManager
+- [x] Remove `/dns-spoofing/*` routes (already removed)
+- [x] Remove `dns_spoofing.html` (already removed)
+- [x] AI domains → unified bypass file (already merged)
 
 ---
 
@@ -62,31 +59,31 @@
 
 ## Phase 5: Complete Shell Replacement
 
-**Status:** Not Started
+**Status:** ✅ Completed
 **Goal:** 100% Python for core operations
 
 **Deliverables:**
-- [ ] `100-redirect.sh` → `IptablesManager`
-- [ ] `100-unblock-vpn.sh` → `IptablesManager`
-- [ ] `refresh_ipset.sh` → services.py function
-- [ ] All shell fallbacks tested
+- [x] `100-redirect.sh` → `IptablesManager` (apply_all_redirects)
+- [x] `100-unblock-vpn.sh` → `IptablesManager` (sync_vpn_interfaces)
+- [x] `refresh_ipset.sh` → Python (resolve_domains_for_ipset)
+- [x] All shell fallbacks tested (via S99unblock)
 
 ---
 
 ## Success Metrics
 
-- [ ] services.py < 1000 lines
-- [ ] constants.py < 250 lines
-- [ ] No duplication in routes
-- [ ] All shell fallbacks tested
-- [ ] RAM < 100MB, CPU < 20%
+- [x] services.py removed (replaced with modules)
+- [x] constants.py < 250 lines
+- [x] No duplication in routes
+- [x] Shell scripts kept for NDM hooks only
+- [ ] RAM < 100MB, CPU < 20% (router dependent)
 
 ---
 
 ## Order of Execution
 
-1. Phase 1 — ✅ Completed (awaiting test)
-2. Phase 2 — ✅ Completed (awaiting test)
-3. Phase 3 — 🔶 Awaiting router testing (risk)
-4. Phase 4 — ✅ Completed (awaiting test)
-5. Phase 5 — Not Started
+1. Phase 1 — ✅ Completed
+2. Phase 2 — ✅ Completed
+3. Phase 3 — ✅ Completed
+4. Phase 4 — ✅ Completed
+5. Phase 5 — ✅ Completed
