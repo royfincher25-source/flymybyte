@@ -133,12 +133,19 @@ def add_to_bypass(filename: str):
 
         if added_count > 0:
             # Use DnsmasqManager for atomic config regeneration and dnsmasq restart
-            # IP/CIDR entries will be loaded on web_ui startup
+            # Also call resolve_bypass.sh to populate ipset with resolved IPs
             try:
                 dns_mgr = get_dnsmasq_manager()
                 ok, msg = dns_mgr.generate_all()
                 if ok:
                     dns_mgr.restart_dnsmasq_with_retry()
+                    
+                    # Also trigger ipset update with DNS resolution (resolve_bypass.sh)
+                    from core.dns_ops import resolve_domains_for_ipset
+                    from core.constants import IPSET_MAP
+                    ipset_name = IPSET_MAP.get(filename, f'unblock{filename}')
+                    resolve_domains_for_ipset(filepath, ipset_name)
+                    
                     flash(f'✅ Добавлено: {added_count} | {added_text}', 'success')
                 else:
                     flash(f'⚠️ Добавлено {added_count}: {added_text}, ошибка: {msg}', 'warning')
@@ -192,11 +199,14 @@ def remove_from_bypass(filename: str):
         save_bypass_list(filepath, current_list)
         
         if removed_count > 0:
-            success, output = run_unblock_update()
-            if success:
+            # Use resolve_domains_for_ipset instead of run_unblock_update
+            try:
+                from core.dns_ops import resolve_domains_for_ipset
+                resolve_domains_for_ipset(filepath, f'unblock{filename}')
                 flash(f'❌ Удалено: {removed_count} | {removed_text}', 'success')
-            else:
-                flash(f'⚠️ Удалено {removed_count}: {removed_text}, ошибка: {output}', 'warning')
+            except Exception as e:
+                logger.error(f"[ROUTES] ipset refresh error: {e}")
+                flash(f'❌ Удалено: {removed_count}, но ошибка обновления ipset: {e}', 'warning')
         else:
             flash('ℹ️ Ни одна запись не найдена в списке', 'info')
         return redirect(url_for('bypass.view_bypass', filename=filename))

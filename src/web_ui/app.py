@@ -103,14 +103,15 @@ def create_app(config_class=None):
         logger.warning(f"Failed to add DNS redirect: {e}")
 
     # Load IP/CIDR entries from bypass files on startup
-    # - Domains: handled by dnsmasq automatically (ipset=/domain.com/ipset)
-    # - IP/CIDR: need to be added manually from bypass files
+    # - Domains: resolved via resolve_domains_for_ipset() script
+    # - IP/CIDR: added manually from bypass files
     try:
         from core.app_config import WebConfig
         from core.utils import load_bypass_list
         from core.utils import is_ip_address, is_cidr
         from core.ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
         from core.constants import IPSET_MAP
+        from core.dns_ops import resolve_domains_for_ipset
         import subprocess
         
         config = WebConfig()
@@ -124,27 +125,35 @@ def create_app(config_class=None):
                 filepath = os.path.join(unblock_dir, filename)
                 entries = load_bypass_list(filepath)
                 
-                # Get IP/CIDR only (skip domains - they're automatic)
+                # Get IP/CIDR only (skip domains - they're handled by resolve_bypass.sh)
                 ip_or_cidr = [e for e in entries if is_ip_address(e) or is_cidr(e)]
                 
-                if not ip_or_cidr:
-                    continue
-                    
                 # Map filename -> ipset name (e.g., vless.txt -> unblockvless)
                 name_stem = filename.replace('.txt', '')
                 ipset_name = IPSET_MAP.get(name_stem, f'unblock{name_stem}')
                 
-                # Flush and reload
+                # Flush and reload IP/CIDR
                 try:
                     subprocess.run(['ipset', '-F', ipset_name], capture_output=True, timeout=5)
                 except:
                     pass
                 
                 ensure_ipset_exists(ipset_name)
-                ok, msg = bulk_add_to_ipset(ipset_name, ip_or_cidr)
-                logger.info(f"[STARTUP] Loaded {len(ip_or_cidr)} IP/CIDR to {ipset_name}")
+                
+                # Add IP/CIDR entries
+                if ip_or_cidr:
+                    ok, msg = bulk_add_to_ipset(ipset_name, ip_or_cidr)
+                    logger.info(f"[STARTUP] Loaded {len(ip_or_cidr)} IP/CIDR to {ipset_name}")
+                
+                # Also resolve domains and add to ipset (this was missing!)
+                logger.info(f"[STARTUP] Resolving domains for {ipset_name}...")
+                try:
+                    count = resolve_domains_for_ipset(filepath, ipset_name)
+                    logger.info(f"[STARTUP] Resolved {count} IPs for {ipset_name}")
+                except Exception as e:
+                    logger.warning(f"[STARTUP] Failed to resolve domains for {ipset_name}: {e}")
     except Exception as e:
-        logger.warning(f"Failed to load IP/CIDR on startup: {e}")
+        logger.warning(f"Failed to load bypass lists on startup: {e}")
 
     def graceful_shutdown(signum=None, frame=None):
         logger.info("Graceful shutdown initiated...")

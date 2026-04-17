@@ -391,10 +391,10 @@ def shadowsocks_config(key: str) -> Dict[str, Any]:
         'server_port': parsed['port'],
         'password': parsed['password'],
         'timeout': 86400,
-        'local_address': '::',
+        'local_address': '0.0.0.0',
         'local_port': 1082,
         'fast_open': False,
-        'ipv6_first': True,
+        'ipv6_first': False,
     }
 
     logger.debug("shadowsocks_config: generated")
