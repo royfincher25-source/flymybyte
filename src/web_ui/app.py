@@ -103,7 +103,7 @@ def create_app(config_class=None):
         logger.warning(f"Failed to add DNS redirect: {e}")
 
     # Load IP/CIDR entries from bypass files on startup
-    # - Domains: resolved via resolve_domains_for_ipset() script
+    # - Domains: resolved via S99unblock start (resolve_bypass.sh)
     # - IP/CIDR: added manually from bypass files
     try:
         from core.app_config import WebConfig
@@ -111,7 +111,6 @@ def create_app(config_class=None):
         from core.utils import is_ip_address, is_cidr
         from core.ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
         from core.constants import IPSET_MAP
-        from core.dns_ops import resolve_domains_for_ipset
         import subprocess
         
         config = WebConfig()
@@ -125,33 +124,43 @@ def create_app(config_class=None):
                 filepath = os.path.join(unblock_dir, filename)
                 entries = load_bypass_list(filepath)
                 
-                # Get IP/CIDR only (skip domains - they're handled by resolve_bypass.sh)
+                # Get IP/CIDR only (skip domains - они долго резолвятся и вызывают зависание)
                 ip_or_cidr = [e for e in entries if is_ip_address(e) or is_cidr(e)]
                 
                 # Map filename -> ipset name (e.g., vless.txt -> unblockvless)
                 name_stem = filename.replace('.txt', '')
                 ipset_name = IPSET_MAP.get(name_stem, f'unblock{name_stem}')
                 
-                # Flush and reload IP/CIDR
+                # Полная очистка ipset перед загрузкой (защита от переполнения)
                 try:
-                    subprocess.run(['ipset', '-F', ipset_name], capture_output=True, timeout=5)
+                    subprocess.run(['ipset', 'flush', ipset_name], capture_output=True, timeout=5)
+                    logger.info(f"[STARTUP] Flushed {ipset_name}")
                 except:
                     pass
                 
                 ensure_ipset_exists(ipset_name)
                 
-                # Add IP/CIDR entries
+                # Add IP/CIDR entries (только IP, без доменов - домены резолвятся асинхронно)
                 if ip_or_cidr:
                     ok, msg = bulk_add_to_ipset(ipset_name, ip_or_cidr)
                     logger.info(f"[STARTUP] Loaded {len(ip_or_cidr)} IP/CIDR to {ipset_name}")
                 
-                # Also resolve domains and add to ipset (this was missing!)
-                logger.info(f"[STARTUP] Resolving domains for {ipset_name}...")
-                try:
-                    count = resolve_domains_for_ipset(filepath, ipset_name)
-                    logger.info(f"[STARTUP] Resolved {count} IPs for {ipset_name}")
-                except Exception as e:
-                    logger.warning(f"[STARTUP] Failed to resolve domains for {ipset_name}: {e}")
+                # Запустить S99unblock start в фоне для резолва доменов
+                # Это нужно для YouTube и других доменов
+                import threading
+                def _run_s99unblock():
+                    try:
+                        result = subprocess.run(
+                            ['sh', '/opt/etc/init.d/S99unblock', 'start'],
+                            capture_output=True, timeout=300
+                        )
+                        logger.info(f"[STARTUP] S99unblock background: {result.returncode}")
+                    except Exception as e:
+                        logger.warning(f"[STARTUP] S99unblock background failed: {e}")
+                
+                bg_thread = threading.Thread(target=_run_s99unblock, daemon=True)
+                bg_thread.start()
+                logger.info("[STARTUP] S99unblock started in background for domain resolution")
     except Exception as e:
         logger.warning(f"Failed to load bypass lists on startup: {e}")
 

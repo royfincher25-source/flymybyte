@@ -66,6 +66,22 @@ check_process() {
     return 1
 }
 
+is_service_disabled() {
+    svc="$1"
+    case "$svc" in
+        vless)
+            [ -f /tmp/vpn_disabled_vless ] && return 0
+            ;;
+        shadowsocks)
+            [ -f /tmp/vpn_disabled_shadowsocks ] && return 0
+            ;;
+        trojan)
+            [ -f /tmp/vpn_disabled_trojan ] && return 0
+            ;;
+    esac
+    return 1
+}
+
 restart_service() {
     svc="$1"
     info=$(get_service_info "$svc")
@@ -94,6 +110,11 @@ while true; do
         port=$(echo "$ipset_data" | cut -d',' -f2)
         
         if [ ! -f "$config" ]; then
+            continue
+        fi
+        
+        # Проверяем, не отключен ли сервис пользователем
+        if is_service_disabled "$svc"; then
             continue
         fi
         

@@ -373,7 +373,7 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
     Returns:
         Количество добавленных записей
     """
-    from .utils import load_bypass_list
+    from .utils import load_bypass_list, is_cidr, is_ip_address
     from .ipset_ops import bulk_add_to_ipset, ensure_ipset_exists
 
     RESOLVE_SCRIPT = '/opt/bin/resolve_bypass.sh'
@@ -400,20 +400,15 @@ def resolve_domains_for_ipset(filepath: str, ipset_name: Optional[str] = None) -
         if not filepath.startswith('/') or '..' in filepath:
             logger.error(f"[DNS] Invalid filepath: {filepath}")
         else:
-            # Flush ipset before resolving (prevent accumulation)
-            try:
-                subprocess.run(['ipset', 'flush', ipset_name], capture_output=True, timeout=5)
-                logger.info(f"[DNS] Flushed {ipset_name} before resolution")
-            except Exception as e:
-                logger.warning(f"[DNS] Failed to flush {ipset_name}: {e}")
-            
+            # НЕ делаем flush - сохраняем IP/CIDR которые уже добавлены!
+            # resolve_bypass.sh добавит domain IPs с -exist
             try:
                 result = subprocess.run(
                     [RESOLVE_SCRIPT, filepath, ipset_name],
                     shell=False,
                     capture_output=True,
                     text=True,
-                    timeout=60
+                    timeout=180
                 )
                 logger.info(f"[DNS] Script stdout: {result.stdout[:100]}")
                 logger.info(f"[DNS] Script stderr: {result.stderr[:100]}")

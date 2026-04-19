@@ -174,15 +174,6 @@ def save_bypass_list(filepath: str, sites: list):
     return _save(filepath, sites)
 
 
-def get_script_path(script_name: str) -> Optional[str]:
-            return all(0 <= int(p) <= 255 for p in parts)
-        except ValueError:
-            pass
-    if ':' in entry:
-        return True
-    return False
-
-
 def is_cidr(entry: str) -> bool:
     """Check if entry is CIDR notation (IPv4 or IPv6)."""
     from .bypass_utils import is_cidr as _is_cidr
@@ -203,23 +194,6 @@ def save_bypass_list(filepath: str, sites: List[str]) -> None:
     """Save bypass list to file."""
     from .bypass_utils import save_bypass_list as _save
     return _save(filepath, sites)
-
-
-def get_script_path(script_name: str) -> Optional[str]:
-        os.replace(temp_path, filepath)
-        cache_key = f'bypass:{filepath}'
-        Cache._cache.pop(cache_key, None)
-        Cache._timestamps.pop(cache_key, None)
-        Cache._access_order.pop(cache_key, None)
-        logger.info(f"[BYPASS] Saved {len(sites)} entries to {filepath}")
-    except Exception as e:
-        logger.error(f"[BYPASS] Error saving {filepath}: {e}")
-        try:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
-        except (OSError, IOError):
-            pass
-        raise
 
 
 # =============================================================================
@@ -355,21 +329,6 @@ def get_memory_stats() -> dict:
     """Get memory usage from /proc/meminfo."""
     from .system_utils import get_memory_stats as _get_mem
     return _get_mem()
-                    total = user + nice + system + idle + iowait
-                    work = user + nice + system
-                    if not hasattr(get_cpu_stats, 'prev_total'):
-                        get_cpu_stats.prev_total = 0
-                        get_cpu_stats.prev_work = 0
-                    total_delta = total - get_cpu_stats.prev_total
-                    work_delta = work - get_cpu_stats.prev_work
-                    cpu_percent = (work_delta / total_delta) * 100 if total_delta > 0 else 0
-                    get_cpu_stats.prev_total = total
-                    get_cpu_stats.prev_work = work
-                    return {'cpu_percent': round(cpu_percent, 1)}
-        return {'cpu_percent': 0}
-    except Exception as e:
-        logger.error(f"Failed to get CPU stats: {e}")
-        return {'cpu_percent': 0}
 
 
 # Cache for get_memory_stats (5 second TTL)

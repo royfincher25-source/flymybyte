@@ -48,10 +48,15 @@ class UnblockManager:
         logger.info(f"  - dnsmasq running: {status_before['dnsmasq_running']}")
         logger.info(f"  - ipsets: {status_before['ipsets']}")
         
-        # Step 1: Flush ipsets
-        logger.info("[UNBLOCK] Step 1: Flushing ipsets...")
-        flush_ok, flush_msg = self._flush_ipsets()
-        logger.info(f"[UNBLOCK] Flush result: {flush_ok} - {flush_msg}")
+        # Step 1: Flush ipsets (только если не работает VPN - иначе сохраняем существующие)
+        logger.info("[UNBLOCK] Step 1: Checking ipsets...")
+        status_before = self.get_status()
+        
+        # НЕ делаем flush - сохраняем существующие IP!
+        # flush удаляет все записи а потом resolve_bypass.sh не может их восстановить (нет доменов в файлах)
+        logger.info(f"[UNBLOCK] Keeping existing ipsets: {status_before['ipsets']}")
+        flush_ok = True
+        flush_msg = "Skipped (preserve existing IPs)"
         
         # Step 2: Update dnsmasq (Python only - Phase 5)
         logger.info("[UNBLOCK] Step 2: Updating dnsmasq...")

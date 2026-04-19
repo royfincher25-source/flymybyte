@@ -146,6 +146,11 @@
       "md5": "c5c4502ada1266a5fb8bce6c607d0f7c",
       "size": 6058
     },
+    "web_ui/resources/scripts/resolve_bypass.sh": {
+      "dest": "/opt/bin/resolve_bypass.sh",
+      "md5": "placeholder",
+      "size": 0
+    },
     "web_ui/resources/scripts/unblock_update.sh": {
       "dest": "/opt/bin/unblock_update.sh",
       "md5": "63833107504dca7af6bb5273fbba37b7",

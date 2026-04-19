@@ -15,6 +15,12 @@ log_error() {
 
 log "=== S99unblock called with action: $1 ==="
 
+# Ensure scripts are executable and fix line endings
+chmod +x /opt/bin/unblock.py 2>/dev/null
+chmod +x /opt/bin/resolve_bypass.sh 2>/dev/null
+chmod +x /opt/bin/unblock_ipset.sh 2>/dev/null
+sed -i 's/\r$//' /opt/bin/resolve_bypass.sh 2>/dev/null
+
 # Логируем системную информацию для отладки
 log "System info:"
 log "  - unblock.py exists: $([ -f /opt/bin/unblock.py ] && echo 'yes' || echo 'no')"
@@ -203,10 +209,11 @@ case "$1" in
     log "Step 7: Syncing VPN interfaces..."
     log "========================================"
     if [ -x "/opt/bin/unblock.py" ]; then
-        if /opt/bin/unblock.py sync-vpn >> "$LOGFILE" 2>&1; then
-            log "  VPN sync completed"
+        # Запускаем update для резолва доменов (а не только sync-vpn)
+        if /opt/bin/unblock.py update >> "$LOGFILE" 2>&1; then
+            log "  unblock.py update completed"
         else
-            log "  VPN sync failed, trying shell 100-unblock-vpn.sh..."
+            log "  unblock.py update failed, trying shell 100-unblock-vpn.sh..."
             /opt/etc/ndm/netfilter.d/100-unblock-vpn.sh >> "$LOGFILE" 2>&1 || log "  VPN shell script not found or failed"
         fi
     else

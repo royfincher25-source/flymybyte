@@ -236,6 +236,7 @@ def emergency_restore() -> Tuple[bool, List[str]]:
         logger.warning("[EMERGENCY] S99unblock not found")
 
     # 9. Если S99unblock не заполнил ipset — запустить unblock_ipset.sh напрямую
+    # НО с ограничением по времени (ipset зависает при большом количестве доменов!)
     log.append("🔍 Проверка ipset...")
     total_entries = 0
     for ipset_name in IPSET_LIST:
@@ -247,17 +248,11 @@ def emergency_restore() -> Tuple[bool, List[str]]:
         except Exception:
             pass
 
+    # НЕ запускать unblock_ipset.sh если ipset уже заполнен — это вызывает зависание!
+    # Shell скрипт resolve_bypass.sh запускается в unblock.py update и может выполняться 10+ минут
     if total_entries == 0:
-        log.append("  ⚠️ ipset пусты — запускаем unblock_ipset.sh напрямую...")
-        try:
-            shell_script = '/opt/bin/unblock_ipset.sh'
-            if os.path.exists(shell_script):
-                ok, out = _run_cmd(['sh', shell_script], timeout=180)
-                log.append(f"  {'✅' if ok else '⚠️'} unblock_ipset.sh: {out[:100] if out else 'no output'}")
-            else:
-                log.append("  ⚠️ unblock_ipset.sh не найден")
-        except Exception as e:
-            log.append(f"  ⚠️ unblock_ipset.sh error: {e}")
+        log.append("  ⚠️ ipset пусты — пропускаем shell (чтобы избежать зависания)")
+        log.append("  ℹ️ Используйте ручное обновление bypass через веб-интерфейс")
     else:
         log.append(f"  ✅ ipset заполнены: {total_entries} записей")
 

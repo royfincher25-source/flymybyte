@@ -356,20 +356,20 @@ def service_restart_all():
     flash('Перезапуск сервисов: ' + ', '.join(results), 'success')
 
     # FIX: После перезапуска VPN сервисов нужно обновить ipsets
-    # S99unblock выполняется ~90 сек, увеличиваем таймаут до 150 сек
+    # S99unblock start слишком долгий (90+ сек), используем sync-vpn
     try:
-        logger.info("[ROUTES] Updating ipsets after VPN restart...")
+        logger.info("[ROUTES] Syncing VPN after restart...")
         result = subprocess.run(
-            ['sh', INIT_SCRIPTS['unblock'], 'start'],
-            capture_output=True, text=True, timeout=150
+            ['sh', '-c', 'sync-vpn'],
+            capture_output=True, text=True, timeout=30
         )
         if result.returncode == 0:
-            results.append('✅ ipset обновлён')
-            logger.info("[ROUTES] ipsets updated successfully")
+            results.append('✅ VPN синхронизирован')
+            logger.info("[ROUTES] VPN synced successfully")
         else:
-            logger.warning(f"[ROUTES] ipset update failed: {result.stderr}")
+            logger.warning(f"[ROUTES] VPN sync failed: {result.stderr}")
     except Exception as e:
-        logger.warning(f"[ROUTES] ipset update error: {e}")
+        logger.warning(f"[ROUTES] VPN sync error: {e}")
 
     return redirect(url_for('system.service'))
 

@@ -22,3 +22,31 @@ youtu.be
 youtube-nocookie.com
 youtubeeducation.com
 yt.be
+
+
+
+# Отсортировать
+Актуальные домены YouTube
+Основные:
+    youtube.com
+    www.youtube.com
+    m.youtube.com
+    music.youtube.com
+    gaming.youtube.com
+    youtubekids.com
+    Видео-контент:
+    googlevideo.com
+    www.googlevideo.com
+    ytimg.com
+    i.ytimg.com
+    s.ytimg.com
+    ggpht.com
+    www.ggpht.com
+API и сервисы:
+    youtubei.googleapis.com
+    youtubeembeddedplayer.googleapis.com
+    googleusercontent.com
+    wide-youtube.l.google.com
+Короткие ссылки:
+    youtu.be
+

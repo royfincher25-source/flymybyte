@@ -105,6 +105,11 @@ class VPNManager:
             if success:
                 logger.info(f"[VPN]   Setting up bypass rules...")
                 self._setup_bypass_rules()
+                # Удаляем маркер отключения - сервис теперь активен
+                try:
+                    os.remove(f'/tmp/vpn_disabled_{self.service_name}')
+                except:
+                    pass
                 logger.info(f"[VPN] <<< START {self.service_name}: OK")
                 return True, f'{self.name} started'
             else:
@@ -182,6 +187,9 @@ class VPNManager:
 
             if final_status != '✅ Активен':
                 logger.info(f"[VPN] <<< STOP {self.service_name}: OK (stopped)")
+                # Создаём маркер для watchdog - сервис отключён пользователем
+                with open(f'/tmp/vpn_disabled_{self.service_name}', 'w') as f:
+                    f.write('disabled')
                 return True, f'{self.name} stopped (key saved)'
             else:
                 logger.warning(f"[VPN] <<< STOP {self.service_name}: STILL ACTIVE")

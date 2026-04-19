@@ -555,3 +555,15 @@ def proxy_config(key: str) -> Dict[str, Any]:
         return vless_config(key)
     else:
         raise ValueError("Неверный формат ключа")
+
+
+def write_json_config(config: Dict[str, Any], filepath: str) -> None:
+    """Write config dict to JSON file."""
+    import json
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+        logger.info(f"Config written to {filepath}")
+    except Exception as e:
+        logger.error(f"Failed to write config to {filepath}: {e}")
+        raise
