@@ -245,29 +245,15 @@ case "$1" in
     for proto in tcp udp; do
         iptables -t nat -F PREROUTING 2>/dev/null && log "  Flushed PREROUTING ($proto)" || log_error "  Failed to flush PREROUTING ($proto)"
     done
-    log "  Clearing ipsets..."
-    for setname in unblocksh unblockvless unblocktroj; do
-        ipset flush "$setname" 2>/dev/null && log "  Flushed $setname" || log "  $setname not found"
-    done
+    # FIX: Do NOT flush ipsets - preserve existing entries
+    # Old: ipset flush removed all IP addresses and caused Telegram to stop working
+    log "  Keeping ipsets (preserving existing entries)..."
     ;;
   restart)
-    log "Restarting unblock..."
-    # Kill all watchdogs first
-    for pid in /proc/[0-9]*; do
-        if [ -f "$pid/cmdline" ] && grep -q "dnsmasq_watchdog" "$pid/cmdline" 2>/dev/null; then
-            pid_num=$(basename "$pid")
-            kill -9 "$pid_num" 2>/dev/null
-        fi
-    done
-    rm -f /tmp/dnsmasq_watchdog.pid
-    for pid in /proc/[0-9]*; do
-        if [ -f "$pid/cmdline" ] && grep -q "vpn_watchdog" "$pid/cmdline" 2>/dev/null; then
-            pid_num=$(basename "$pid")
-            kill -9 "$pid_num" 2>/dev/null
-        fi
-    done
-    rm -f /tmp/vpn_watchdog.pid
-    sleep 1
+    log "Restarting unblock (skipping stop to preserve ipsets)..."
+    # FIX: Skip stop+flush - directly call start to preserve ipset entries
+    # Old: $0 stop && $0 start (which did flush)
+    # New: just call start
     $0 start
     ;;
   *)

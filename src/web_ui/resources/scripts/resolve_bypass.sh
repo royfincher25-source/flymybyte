@@ -16,8 +16,9 @@ fi
 # НЕ очищать ipset - сохранить IP/CIDR которые уже добавлены!
 # ipset flush "$SETNAME" 2>/dev/null  # УБРАНО - сохраняем существующие записи
 
-# Создать ipset если не существует (hash:ip, timeout 300)
-ipset create "$SETNAME" hash:ip timeout 300 maxelem 1048576 -exist 2>/dev/null
+# FIX: Remove timeout to prevent IPs from expiring after 5 minutes
+# Old: timeout 300 caused IPs to disappear over time
+ipset create "$SETNAME" hash:ip maxelem 1048576 -exist 2>/dev/null
 
 TEMP_IPS=$(mktemp)
 > "$TEMP_IPS"

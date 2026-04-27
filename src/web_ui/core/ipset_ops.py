@@ -176,10 +176,8 @@ def bulk_remove_from_ipset(setname: str, entries: List[str]) -> Tuple[bool, str]
 def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, str]:
     """Ensure ipset exists, create if not.
 
-    Creates ipset with timeout=300 (5 min) to prevent bloat from CDN round-robin DNS.
-    Without timeout, dnsmasq ipset=/domain/ directives accumulate unlimited IPs.
+    FIX: Create WITHOUT timeout - old timeout caused IPs to expire after 5 minutes.
     """
-    IPSET_TIMEOUT = 300  # seconds — IPs auto-expire after 5 minutes
     try:
         result = subprocess.run(
             ['ipset', 'list', setname],
@@ -189,22 +187,20 @@ def ensure_ipset_exists(setname: str, settype: str = 'hash:ip') -> Tuple[bool, s
         )
 
         if result.returncode == 0:
-            # Check if timeout is already set correctly
-            if 'timeout 300' not in result.stdout and 'timeout:' not in result.stdout:
-                logger.warning(f"[IPSET] {setname}: exists but no timeout — recreating with timeout={IPSET_TIMEOUT}")
-                subprocess.run(['ipset', 'destroy', setname], capture_output=True, text=True, timeout=10)
-            else:
-                return True, "Exists"
+            # FIX: Don't recreate if exists - preserve existing ipset
+            logger.info(f"[IPSET] {setname}: already exists, keeping as is")
+            return True, "Exists"
 
+        # FIX: Create WITHOUT timeout - old timeout caused IPs to expire after 5 minutes
         result = subprocess.run(
-            ['ipset', 'create', setname, settype, 'maxelem', '1048576', 'timeout', str(IPSET_TIMEOUT)],
+            ['ipset', 'create', setname, settype, 'maxelem', '1048576'],
             capture_output=True,
             text=True,
             timeout=10
         )
 
         if result.returncode == 0:
-            logger.info(f"[IPSET] {setname}: created with timeout={IPSET_TIMEOUT}s")
+            logger.info(f"[IPSET] {setname}: created (no timeout)")
             return True, "Created"
         else:
             return False, result.stderr[:200]

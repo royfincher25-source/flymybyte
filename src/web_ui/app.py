@@ -130,13 +130,11 @@ def create_app(config_class=None):
                 # Map filename -> ipset name (e.g., vless.txt -> unblockvless)
                 name_stem = filename.replace('.txt', '')
                 ipset_name = IPSET_MAP.get(name_stem, f'unblock{name_stem}')
-                
-                # Полная очистка ipset перед загрузкой (защита от переполнения)
-                try:
-                    subprocess.run(['ipset', 'flush', ipset_name], capture_output=True, timeout=5)
-                    logger.info(f"[STARTUP] Flushed {ipset_name}")
-                except:
-                    pass
+
+                # FIX: Do NOT flush ipset on startup - preserve existing entries!
+                # Old: flush cleared all IPs and caused Telegram to stop working
+                # New: keep existing entries, add new ones only
+                logger.info(f"[STARTUP] Preserving {ipset_name} entries (skip flush)")
                 
                 ensure_ipset_exists(ipset_name)
                 
@@ -147,20 +145,70 @@ def create_app(config_class=None):
                 
                 # Запустить S99unblock start в фоне для резолва доменов
                 # Это нужно для YouTube и других доменов
+                # Запускаем ТОЛЬКО ОДИН РАЗ - не дублируем при нескольких вызовах
                 import threading
+
+                S99UNBLOCK_LOCK = "/tmp/s99unblock_startup.lock"
+
                 def _run_s99unblock():
+                    # Проверяем lock файл - если уже запущен, выходим
+                    if os.path.exists(S99UNBLOCK_LOCK):
+                        # Проверим age файла - если старше 10 минут, перезапустим
+                        try:
+                            import time
+                            mtime = os.path.getmtime(S99UNBLOCK_LOCK)
+                            if time.time() - mtime > 600:  # 10 минут
+                                os.remove(S99UNBLOCK_LOCK)
+                            else:
+                                logger.info("[STARTUP] S99unblock already running (lock exists), skipping")
+                                return
+                        except:
+                            pass
+
+                    # Создаём lock файл
                     try:
+                        with open(S99UNBLOCK_LOCK, 'w') as f:
+                            f.write(str(os.getpid()))
+                    except:
+                        pass
+
+                    try:
+                        # Убрали таймаут - пусть работает сколько нужно
+                        # Но добавим проверку процесса чтобы не запускать повторно
                         result = subprocess.run(
                             ['sh', '/opt/etc/init.d/S99unblock', 'start'],
-                            capture_output=True, timeout=300
+                            capture_output=True, timeout=0  # Без таймаута
                         )
-                        logger.info(f"[STARTUP] S99unblock background: {result.returncode}")
+                        logger.info(f"[STARTUP] S99unblock background completed: {result.returncode}")
+                    except subprocess.TimeoutExpired:
+                        logger.warning(f"[STARTUP] S99unblock background timed out")
                     except Exception as e:
                         logger.warning(f"[STARTUP] S99unblock background failed: {e}")
-                
-                bg_thread = threading.Thread(target=_run_s99unblock, daemon=True)
-                bg_thread.start()
-                logger.info("[STARTUP] S99unblock started in background for domain resolution")
+                    finally:
+                        # Удаляем lock
+                        try:
+                            os.remove(S99UNBLOCK_LOCK)
+                        except:
+                            pass
+
+                # Проверим что S99unblock не запущен
+                running = False
+                for pid_dir in os.listdir('/proc'):
+                    if pid_dir.isdigit():
+                        try:
+                            with open(f'/proc/{pid_dir}/cmdline', 'r') as f:
+                                if 'S99unblock' in f.read():
+                                    running = True
+                                    break
+                        except:
+                            pass
+
+                if not running:
+                    bg_thread = threading.Thread(target=_run_s99unblock, daemon=True)
+                    bg_thread.start()
+                    logger.info("[STARTUP] S99unblock started in background for domain resolution")
+                else:
+                    logger.info("[STARTUP] S99unblock already running, skipping startup launch")
     except Exception as e:
         logger.warning(f"Failed to load bypass lists on startup: {e}")
 

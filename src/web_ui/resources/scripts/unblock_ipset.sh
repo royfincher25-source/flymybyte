@@ -184,6 +184,15 @@ check_service() {
     return 1  # Service not running
 }
 
+# DEBUG: Log ipset status BEFORE processing
+log "=========================================="
+log "=== unblock_ipset.sh START (DEBUG) ==="
+log "IPset status BEFORE:"
+for setname in unblocksh unblockvless unblocktroj; do
+    count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]" || echo 0)
+    log "  $setname: $count entries"
+done
+
 # Process predefined files
 for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/vless.txt:unblockvless" "/opt/etc/unblock/trojan.txt:unblocktroj"; do
     file=$(echo "$entry" | cut -d: -f1)
@@ -193,9 +202,11 @@ for entry in "/opt/etc/unblock/shadowsocks.txt:unblocksh" "/opt/etc/unblock/vles
     ipset create "$setname" hash:ip 2>/dev/null && log "  Created ipset: $setname" || log "  Ipset exists: $setname"
 
     # Check if corresponding service is running
+    # FIX: Keep existing entries instead of flushing when service is down
+    # This prevents ipset from being cleared during VPN restarts
     if ! check_service "$setname"; then
-        log "  SKIP: $setname (service not running) - flushing ipset"
-        ipset flush "$setname" 2>/dev/null
+        log "  SKIP: $setname (service not running) - keeping existing entries"
+        # ipset flush removed - preserve existing IPs during service restarts
         continue
     fi
 
@@ -268,5 +279,14 @@ for vpn_file in /opt/etc/unblock/vpn-*.txt; do
     fi
 done
 
+# DEBUG: Log final status
+log "IPset status AFTER:"
+for setname in unblocksh unblockvless unblocktroj; do
+    count=$(ipset list "$setname" 2>/dev/null | grep -c "^[0-9]" || echo 0)
+    log "  $setname: $count entries"
+done
+
 log "=== Script completed ==="
+log "=== unblock_ipset.sh END (DEBUG) ==="
+log "=========================================="
 echo "✅ IPSET заполнен" | tee -a "$LOGFILE"
